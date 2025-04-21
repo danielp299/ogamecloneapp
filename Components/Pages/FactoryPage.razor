@@ -1,0 +1,331 @@
+@page "/factory"
+
+<style>
+    .buildings-banner {
+        background-image: url('buildings-banner.jpg'); /* Replace with your image path */
+        background-size: cover;
+        background-position: center;
+        color: white;
+        text-align: center;
+        padding: 100px 20px;
+        margin-bottom: 20px;
+    }
+
+    .buildings-banner h2 {
+        font-size: 3em;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .buildings-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+
+    .building-card {
+        background-color: #333;
+        border-radius: 5px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid #555;
+        color: white;
+        display: flex; /* Added */
+        flex-direction: column; /* Added */
+        justify-content: space-between; /* Added */
+        position: relative; /* Added */
+        display: flex; /* Add this line */
+        flex-direction: column; /* Add this line */
+        align-items: center;
+        width:300px;
+    }
+    .building-card-content{
+        display:flex;
+        flex-direction: row;
+        width: 100%;
+        justify-content: center;
+        gap: 10px;
+    }
+    .building-card-quantity-selector {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    .quantity-button {
+        width: 30px;
+        height: 30px;
+        background-color: #555;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 5px;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;}
+
+    .building-card img {
+        width: 100%;
+        max-height: 150px;
+        object-fit: cover;
+        border: 2px solid #777;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+
+    .building-card h3 {
+        color: white;
+    }
+
+    .building-card .level {
+        position: absolute;
+        top: 10px;
+        right: 10px; /* Changed from left to right */
+        background-color: #555;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+
+    .building-card input {
+            width: 50px;
+            text-align: center;
+        }
+
+        .building-card button {
+        padding: 10px;
+        background-color: #555;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;\n    }\n    .queue-container {\n        margin-top: 20px;\n        background-color: #333;\n        border-radius: 5px;\n        padding: 20px;\n        color: white;\n        border: 1px solid #555;\n    }\n    .queue-item {\n        background-color: #444;\n        padding: 10px;\n        margin-bottom: 10px;\n        border-radius: 5px;\n        border: 1px solid #555;\n    }\n\n    .queue-item button {\n        margin-left: 10px;\n    }\n    .resources-container {\n        margin-bottom: 20px;\n        background-color: #333;\n        border-radius: 5px;\n        padding: 20px;\n        color: white;\n        border: 1px solid #555;\n        display: flex;\n        justify-content: space-around;\n    }\n\n    .resource-item {\n        display: flex;\n        flex-direction: column;\n        align-items: center;\n    }\n\n    .resource-item img {\n        width: 30px;\n        height: 30px;\n        object-fit: cover;\n        margin-bottom: 5px;\n    }\n
+    }
+</style>
+
+<div class="buildings-banner">
+    <h2>Factory</h2>
+</div>
+
+<div class="buildings-grid">
+    @foreach (var ship in ships)
+    {
+
+        <div class="building-card">
+            <span class="level">Level: @ship.Level</span>
+            <img src="@ship.Image" alt="@ship.Title" />
+            <h3>@ship.Title</h3>
+            <p>@ship.Description</p>
+                <p>Metal: @ship.MetalCost</p>
+                <p>Crystal: @ship.CrystalCost</p>
+                <p>Deuterium: @ship.DeuteriumCost</p>
+                <p>Construction Duration: @ship.ConstructionDuration</p>
+            <div class="building-card-quantity-selector">
+                <Button class="quantity-button" @onclick="@( e => AddToQuantityToBuild(ship, 10))">10</Button>
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 50)">50</button>
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 200)">200</button>
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 800)">800</button>
+            </div>
+            <div class="building-card-content">
+                <input type="number" value="@ship.QuantityToBuild" @oninput="((ChangeEventArgs e) => OnQuantityToBuildInput(ship, e))"/>
+                <button class="btn btn-primary" @onclick="() => AddToQueueQuantity(ship, ship.QuantityToBuild)">Build</button>
+                <Button class="btn btn-secondary" @onclick="@( e => ClearQuantityToBuild(ship))">Clear</Button>
+            </div>
+         </div>
+        
+
+        
+    }
+</div>
+
+@code {
+    public class ShipDto
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public int MetalCost { get; set; }
+        public int CrystalCost { get; set; }
+        public int DeuteriumCost { get; set; }
+        public string ConstructionDuration { get; set; }
+        public string Image { get; set; }
+        public int Level { get; set; } = 1;
+        public int Quantity{ get; set; } = 0;
+        public int QuantityToBuild { get; set; } = 1;
+    }
+
+    
+    public class QueueItemDto
+    {
+        public ShipDto Ship { get; set; }
+        public string TimeRemaining { get; set; }
+    }
+
+    private List<ShipDto> ships = new List<ShipDto>();
+    private List<QueueItemDto> constructionQueue = new List<QueueItemDto>();
+    private int Metal { get; set; } = 10000;
+    private int Crystal { get; set; } = 10000;
+    private int Deuterium { get; set; } = 10000;
+
+
+    public void AddToQueueQuantity(ShipDto ship, int quantity)
+    {
+         if (quantity <= 0) return; // Avoid zero or negative quantity
+
+        int totalMetalCost = ship.MetalCost * quantity;
+        int totalCrystalCost = ship.CrystalCost * quantity;
+        int totalDeuteriumCost = ship.DeuteriumCost * quantity;
+
+        if (Metal >= totalMetalCost && Crystal >= totalCrystalCost && Deuterium >= totalDeuteriumCost)
+        {
+            for (int i = 0; i < quantity; i++)
+            {
+                constructionQueue.Add(new QueueItemDto { Ship = ship, TimeRemaining = ship.ConstructionDuration });
+            }
+
+            Metal -= totalMetalCost;
+            Crystal -= totalCrystalCost;
+            Deuterium -= totalDeuteriumCost;
+        }
+    }   
+    private void AddToQuantityToBuild(ShipDto ship, int quantity)
+    {
+        ship.QuantityToBuild += quantity;
+    }
+    
+   
+    private void ClearQuantityToBuild(ShipDto ship)
+    {
+        Console.WriteLine("ClearQuantityToBuild");
+        ship.QuantityToBuild = 1;
+    }
+    
+protected override void OnInitialized()
+{
+    CreateShips();
+}
+
+private void OnQuantityToBuildInput(ShipDto ship, ChangeEventArgs e)
+{
+        if (int.TryParse(e.Value?.ToString(), out int parsedValue))
+        {
+            ship.QuantityToBuild = parsedValue;
+        }
+}
+
+private void CreateShips()
+{
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Small Cargo",
+        Description = "Small cargo ship.",
+        MetalCost = 2000,
+        CrystalCost = 2000,
+        DeuteriumCost = 0,
+        ConstructionDuration = "00:00:30",
+        Image = "smallCargo.jpg"
+    });
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Large Cargo",
+        Description = "Large cargo ship.",
+        MetalCost = 6000,
+        CrystalCost = 6000,
+        DeuteriumCost = 0,
+        ConstructionDuration = "00:01:00",
+        Image = "largeCargo.jpg"
+    });
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Light Fighter",
+        Description = "Light combat ship.",
+        MetalCost = 3000,
+        CrystalCost = 1000,
+        DeuteriumCost = 0,
+        ConstructionDuration = "00:00:45",
+        Image = "lightFighter.jpg"
+    });
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Heavy Fighter",
+        Description = "Heavy combat ship.",
+        MetalCost = 6000,
+        CrystalCost = 3000,
+        DeuteriumCost = 0,
+        ConstructionDuration = "00:01:30",
+        Image = "heavyFighter.jpg"
+    });
+
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Cruiser",
+        Description = "Large combat ship.",
+        MetalCost = 20000,
+        CrystalCost = 7000,
+        DeuteriumCost = 2000,
+        ConstructionDuration = "00:03:00",
+        Image = "cruiser.jpg"
+    });
+
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Battleship",
+        Description = "Huge combat ship.",
+        MetalCost = 45000,
+        CrystalCost = 15000,
+        DeuteriumCost = 0,
+        ConstructionDuration = "00:06:00",
+        Image = "battleship.jpg"
+    });
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Colony Ship",
+        Description = "Ship to colonize planets.",
+        MetalCost = 75000,
+        CrystalCost = 30000,
+        DeuteriumCost = 15000,
+        ConstructionDuration = "00:08:00",
+        Image = "colonyShip.jpg"
+    });
+
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Recycler",
+        Description = "Ship to recycle fleets.",
+        MetalCost = 10000,
+        CrystalCost = 6000,
+        DeuteriumCost = 2000,
+        ConstructionDuration = "00:02:00",
+        Image = "recycler.jpg"
+    });
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Destroyer",
+        Description = "Strong combat ship.",
+        MetalCost = 60000,
+        CrystalCost = 25000,
+        DeuteriumCost = 10000,
+        ConstructionDuration = "00:07:00",
+        Image = "destroyer.jpg"
+    });
+    ships.Add(new ShipDto
+    {
+        Id = Guid.NewGuid(),
+        Title = "Death Star",
+        Description = "The strongest ship.",
+        MetalCost = 5000000,
+        CrystalCost = 4000000,
+        DeuteriumCost = 1000000,
+        ConstructionDuration = "01:00:00",
+        Image = "deathstar.jpg"
+    });
+}
+
+}

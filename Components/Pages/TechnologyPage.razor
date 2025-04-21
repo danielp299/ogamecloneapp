@@ -1,0 +1,223 @@
+razor
+@page "/Technologies"
+
+<style>
+    .buildings-banner {
+        background-image: url('buildings-banner.jpg'); /* Replace with your image path */
+        background-size: cover;
+        background-position: center;
+        color: white;
+        text-align: center;
+        padding: 100px 20px;
+        margin-bottom: 20px;
+    }
+
+    .buildings-banner h2 {
+        font-size: 3em;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .buildings-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+
+    .building-card {
+        background-color: #333;
+        border-radius: 5px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid #555;
+        color: white;
+        display: flex; /* Added */
+        flex-direction: column; /* Added */
+        justify-content: space-between; /* Added */
+        position: relative; /* Added */
+    }
+
+    .building-card img {
+        width: 100%;
+        max-height: 150px;
+        object-fit: cover;
+        border: 2px solid #777;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+
+    .building-card h3 {
+        color: white;
+    }
+
+    .building-card .level {
+        position: absolute;
+        top: 10px;
+        right: 10px; /* Changed from left to right */
+        background-color: #555;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+
+    .building-card button {
+        padding: 10px;
+        background-color: #555;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+</style>
+
+<div class="buildings-banner">
+    <h2>Technologies</h2>
+</div>
+
+<div class="buildings-grid">
+    @foreach (var tech in technologies)
+    {
+        <div class="building-card">
+            <span class="level">Level: @tech.Level</span>
+            <img src="@tech.Image" alt="@tech.Title" />
+            <h3>@tech.Title</h3>
+            <p>@tech.Description</p>
+            <p>Metal: @tech.MetalCost</p>
+            <p>Crystal: @tech.CrystalCost</p>
+            <p>Deuterium: @tech.DeuteriumCost</p>
+            <p>Research Duration: @tech.ResearchDuration</p>
+            <button>Research</button>
+        </div>
+    }
+</div>
+
+@code {
+    public class TechnologyDto
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public int MetalCost { get; set; }
+        public int CrystalCost { get; set; }
+        public int DeuteriumCost { get; set; }
+        public string ResearchDuration { get; set; }
+        public string Image { get; set; }
+        public int Level { get; set; } = 1;
+    }
+
+    private List<TechnologyDto> technologies = new List<TechnologyDto>();
+
+    protected override void OnInitialized()
+    {
+        technologies.Add(new TechnologyDto
+            {
+                Title = "Espionage Technology",
+                Description = "Increases espionage capabilities.",
+                MetalCost = 200,
+                CrystalCost = 1000,
+                DeuteriumCost = 200,
+                ResearchDuration = "00:01:00",
+                Image = "espionage.jpg"
+            });
+            technologies.Add(new TechnologyDto
+            {
+                Title = "Computer Technology",
+                Description = "Increases the maximum fleet slots.",
+                MetalCost = 0,
+                CrystalCost = 400,
+                DeuteriumCost = 600,
+                ResearchDuration = "00:01:30",
+                Image = "computer.jpg"
+            });
+             technologies.Add(new TechnologyDto
+            {
+                Title = "Weapons Technology",
+                Description = "Increases ships attack.",
+                MetalCost = 1000,
+                CrystalCost = 500,
+                DeuteriumCost = 0,
+                ResearchDuration = "00:03:00",
+                Image = "weapons.jpg"
+            });
+              technologies.Add(new TechnologyDto
+            {
+                Title = "Shielding Technology",
+                Description = "Increases ships defense.",
+                MetalCost = 1000,
+                CrystalCost = 1000,
+                DeuteriumCost = 0,
+                ResearchDuration = "00:03:30",
+                Image = "shield.jpg"
+            });
+               technologies.Add(new TechnologyDto
+            {
+                Title = "Armour Technology",
+                Description = "Increases ships armour.",
+                MetalCost = 1000,
+                CrystalCost = 1000,
+                DeuteriumCost = 0,
+                ResearchDuration = "00:03:30",
+                Image = "armour.jpg"
+            });
+              technologies.Add(new TechnologyDto
+            {
+                Title = "Combustion Drive",
+                Description = "Increases ships speed.",
+                MetalCost = 400,
+                CrystalCost = 0,
+                DeuteriumCost = 600,
+                ResearchDuration = "00:01:00",
+                Image = "combustion.jpg"
+            });
+              technologies.Add(new TechnologyDto
+            {
+                Title = "Impulse Drive",
+                Description = "Increases ships speed.",
+                MetalCost = 2000,
+                CrystalCost = 4000,
+                DeuteriumCost = 600,
+                ResearchDuration = "00:02:00",
+                Image = "impulse.jpg"
+            });
+              technologies.Add(new TechnologyDto
+            {
+                Title = "Hyperspace Drive",
+                Description = "Increases ships speed.",
+                MetalCost = 10000,
+                CrystalCost = 20000,
+                DeuteriumCost = 6000,
+                ResearchDuration = "00:04:00",
+                Image = "hyperspace.jpg"
+            });
+             technologies.Add(new TechnologyDto
+            {
+                Title = "Laser Technology",
+                Description = "Required for some ships.",
+                MetalCost = 2000,
+                CrystalCost = 1000,
+                DeuteriumCost = 0,
+                ResearchDuration = "00:01:00",
+                Image = "laser.jpg"
+            });
+                technologies.Add(new TechnologyDto
+            {
+                Title = "Ion Technology",
+                Description = "Required for some ships.",
+                MetalCost = 5000,
+                CrystalCost = 2000,
+                DeuteriumCost = 1000,
+                ResearchDuration = "00:02:00",
+                Image = "ion.jpg"
+            });
+                technologies.Add(new TechnologyDto
+            {
+                Title = "Hyperspace Technology",
+                Description = "Required for some ships.",
+                MetalCost = 20000,
+                CrystalCost = 40000,
+                DeuteriumCost = 10000,
+                ResearchDuration = "00:05:00",
+                Image = "hyperspaceTech.jpg"
+            });
+            
+    }
+}

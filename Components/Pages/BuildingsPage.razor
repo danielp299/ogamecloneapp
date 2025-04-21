@@ -1,0 +1,266 @@
+razor
+@page "/buildings"
+
+<style>
+    .buildings-banner {
+        background-image: url('buildings-banner.jpg'); /* Replace with your image path */
+        background-size: cover;
+        background-position: center;
+        color: white;
+        text-align: center;
+        padding: 100px 20px;
+        margin-bottom: 20px;
+    }
+
+    .buildings-banner h2 {
+        font-size: 3em;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .buildings-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+
+    .building-card {
+        background-color: #333;
+        border-radius: 5px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid #555;
+        color: white;
+        display: flex; /* Added */
+        flex-direction: column; /* Added */
+        justify-content: space-between; /* Added */
+        position: relative; /* Added */
+    }
+
+    .building-card img {
+        width: 100%;
+        max-height: 150px;
+        object-fit: cover;
+        border: 2px solid #777;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+
+    .building-card h3 {
+        color: white;
+    }
+    
+    .building-card p {
+        margin-bottom: 5px;
+    }
+
+    .building-card .level {
+        position: absolute;
+        top: 10px;
+        right: 10px; /* Changed from left to right */
+        background-color: #555;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+
+    .building-card button {
+        padding: 10px;
+        background-color: #555;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+</style>
+
+<div class="buildings-banner">
+    <h2>Buildings</h2>
+</div>
+
+<div class="buildings-grid">
+    @foreach (var building in buildings)
+    {
+        <div class="building-card">
+            <span class="level">Level: @building.Level</span>
+            <img src="@building.Image" alt="@building.Title" />
+            <h3>@building.Title</h3>
+            <p>@building.Description</p>
+            <p>Metal: @building.MetalCost</p>
+            <p>Crystal: @building.CrystalCost</p>
+            <p>Deuterium: @building.DeuteriumCost</p>
+            <p>Duration: @building.ConstructionDuration</p>
+            <p>Energy Consumption: @building.EnergyConsumption</p>
+            <button>Upgrade</button>
+        </div>
+    }
+</div>
+
+@code {
+    public class BuildingDto
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public int MetalCost { get; set; }
+        public int CrystalCost { get; set; }
+        public int DeuteriumCost { get; set; }
+        public string ConstructionDuration { get; set; }
+
+        public string Image { get; set; }
+        public int Level { get; set; } = 1;
+        public int EnergyConsumption { get; set; }
+    }
+
+    private List<BuildingDto> buildings = new List<BuildingDto>();
+
+    protected override void OnInitialized()
+    {
+        buildings.Add(new BuildingDto
+            {
+                Title = "Metal Mine",
+                Description = "Produces Metal.",
+                MetalCost = 60,
+                CrystalCost = 15,
+                DeuteriumCost = 0,
+                ConstructionDuration = "00:00:10",
+                Image = "building1.jpg",
+                EnergyConsumption = 10
+            });
+        buildings.Add(new BuildingDto
+            {
+                Title = "Crystal Mine",
+                Description = "Produces Crystal.",
+                MetalCost = 48,
+                CrystalCost = 24,
+                DeuteriumCost = 0,
+                ConstructionDuration = "00:00:15",
+                Image = "building2.jpg",
+                EnergyConsumption = 8
+            });
+        buildings.Add(new BuildingDto
+            {
+                Title = "Deuterium Synthesizer",
+                Description = "Produces Deuterium.",
+                MetalCost = 225,
+                CrystalCost = 75,
+                DeuteriumCost = 0,
+                ConstructionDuration = "00:00:30",
+                Image = "building3.jpg",
+                EnergyConsumption = 15
+            });
+        buildings.Add(new BuildingDto
+            {
+                Title = "Solar Plant",
+                Description = "Generates Energy.",
+                MetalCost = 75,
+                CrystalCost = 30,
+                DeuteriumCost = 0,
+                ConstructionDuration = "00:00:20",
+                Image = "building4.jpg",
+                EnergyConsumption = -20
+            });
+        buildings.Add(new BuildingDto
+            {
+                Title = "Robotics Factory",
+                Description = "Builds robots.",
+                MetalCost = 400,
+                CrystalCost = 120,
+                DeuteriumCost = 200,
+                ConstructionDuration = "00:01:00",
+                Image = "building5.jpg",
+                EnergyConsumption = 30
+            });
+
+        buildings.Add(new BuildingDto
+            {
+                Title = "Shipyard",
+                Description = "Builds ships.",
+                MetalCost = 400,
+                CrystalCost = 200,
+                DeuteriumCost = 100,
+                ConstructionDuration = "00:01:30",
+                Image = "building6.jpg",
+                EnergyConsumption = 25
+            });
+        buildings.Add(new BuildingDto
+            {
+                Title = "Metal Storage",
+                Description = "Stores Metal.",
+                MetalCost = 200,
+                CrystalCost = 0,
+                DeuteriumCost = 0,
+                ConstructionDuration = "00:00:45",
+                Image = "building7.jpg",
+                EnergyConsumption = 0
+            });
+        buildings.Add(new BuildingDto
+            {
+                Title = "Crystal Storage",
+                Description = "Stores Crystal.",
+                MetalCost = 200,
+                CrystalCost = 100,
+                DeuteriumCost = 0,
+                ConstructionDuration = "00:00:50",
+                Image = "building8.jpg",
+                EnergyConsumption = 0
+            });
+        buildings.Add(new BuildingDto
+            {
+                Title = "Deuterium Storage",
+                Description = "Stores Deuterium.",
+                MetalCost = 200,
+                CrystalCost = 200,
+                DeuteriumCost = 0,
+                ConstructionDuration = "00:00:55",
+                Image = "building9.jpg",
+                EnergyConsumption = 0
+            });
+        buildings.Add(new BuildingDto
+            {
+                Title = "Research Lab",
+                Description = "Allows to do Research.",
+                MetalCost = 400,
+                CrystalCost = 200,
+                DeuteriumCost = 100,
+                ConstructionDuration = "00:01:15",
+                Image = "building10.jpg",
+                EnergyConsumption = 20
+            });
+
+        buildings.Add(new BuildingDto
+            {
+                Title = "Terraformer",
+                Description = "Allows to build more buildings.",
+                MetalCost = 50000,
+                CrystalCost = 100000,
+                DeuteriumCost = 1000,
+                ConstructionDuration = "01:00:00",
+                Image = "building11.jpg",
+                EnergyConsumption = 50
+            });
+
+        buildings.Add(new BuildingDto
+            {
+                Title = "Missile Silo",
+                Description = "Stores interplantary missiles.",
+                MetalCost = 20000,
+                CrystalCost = 20000,
+                DeuteriumCost = 1000,
+                ConstructionDuration = "00:05:00",
+                Image = "building12.jpg",
+                EnergyConsumption = 0
+            });
+        buildings.Add(new BuildingDto
+            {
+                Title = "Nanite Factory",
+                Description = "Increases Building speed.",
+                MetalCost = 1000000,
+                CrystalCost = 500000,
+                DeuteriumCost = 100000,
+                ConstructionDuration = "02:00:00",
+                Image = "building13.jpg",
+                EnergyConsumption = 100
+            });
+    }
+
+}
