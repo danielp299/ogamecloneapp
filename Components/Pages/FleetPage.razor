@@ -1,0 +1,94 @@
+razor
+@page "/fleet"
+
+<style>
+    .fleet-banner {
+        background-image: url('fleet-banner.jpg'); /* Replace with your image path */
+        background-size: cover;
+        background-position: center;
+        color: white;
+        text-align: center;
+        padding: 100px 20px;
+        margin-bottom: 20px;
+    }
+
+    .fleet-banner h2 {
+        font-size: 3em;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .fleet-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Responsive columns */
+        gap: 20px;
+        max-width: 1200px; /* Example max width for the grid */
+        margin: 0 auto; /* Center the grid */
+    }
+
+    .ship-card {
+        background-color: #333;
+        border-radius: 5px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid #555;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .ship-card img {
+        width: 128px;
+        height: 128px;
+        object-fit: cover;
+        border: 2px solid #777;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+
+    .ship-card h3 {
+        color: white;
+        margin-bottom: 10px;
+    }
+    .ship-card .ship-counter{
+        font-size: 1.2em;
+    }
+</style>
+
+<div class="fleet-banner">
+    <h2>Fleet</h2>
+</div>
+
+<div class="fleet-grid">
+    @foreach (var ship in ships)
+    {
+        <div class="ship-card">
+            <img src="@ship.Image" alt="@ship.Title" />
+            <h3>@ship.Title</h3>
+            <p class="ship-counter">Count: @ship.Quantity</p>
+        </div>
+    }
+</div>
+
+@code {
+    public class ShipDto
+    {
+        public string Title { get; set; }
+        public string Image { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    private List<ShipDto> ships = new List<ShipDto>()
+    {
+        new ShipDto { Title = "Small Cargo", Image = "smallCargo.jpg", Quantity = 10 },
+        new ShipDto { Title = "Large Cargo", Image = "largeCargo.jpg", Quantity = 5 },
+        new ShipDto { Title = "Light Fighter", Image = "lightFighter.jpg", Quantity = 20 },
+        new ShipDto { Title = "Heavy Fighter", Image = "heavyFighter.jpg", Quantity = 15 },
+        new ShipDto { Title = "Cruiser", Image = "cruiser.jpg", Quantity = 8 },
+        new ShipDto { Title = "Battleship", Image = "battleship.jpg", Quantity = 3 },
+        new ShipDto { Title = "Colony Ship", Image = "colonyShip.jpg", Quantity = 1 },
+        new ShipDto { Title = "Recycler", Image = "recycler.jpg", Quantity = 2 },
+        new ShipDto { Title = "Destroyer", Image = "destroyer.jpg", Quantity = 4 },
+        new ShipDto { Title = "Death Star", Image = "deathstar.jpg", Quantity = 1 }
+    };
+}
