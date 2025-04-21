@@ -3,14 +3,14 @@ razor
 @rendermode InteractiveServer
 
 <style>
-    .constellation-page {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        width: 100%;
-        gap: 5%;
-    
-
+.constellation-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+    .constellation-item {
+         margin-bottom: 7%;
     .constellation-section {
         border: 1px solid #555;
         border-radius: 5px;
@@ -21,16 +21,13 @@ razor
         width: 80%;
         max-width: 800px;
         display: flex;
-        border: 3% solid #555;
-        flex-direction: column;
-        align-items: center;
-        margin-bottom: 5%;
-   
-    }   
-
+        border: 3% solid white;
+         flex-direction: column;
+        align-items: center;        
+    }
     .constellation-image {
-         width: 100%;
-         width: 87%;
+         width: 250px;
+         height: 250px;
          aspect-ratio: 1 / 1; /* Make the container square */
          object-fit: cover;
          object-position: center;
@@ -40,20 +37,27 @@ razor
          border: 2px solid white;
          border-radius: 15px;
     }
+    .constellation-item:hover { transform: scale(1.02); }
     
     .constellation-buttons {
          display: flex;
         justify-content: flex-end; /* Align buttons to the right */
-        align-items: center;
+         align-items: center;
+        
         gap: 3%; /* Space between buttons */
+        width: 87%;     
+    }   
+     .planets-container {
         width: 87%;
-        margin-bottom: 20px;
+         overflow-x: auto;
+    }
+    .planet-grid {
+        display: grid;
+        grid-template-columns: repeat(9, 1fr);
     }
 
     .constellation-buttons button {
-        width: 20%;
-        height: auto;
-        color: white;
+          color: white;
         border: none;
         border-radius: 5px;
         padding: 10px 20px;
@@ -73,6 +77,35 @@ razor
         padding: 10px;
         border-radius: 5px;
     }
+    .planet-card{
+        display:flex;
+        flex-direction: column;
+         width: 100%;
+        align-items: center;
+        justify-content: center;
+        
+    }
+    .planet-card img {
+        width: 250px;
+        height: 250px;
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+        object-position: center;
+         border-radius: 15px;
+    }
+    .planet-card-buttons {
+        position: relative;
+         display: flex;
+        justify-content: flex-end; /* Align buttons to the right */
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+         border: 1px solid #555;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px;
+    }
+     .planet-card-buttons {
+    }   
 </style>
 
 <div class="constellation-page">
@@ -82,19 +115,40 @@ razor
             
             <img src="@constellation.ImageUrl" alt="Constellation" class="constellation-image" /></div>
             <div class="constellation-buttons">                
-                <button @onclick="(e => LikeConstellation(constellation.Id))">Like</button>            
+                <button @onclick="(e => LikeConstellation(constellation.Id))">Like</button>
                 <button @onclick="(e => ScoutConstellation(constellation.Id))">Scout</button>
-                <button @onclick="(e => ExploreConstellation(constellation.Id))">Explore</button>
+                <button @onclick="(e => ExploreConstellation(constellation))">Explore</button>
                 <button @onclick="(e => ForgetConstellation(constellation.Id))">Forget</button>
                
             </div>
             
-            <div class="constellation-stats">
+              <div class="constellation-stats">
                 <div class="constellation-stat">Number of Inhabited Planets: @constellation.InhabitedPlanets</div>
                 <div class="constellation-stat">Difficulty: @constellation.Difficulty</div>
                 <div class="constellation-stat">Total Resources: @constellation.TotalResources</div>
                 <div class="constellation-stat">Activity Level: @constellation.ActivityLevel</div>
             </div>
+             @if (constellation.ShowPlanets)
+             {
+             <div class="planets-container">
+                <div class="planet-grid">
+                    @foreach (var planet in constellation.Planets)
+                    {
+                        <div class="planet-card">
+                            <img src="@planet.ImageUrl" />
+                          <p>Size: @planet.Size</p>
+                            <p>Temperature: @planet.Temperature</p>
+                            <div class="planet-card-buttons">
+                                <button >Scout</button>
+                                <button>Attack</button>
+                                <button>Harvest</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+           </div>
+           <button @onclick="(e => ExploreConstellation(constellation))">Hide</button>
+            }
     }
 </div>
 
@@ -107,25 +161,51 @@ razor
         public string Difficulty { get; set; }
         public int TotalResources { get; set; }
         public string ActivityLevel { get; set; }
+        public List<PlanetDto> Planets { get; set; } = new List<PlanetDto>();
+         public bool ShowPlanets { get; set; } = false;
+    }
+    public class PlanetDto
+    {
+        public Guid Id { get; set; }
+        public string ImageUrl { get; set; }
+        public int Size { get; set; }
+        public string Temperature { get; set; }
     }
 
     private List<ConstellationPageDto> constellations = new List<ConstellationPageDto>();
 
     protected override void OnInitialized()
     {
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 3; i++)
         {
-            constellations.Add(new ConstellationPageDto
+            var constellation = new ConstellationPageDto
             {
                 Id = Guid.NewGuid(),
                 ImageUrl = "constellation.jpg",
                 InhabitedPlanets = i + 10,
                 Difficulty = "Normal",
                 TotalResources = i * 1000,
-                ActivityLevel = "High"
-            });
+                ActivityLevel = "High",
+
+            };
+            for (int j = 0; j < 9; j++)
+
+            {
+                constellation.Planets.Add(new PlanetDto
+                {
+                    Id = Guid.NewGuid(),
+                    ImageUrl = "planet.jpg",
+                    Size = j * 100,
+                    Temperature = "Cold"
+                });
+
+            }
+
+               constellations.Add(constellation);
+
+
         }
-        }
+    }
         private void LikeConstellation(Guid id)
         {
             Console.WriteLine($"LikeConstellation: {id}");
@@ -137,10 +217,9 @@ razor
         private void ForgetConstellation(Guid id)
         {
             Console.WriteLine($"ForgetConstellation: {id}");
-        
-        private void ExploreConstellation(Guid id)
-        {
-             Console.WriteLine($"ExploreConstellation: {id}");
         }
-    }
+        private void ExploreConstellation(ConstellationPageDto constellation)
+        {
+            constellation.ShowPlanets = !constellation.ShowPlanets;
+        }
 }
