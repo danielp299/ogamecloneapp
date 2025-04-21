@@ -1,4 +1,5 @@
 @page "/factory"
+@rendermode InteractiveServer
 
 <style>
     .buildings-banner {
@@ -36,7 +37,7 @@
         display: flex; /* Add this line */
         flex-direction: column; /* Add this line */
         align-items: center;
-        width:300px;
+        width: 300px;
     }
     .building-card-content{
         display:flex;
@@ -56,21 +57,25 @@
         height: 30px;
         background-color: #555;
         color: white;
+
         border: none;
         border-radius: 5px;
+
+
         padding: 5px;
         cursor: pointer;
         width: 30px;
         height: 30px;}
 
     .building-card img {
-        width: 100%;
-        max-height: 150px;
+        width: 177px;
+        height: 177px;
         object-fit: cover;
         border: 2px solid #777;
-        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
         margin-bottom: 10px;
-    }
+}
 
     .building-card h3 {
         color: white;
@@ -87,7 +92,7 @@
     }
 
     .building-card input {
-            width: 50px;
+            width: 80px;
             text-align: center;
         }
 
@@ -97,7 +102,6 @@
         color: white;
         border: none;
         cursor: pointer;
-        border-radius: 5px;\n    }\n    .queue-container {\n        margin-top: 20px;\n        background-color: #333;\n        border-radius: 5px;\n        padding: 20px;\n        color: white;\n        border: 1px solid #555;\n    }\n    .queue-item {\n        background-color: #444;\n        padding: 10px;\n        margin-bottom: 10px;\n        border-radius: 5px;\n        border: 1px solid #555;\n    }\n\n    .queue-item button {\n        margin-left: 10px;\n    }\n    .resources-container {\n        margin-bottom: 20px;\n        background-color: #333;\n        border-radius: 5px;\n        padding: 20px;\n        color: white;\n        border: 1px solid #555;\n        display: flex;\n        justify-content: space-around;\n    }\n\n    .resource-item {\n        display: flex;\n        flex-direction: column;\n        align-items: center;\n    }\n\n    .resource-item img {\n        width: 30px;\n        height: 30px;\n        object-fit: cover;\n        margin-bottom: 5px;\n    }\n
     }
 </style>
 
@@ -119,15 +123,15 @@
                 <p>Deuterium: @ship.DeuteriumCost</p>
                 <p>Construction Duration: @ship.ConstructionDuration</p>
             <div class="building-card-quantity-selector">
-                <Button class="quantity-button" @onclick="@( e => AddToQuantityToBuild(ship, 10))">10</Button>
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 10)">10</button>
                 <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 50)">50</button>
                 <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 200)">200</button>
                 <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 800)">800</button>
             </div>
             <div class="building-card-content">
-                <input type="number" value="@ship.QuantityToBuild" @oninput="((ChangeEventArgs e) => OnQuantityToBuildInput(ship, e))"/>
+                <input type="number" value="@ship.QuantityToBuild" @oninput="((ChangeEventArgs e) => OnQuantityToBuildInput(ship, e))" max="999999" maxlength="6"/>
                 <button class="btn btn-primary" @onclick="() => AddToQueueQuantity(ship, ship.QuantityToBuild)">Build</button>
-                <Button class="btn btn-secondary" @onclick="@( e => ClearQuantityToBuild(ship))">Clear</Button>
+                <button class="btn btn-secondary" @onclick="() => ClearQuantityToBuild(ship)">Clear</button>
             </div>
          </div>
         
@@ -148,7 +152,7 @@
         public string ConstructionDuration { get; set; }
         public string Image { get; set; }
         public int Level { get; set; } = 1;
-        public int Quantity{ get; set; } = 0;
+        public int Quantity { get; set; } = 0;
         public int QuantityToBuild { get; set; } = 1;
     }
 
@@ -164,6 +168,7 @@
     private int Metal { get; set; } = 10000;
     private int Crystal { get; set; } = 10000;
     private int Deuterium { get; set; } = 10000;
+    private int maxQuantityToBuild = 10000;
 
 
     public void AddToQueueQuantity(ShipDto ship, int quantity)
@@ -188,10 +193,18 @@
     }   
     private void AddToQuantityToBuild(ShipDto ship, int quantity)
     {
-        ship.QuantityToBuild += quantity;
+        if (ship.QuantityToBuild == 1)
+        {
+            ship.QuantityToBuild = 0;
+        }
+        ship.QuantityToBuild += quantity; // Add the quantity to the existing value
+        if (ship.QuantityToBuild > maxQuantityToBuild)
+        {
+            ship.QuantityToBuild = maxQuantityToBuild;
+        }
     }
-    
-   
+
+
     private void ClearQuantityToBuild(ShipDto ship)
     {
         Console.WriteLine("ClearQuantityToBuild");

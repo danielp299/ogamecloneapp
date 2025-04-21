@@ -1,5 +1,6 @@
 razor
 @page "/Technologies"
+@rendermode InteractiveServer
 
 <style>
     .buildings-banner {
@@ -22,6 +23,20 @@ razor
         grid-template-columns: repeat(4, 1fr);
         gap: 20px;
     }
+    .technology-card{
+        background-color: #333;
+        border-radius: 5px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid #555;
+        color: white;
+        display: flex; /* Added */
+        flex-direction: column; /* Added */
+        justify-content: space-between; /* Added */
+        position: relative; /* Added */
+        align-items:center;
+        gap: 20px;
+    }
 
     .building-card {
         background-color: #333;
@@ -37,8 +52,14 @@ razor
     }
 
     .building-card img {
-        width: 100%;
-        max-height: 150px;
+        width: 177px;
+        height: 177px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0 auto;
+
+
         object-fit: cover;
         border: 2px solid #777;
         border-radius: 5px;
@@ -67,6 +88,17 @@ razor
         cursor: pointer;
         border-radius: 5px;
     }
+    .technology-card img {
+        width: 177px;
+        height: 177px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0 auto;
+        object-fit: cover;
+        border: 2px solid #777;
+        border-radius: 5px;
+    }
 </style>
 
 <div class="buildings-banner">
@@ -76,7 +108,7 @@ razor
 <div class="buildings-grid">
     @foreach (var tech in technologies)
     {
-        <div class="building-card">
+        <div class="technology-card">
             <span class="level">Level: @tech.Level</span>
             <img src="@tech.Image" alt="@tech.Title" />
             <h3>@tech.Title</h3>
