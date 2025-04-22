@@ -9,38 +9,32 @@ razor
     display: flex;
     flex-direction: column;
 }
-    .constellation-section {
-        border: 1px solid #555;
-        border-radius: 5px;
-        margin-bottom: 20px;
-        padding: 20px;
-        background-color: #333;
-        color: white;
-        max-width: 800px;
-        width: 80%;
-        border: 3% solid white;
+  .constellation-card{
         display: flex;
         flex-direction: column;
-        align-items: center;
+        justify-content: center;
+        align-items: center;        border: 2px solid lightgray;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 15px;
     }
     .constellation-image {
         width: 250px;
         height: 250px;
+        aspect-ratio: 1/1;
         object-fit: cover;
         border: 2px solid white;
-         border-radius: 15px;
-    }
-  
+        border-radius: 15px;
+    }  
     .constellation-buttons {
         display: flex;
-        justify-content: flex-end;
-        align-items: center;
+        justify-content: center;
         gap: 3%;
-        width: 87%;
     }
     .planet-grid {
-        display: grid;
-        grid-template-columns: repeat(9, 1fr);
+        gap: 10px;
+        display: grid;        
+        grid-template-columns: 1fr;
     }
     .constellation-buttons button {
         color: white;
@@ -54,37 +48,25 @@ razor
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
         width: 100%;
-    
-    
-
-    .constellation-stat {
+    }.constellation-stat {
         border: 1px solid #555;
         padding: 10px;
         border-radius: 5px;
-    } 
-    .planets-container {
-        width: 87%;
-        overflow-x: auto;
     }
     .planet-card{
+        gap: 10px;
         text-align: center;
     }
     .planet-card img {
-        width: 250px;
         height: 250px;
         aspect-ratio: 1 / 1;
         object-fit: cover;
         object-position: center;
         border-radius: 15px;
-    }
-    .planet-card-buttons {
-        display: flex;
-        justify-content: flex-end;
+    }    
+    .planet-card-buttons {        display: flex;
         border: 1px solid #555;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px;
-        
+        padding: 10px;        
     }
      .planet-card-buttons {
     }   
@@ -93,9 +75,8 @@ razor
 <div class="constellation-page">
     @foreach (var constellation in constellations)
     {
-        <div class="constellation-section">
-            
-            <img src="@constellation.ImageUrl" alt="Constellation" class="constellation-image" /></div>
+        <div class="constellation-card">
+            <img src="@constellation.ImageUrl" alt="Constellation" class="constellation-image" />
             <div class="constellation-buttons">                
                 <button @onclick="(e => LikeConstellation(constellation.Id))">Like</button>
                 <button @onclick="(e => ScoutConstellation(constellation.Id))">Scout</button>
@@ -131,6 +112,7 @@ razor
            </div>
            <button @onclick="(e => ExploreConstellation(constellation))">Hide</button>
             }
+        </div>
     }
 </div>
 
