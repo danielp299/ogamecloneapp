@@ -3,6 +3,20 @@ razor
 @rendermode InteractiveServer
 
 <style>
+    .separator {
+        width: 90%;
+        border: 1px solid lightgray;
+        margin-top: 20px;
+        margin-bottom: 20px;
+    }
+     .planet-separator {
+        width: 75%;
+        width: 90%;
+        border: 1px solid lightgray;
+        margin-top: 20px;
+        margin-bottom: 20px;
+    }
+
 .constellation-page {
     align-items: center;
     width: 100%;
@@ -14,7 +28,7 @@ razor
         flex-direction: column;
         justify-content: center;
         align-items: center;        border: 2px solid lightgray;
-        padding: 20px;
+        padding: 20px;    
         margin-bottom: 20px;
         border-radius: 15px;
     }
@@ -29,14 +43,14 @@ razor
     .constellation-buttons {
         display: flex;
         justify-content: center;
-        gap: 3%;
+        gap: 3%;    
     }
     .planet-grid {
         gap: 10px;
-        display: grid;        
+        display: grid;
         grid-template-columns: 1fr;
     }
-    .constellation-buttons button {
+        .constellation-buttons button {
         color: white;
         border: none;
         border-radius: 5px;
@@ -46,31 +60,30 @@ razor
     .constellation-stats {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-        width: 100%;
-    }.constellation-stat {
+        gap: 10px;        
+    }
+    .constellation-stat {
         border: 1px solid #555;
         padding: 10px;
         border-radius: 5px;
-    }
+    }    
     .planet-card{
-        gap: 10px;
         text-align: center;
     }
     .planet-card img {
+        width: 250px;
         height: 250px;
+        border: 2px solid white;
         aspect-ratio: 1 / 1;
-        object-fit: cover;
         object-position: center;
-        border-radius: 15px;
-    }    
+        object-fit: cover;
+        border-radius: 15px;    aspect-ratio: 1 / 1;    object-position: center;}
     .planet-card-buttons {        display: flex;
         border: 1px solid #555;
-        padding: 10px;        
-    }
-     .planet-card-buttons {
+        padding: 10px;                
     }   
 </style>
+
 
 <div class="constellation-page">
     @foreach (var constellation in constellations)
@@ -93,27 +106,29 @@ razor
             </div>
              @if (constellation.ShowPlanets)
              {
+                 <hr class="separator" />
              <div class="planets-container">
                 <div class="planet-grid">
                     @foreach (var planet in constellation.Planets)
                     {
                         <div class="planet-card">
-                            <img src="@planet.ImageUrl" />
-                          <p>Size: @planet.Size</p>
-                            <p>Temperature: @planet.Temperature</p>
+                            <img src="@planet.ImageUrl" alt="Planet Image" />
                             <div class="planet-card-buttons">
                                 <button >Scout</button>
                                 <button>Attack</button>
                                 <button>Harvest</button>
                             </div>
+                            <p>Size: @planet.Size</p>
+                            <p>Temperature: @planet.Temperature</p>
                         </div>
+                        <hr class="planet-separator" />
                     }
                 </div>
            </div>
            <button @onclick="(e => ExploreConstellation(constellation))">Hide</button>
             }
         </div>
-    }
+    }    
 </div>
 
 @code {
@@ -187,3 +202,4 @@ razor
             constellation.ShowPlanets = !constellation.ShowPlanets;
         }
 }
+
