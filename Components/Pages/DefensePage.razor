@@ -1,0 +1,224 @@
+@page "/defense"
+@rendermode InteractiveServer
+<style>
+    .buildings-banner {
+        background-image: url('buildings-banner.jpg'); /* Replace with your image path */
+        background-size: cover;
+        background-position: center;
+        color: white;
+        text-align: center;
+        padding: 100px 20px;
+        margin-bottom: 20px;
+    }    
+    .buildings-banner h2 {
+        font-size: 3em;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    .buildings-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+    .building-card {
+        background-color: #333;
+        border-radius: 5px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid #555;
+        color: white;
+        display: flex; /* Added */
+        flex-direction: column; /* Added */
+        justify-content: space-between; /* Added */
+        position: relative; /* Added */
+        display: flex; /* Add this line */
+        flex-direction: column; /* Add this line */
+        align-items: center;
+        width: 300px;
+    }    
+    .building-card-content{
+        display:flex;
+        flex-direction: row;
+        width: 100%;
+        justify-content: center;
+        gap: 10px;
+    }    
+    .building-card-quantity-selector {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
+        margin-bottom: 10px;
+    }    
+    .quantity-button {
+        width: 30px;
+        height: 30px;
+        background-color: #555;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 5px;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;}    
+    .building-card img {
+        width: 177px;
+        height: 177px;
+        object-fit: cover;
+        border: 2px solid #777;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        border-radius: 10px;        
+        margin-bottom: 10px;
+    }
+    .building-card h3 {
+        color: white;
+    }
+    .building-card .level {
+        position: absolute;
+        top: 10px;
+        right: 10px; /* Changed from left to right */
+        background-color: #555;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+    .building-card input {
+            width: 80px;
+        text-align: center;
+    }
+    .building-card button {
+        padding: 10px;
+        background-color: #555;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }    
+</style>
+
+<div class="buildings-banner">
+    <h2>Defense Page</h2>
+</div>
+
+<div class="buildings-grid">    
+    @foreach (var cannon in cannons)    
+    {        
+        <div class="building-card">            
+            <span class="level">Level: @cannon.Level</span>            
+            <img src="@cannon.Image" alt="@cannon.Title" />            
+            <h3>@cannon.Title</h3>            
+            <p>@cannon.Description</p>            
+            <p>Metal: @cannon.MetalCost</p>            
+            <p>Crystal: @cannon.CrystalCost</p>            
+            <p>Deuterium: @cannon.DeuteriumCost</p>            
+            <p>Construction Duration: @cannon.ConstructionDuration</p>            
+            <div class="building-card-quantity-selector">                
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(cannon, 10)">10</button>                
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(cannon, 50)">50</button>                
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(cannon, 200)">200</button>                
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(cannon, 800)">800</button>            
+            </div>            
+            <div class="building-card-content">                
+                <input type="number" value="@cannon.QuantityToBuild" @oninput="((ChangeEventArgs e) => OnQuantityToBuildInput(cannon, e))" max="999999" maxlength="6" />                
+                <button class="btn btn-primary" @onclick="() => AddToQueueQuantity(cannon, cannon.QuantityToBuild)">Build</button>                
+                <button class="btn btn-secondary" @onclick="() => ClearQuantityToBuild(cannon)">Clear</button>            
+            </div>        
+        </div>    
+    }
+</div>
+
+@code{
+    public class CannonDto    {        
+        public Guid Id { get; set; }        
+        public string Title { get; set; }        
+        public string Description { get; set; }        
+        public int MetalCost { get; set; }        
+        public int CrystalCost { get; set; }        
+        public int DeuteriumCost { get; set; }        
+        public string ConstructionDuration { get; set; }        
+        public string Image { get; set; }        
+        public int Level { get; set; } = 1;        
+        public int Quantity { get; set; } = 0;        
+        public int QuantityToBuild { get; set; } = 1;    
+    }
+
+    public class QueueItemDto {        
+        public CannonDto Cannon { get; set; }        
+        public string TimeRemaining { get; set; }    
+    }
+
+    private List<CannonDto> cannons = new List<CannonDto>();    
+    private List<QueueItemDto> constructionQueue = new List<QueueItemDto>();    
+    private int Metal { get; set; } = 10000;    
+    private int Crystal { get; set; } = 10000;    
+    private int Deuterium { get; set; } = 10000;    
+    private int maxQuantityToBuild = 10000;
+    
+    public void AddToQueueQuantity(CannonDto cannon, int quantity)    
+    {        
+        if (quantity <= 0) return; // Avoid zero or negative quantity
+        int totalMetalCost = cannon.MetalCost * quantity;        
+        int totalCrystalCost = cannon.CrystalCost * quantity;        
+        int totalDeuteriumCost = cannon.DeuteriumCost * quantity;
+        if (Metal >= totalMetalCost && Crystal >= totalCrystalCost && Deuterium >= totalDeuteriumCost)        
+        {            
+            for (int i = 0; i < quantity; i++)            
+            {                
+                constructionQueue.Add(new QueueItemDto { Cannon = cannon, TimeRemaining = cannon.ConstructionDuration });            
+            }
+            Metal -= totalMetalCost;            
+            Crystal -= totalCrystalCost;            
+            Deuterium -= totalDeuteriumCost;        
+        }    
+    }
+    private void AddToQuantityToBuild(CannonDto cannon, int quantity)    
+    {        
+        if (cannon.QuantityToBuild == 1)        
+        {            
+            cannon.QuantityToBuild = 0;        
+        }        
+        cannon.QuantityToBuild += quantity; // Add the quantity to the existing value        
+        if (cannon.QuantityToBuild > maxQuantityToBuild)        
+        {            
+            cannon.QuantityToBuild = maxQuantityToBuild;        
+        }    
+    }
+    private void ClearQuantityToBuild(CannonDto cannon)    
+    {        
+        Console.WriteLine("ClearQuantityToBuild");        
+        cannon.QuantityToBuild = 1;    
+    }
+    protected override void OnInitialized()    
+    {        
+        CreateCannons();    
+    }
+    private void OnQuantityToBuildInput(CannonDto cannon, ChangeEventArgs e)    
+    {        
+        if (int.TryParse(e.Value?.ToString(), out int parsedValue))        
+        {            
+            cannon.QuantityToBuild = parsedValue;        
+        }    
+    }
+    private void CreateCannons()    
+    {        
+        cannons.Add(new CannonDto        
+        {            
+            Id = Guid.NewGuid(),            
+            Title = "Rocket Launcher",            
+            Description = "A basic defense unit.",            
+            MetalCost = 2000,            
+            CrystalCost = 0,            
+            DeuteriumCost = 0,            
+            ConstructionDuration = "00:00:30",            
+            Image = "rocketLauncher.jpg"        
+        });        
+        cannons.Add(new CannonDto        
+        {            
+            Id = Guid.NewGuid(),            
+            Title = "Laser Cannon",            
+            Description = "A more advanced defense unit.",            
+            MetalCost = 3000,            
+            CrystalCost = 1000,            
+            DeuteriumCost = 0,            
+            ConstructionDuration = "00:01:00",            
+            Image = "laserCannon.jpg"        
+        });    
+    }
+}

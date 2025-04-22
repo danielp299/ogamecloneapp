@@ -4,13 +4,11 @@ razor
 
 <style>
 .constellation-page {
-    display: flex;
-    flex-direction: column;
     align-items: center;
     width: 100%;
+    display: flex;
+    flex-direction: column;
 }
-    .constellation-item {
-         margin-bottom: 7%;
     .constellation-section {
         border: 1px solid #555;
         border-radius: 5px;
@@ -18,52 +16,39 @@ razor
         padding: 20px;
         background-color: #333;
         color: white;
-        width: 80%;
         max-width: 800px;
-        display: flex;
+        width: 80%;
         border: 3% solid white;
-         flex-direction: column;
-        align-items: center;        
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
     .constellation-image {
-         width: 250px;
-         height: 250px;
-         aspect-ratio: 1 / 1; /* Make the container square */
-         object-fit: cover;
-         object-position: center;
-        display: flex;
-         align-items: center;
-         justify-content: center;
-         border: 2px solid white;
+        width: 250px;
+        height: 250px;
+        object-fit: cover;
+        border: 2px solid white;
          border-radius: 15px;
     }
-    .constellation-item:hover { transform: scale(1.02); }
-    
+  
     .constellation-buttons {
-         display: flex;
-        justify-content: flex-end; /* Align buttons to the right */
-         align-items: center;
-        
-        gap: 3%; /* Space between buttons */
-        width: 87%;     
-    }   
-     .planets-container {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 3%;
         width: 87%;
-         overflow-x: auto;
     }
     .planet-grid {
         display: grid;
         grid-template-columns: repeat(9, 1fr);
     }
-
     .constellation-buttons button {
-          color: white;
+        color: white;
         border: none;
         border-radius: 5px;
         padding: 10px 20px;
         width: 100%;
     }
-
     .constellation-stats {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -76,14 +61,13 @@ razor
         border: 1px solid #555;
         padding: 10px;
         border-radius: 5px;
+    } 
+    .planets-container {
+        width: 87%;
+        overflow-x: auto;
     }
     .planet-card{
-        display:flex;
-        flex-direction: column;
-         width: 100%;
-        align-items: center;
-        justify-content: center;
-        
+        text-align: center;
     }
     .planet-card img {
         width: 250px;
@@ -91,18 +75,16 @@ razor
         aspect-ratio: 1 / 1;
         object-fit: cover;
         object-position: center;
-         border-radius: 15px;
+        border-radius: 15px;
     }
     .planet-card-buttons {
-        position: relative;
-         display: flex;
-        justify-content: flex-end; /* Align buttons to the right */
-        aspect-ratio: 1 / 1;
-        object-fit: cover;
-         border: 1px solid #555;
+        display: flex;
+        justify-content: flex-end;
+        border: 1px solid #555;
         padding: 10px;
         border-radius: 5px;
         margin: 10px;
+        
     }
      .planet-card-buttons {
     }   
