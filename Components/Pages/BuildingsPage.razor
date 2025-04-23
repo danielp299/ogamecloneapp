@@ -4,19 +4,15 @@ razor
 <style>
     .material-icon {
         width: 16px !important;
-        height: 16px !important;        
+        height: 16px !important;
         margin-right: 4px;
-        vertical-align: middle;
     }
 </style>
 <style>
-     .cost-container {
+    .cost-item {
         display: flex;
         align-items: center;
-        margin-bottom: 5px; 
-        justify-content: center;
-        
-    }
+        margin-right: 10px; /* Adds space between cost items */    }
 </style>
 @rendermode InteractiveServer
 
@@ -60,16 +56,13 @@ razor
         color: white;
         display: flex; /* Added */
         flex-direction: column; /* Added */
-        justify-content: space-between; /* Added */        
-        flex-direction: column; /* Add this line */
+        justify-content: space-between; /* Added */               
         align-items: center;
     }
 
     .building-card img {
         width: 177px;
-        height: 177px;
-        
-        
+        height: 177px;        
 
         object-fit: cover;
         border: 2px solid #777;
@@ -84,7 +77,6 @@ razor
         color: white;
     }
    
-
     .building-card .level {
         position: absolute;
         top: 10px;
@@ -118,7 +110,7 @@ razor
                 <h3>@item.Title</h3>
                 <p>Duration: @item.ConstructionDuration.ToString()</p>
                 @if (item.IsBuilding) {
-                   <p>Time remaining: @item.TimeRemaining.ToString()</p> 
+                   <p>Time remaining: @item.TimeRemaining.ToString()</p>
                 }
             </div>
             }
@@ -131,20 +123,22 @@ razor
             <span class="level">Level: @building.Level</span>
             <img src="@building.Image" alt="@building.Title" />
             <h3>@building.Title</h3>
-            <p>@building.Description</p>
-            <div class="cost-container">
-              <img src="metal-icon.png" alt="Metal" class="material-icon" /> Metal: @building.MetalCost
-            </div>
-            <div class="cost-container">
-              <img src="crystal-icon.png" alt="Crystal" class="material-icon" /> Crystal: @building.CrystalCost
-            </div>
-             <div class="cost-container">
-             <img src="deuterium-icon.png" alt="Deuterium" class="material-icon" /> Deuterium: @building.DeuteriumCost
+            <p>@building.Description</p>            
+            <div class="d-flex justify-content-center">
+                <div class="cost-item d-flex align-items-center">
+                     <img src="metal-icon.png" alt="Metal" style="width:20px;height:20px" /> Metal: @building.MetalCost</div>
+                <div class="cost-item d-flex align-items-center">
+                    <img src="crystal-icon.png" alt="Crystal" style="width:20px;height:20px" /> Crystal: @building.CrystalCost</div>
+                <div class="cost-item d-flex align-items-center">
+                    <img src="deuterium-icon.png" alt="Deuterium" style="width:20px;height:20px" /> Deuterium: @building.DeuteriumCost
+                    </div>
              </div>
+
+
             <p>Duration: @building.ConstructionDuration.ToString()</p>
             <p>Energy Consumption: @building.EnergyConsumption</p>
             
-             @if (!ConstructionQueue.Contains(building))
+            <div class="card-footer">@if (!ConstructionQueue.Contains(building))
             {
                  @if (building.Level < 1)
                  {
@@ -161,7 +155,7 @@ razor
                     <button @onclick="() => Cancel(building)">Cancel</button>
                 }
             }
-                 
+            </div>
         </div>
     }
 </div>  
@@ -217,7 +211,7 @@ razor
         if (ConstructionQueue.Count > 0)
         {
             CurrentBuilding = ConstructionQueue[0];            
-            CurrentBuilding.IsBuilding = true;
+            CurrentBuilding.IsBuilding = true;           
             CurrentBuilding.TimeRemaining = CurrentBuilding.ConstructionDuration;
 
             while (CurrentBuilding.TimeRemaining > TimeSpan.Zero)
@@ -227,13 +221,13 @@ razor
                 await InvokeAsync(StateHasChanged);
             }
 
-            CurrentBuilding.IsBuilding = false;
+            CurrentBuilding.IsBuilding = false;            
             ConstructionQueue.RemoveAt(0);
             CurrentBuilding = null;
             await InvokeAsync(StateHasChanged);
 
             // Start the next building in the queue if there is one
-            await StartNextBuilding();
+            await StartNextBuilding();            
         }
         else
         {
@@ -248,7 +242,7 @@ razor
          building.TimeRemaining = TimeSpan.Zero;
          StartNextBuilding();
     }
-
+    
     private List<BuildingDto> CreateDefaultBuildings() {
         List<BuildingDto> defaultBuildings = new List<BuildingDto>();
         defaultBuildings.Add(new BuildingDto
