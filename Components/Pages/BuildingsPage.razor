@@ -1,7 +1,34 @@
 razor
 @page "/buildings"
+
+<style>
+    .material-icon {
+        width: 16px !important;
+        height: 16px !important;        
+        margin-right: 4px;
+        vertical-align: middle;
+    }
+</style>
+<style>
+     .cost-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px; 
+        justify-content: center;
+        
+    }
+</style>
 @rendermode InteractiveServer
 
+<style>
+    .construction-queue {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+        background-color: #333;
+    }
+</style>
 <style>
     .buildings-banner {
         background-image: url('buildings-banner.jpg'); /* Replace with your image path */
@@ -33,9 +60,7 @@ razor
         color: white;
         display: flex; /* Added */
         flex-direction: column; /* Added */
-        justify-content: space-between; /* Added */
-        position: relative; /* Added */
-        display: flex; /* Add this line */
+        justify-content: space-between; /* Added */        
         flex-direction: column; /* Add this line */
         align-items: center;
     }
@@ -43,6 +68,8 @@ razor
     .building-card img {
         width: 177px;
         height: 177px;
+        
+        
 
         object-fit: cover;
         border: 2px solid #777;
@@ -56,10 +83,7 @@ razor
     .building-card h3 {
         color: white;
     }
-    
-    .building-card p {
-        margin-bottom: 5px;
-    }
+   
 
     .building-card .level {
         position: absolute;
@@ -84,7 +108,22 @@ razor
 <div class="buildings-banner">
     <h2>Buildings</h2>
 </div>
-
+@if(ConstructionQueue.Count > 0) {
+    @* Construction queue *@
+    <h3>Construction Queue</h3>
+    <div class="construction-queue">
+        @foreach (var item in ConstructionQueue)
+        {
+            <div class="building-card">
+                <h3>@item.Title</h3>
+                <p>Duration: @item.ConstructionDuration.ToString()</p>
+                @if (item.IsBuilding) {
+                   <p>Time remaining: @item.TimeRemaining.ToString()</p> 
+                }
+            </div>
+            }
+        </div>
+}
 <div class="buildings-grid">
     @foreach (var building in Buildings)
     {
@@ -93,26 +132,36 @@ razor
             <img src="@building.Image" alt="@building.Title" />
             <h3>@building.Title</h3>
             <p>@building.Description</p>
-            <p>Metal: @building.MetalCost</p>
-            <p>Crystal: @building.CrystalCost</p>
-            <p>Deuterium: @building.DeuteriumCost</p>
+            <div class="cost-container">
+              <img src="metal-icon.png" alt="Metal" class="material-icon" /> Metal: @building.MetalCost
+            </div>
+            <div class="cost-container">
+              <img src="crystal-icon.png" alt="Crystal" class="material-icon" /> Crystal: @building.CrystalCost
+            </div>
+             <div class="cost-container">
+             <img src="deuterium-icon.png" alt="Deuterium" class="material-icon" /> Deuterium: @building.DeuteriumCost
+             </div>
             <p>Duration: @building.ConstructionDuration.ToString()</p>
             <p>Energy Consumption: @building.EnergyConsumption</p>
-            @if (!building.IsBuilding)
+            
+             @if (!ConstructionQueue.Contains(building))
             {
-                @if (building.Level < 1)
-                {
-                    <button id="construct-building-@building.Id" @onclick="() => ConstructOrUpgrade(building)">Construct</button>
-                }
-                else
-                {
-                    <button id="dismantle-building-@building.Id" @onclick="() => Dismantle(building)">Dismantle</button>
-                    <button id="upgrade-building-@building.Id" @onclick="() => ConstructOrUpgrade(building)">Upgrade</button>
-                }
+                 @if (building.Level < 1)
+                 {
+                     <button id="construct-building-@building.Id" @onclick="() => AddToQueue(building)">Construct</button>
+                 }
+                 else
+                 {
+                     <button id="dismantle-building-@building.Id" @onclick="() => Dismantle(building)">Dismantle</button>
+                     <button id="upgrade-building-@building.Id" @onclick="() => AddToQueue(building)">Upgrade</button>
+                 }
             } else {
-                <p>Time remaining: @building.TimeRemaining.ToString()</p>
-                <button @onclick="() => Cancel(building)">Cancel</button>
+                 if(building.IsBuilding){
+                    <p>Time remaining: @building.TimeRemaining.ToString()</p>
+                    <button @onclick="() => Cancel(building)">Cancel</button>
+                }
             }
+                 
         </div>
     }
 </div>  
@@ -143,20 +192,19 @@ razor
     [Parameter]
     public List<BuildingDto> Buildings { get; set; } = new List<BuildingDto>();
 
-    private async Task ConstructOrUpgrade(BuildingDto building)
+
+    private List<BuildingDto> ConstructionQueue = new List<BuildingDto>();
+    private BuildingDto CurrentBuilding { get; set; } = null;
+
+    private async Task AddToQueue(BuildingDto building)
     {
-        building.IsBuilding = true;
-        building.TimeRemaining = building.ConstructionDuration;
+        if (ConstructionQueue.Count >= 5) return; // Max 5 buildings in queue
+        ConstructionQueue.Add(building);
 
-        while (building.TimeRemaining > TimeSpan.Zero)
+        if (CurrentBuilding == null || !CurrentBuilding.IsBuilding)
         {
-            await Task.Delay(1000); // Wait for 1 second
-            building.TimeRemaining = building.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
-            await InvokeAsync(StateHasChanged);
+            await StartNextBuilding();
         }
-
-        building.IsBuilding = false;
-        await InvokeAsync(StateHasChanged);
     }
 
     private void Dismantle(BuildingDto building)
@@ -164,9 +212,41 @@ razor
         Console.WriteLine($"Dismantling {building.Title}");
     }
 
+    private async Task StartNextBuilding()
+    {
+        if (ConstructionQueue.Count > 0)
+        {
+            CurrentBuilding = ConstructionQueue[0];            
+            CurrentBuilding.IsBuilding = true;
+            CurrentBuilding.TimeRemaining = CurrentBuilding.ConstructionDuration;
+
+            while (CurrentBuilding.TimeRemaining > TimeSpan.Zero)
+            {
+                await Task.Delay(1000); // Wait for 1 second
+                CurrentBuilding.TimeRemaining = CurrentBuilding.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
+                await InvokeAsync(StateHasChanged);
+            }
+
+            CurrentBuilding.IsBuilding = false;
+            ConstructionQueue.RemoveAt(0);
+            CurrentBuilding = null;
+            await InvokeAsync(StateHasChanged);
+
+            // Start the next building in the queue if there is one
+            await StartNextBuilding();
+        }
+        else
+        {
+            CurrentBuilding = null;
+        }
+    }
+
     private void Cancel(BuildingDto building) {
-        building.IsBuilding = false;
-        building.TimeRemaining = TimeSpan.Zero;
+        if(building == CurrentBuilding) CurrentBuilding = null;
+         ConstructionQueue.Remove(building);
+         building.IsBuilding = false;
+         building.TimeRemaining = TimeSpan.Zero;
+         StartNextBuilding();
     }
 
     private List<BuildingDto> CreateDefaultBuildings() {
