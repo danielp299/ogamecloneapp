@@ -104,7 +104,7 @@
 @if(ConstructionQueue.Count > 0) {
     @* Construction queue *@
     <h3>Construction Queue</h3>
-    <div class="construction-queue">
+    <div class="construction-queue" id="construction-queue">
         @foreach (var item in ConstructionQueue)
         {
             <div class="building-card">
@@ -117,7 +117,7 @@
             }
         </div>
 }
-<div class="buildings-grid">
+<div class="buildings-grid" id="buildings-grid">
     @foreach (var building in Buildings)
     {
         <div class="building-card">
@@ -186,15 +186,16 @@
     }
 
     [Parameter]
+    public List<BuildingDto> ConstructionQueue { get; set; } = new List<BuildingDto>();
+
+    [Parameter]
     public List<BuildingDto> Buildings { get; set; } = new List<BuildingDto>();
 
-
-    private List<BuildingDto> ConstructionQueue = new List<BuildingDto>();
     private BuildingDto CurrentBuilding { get; set; } = null;
 
     private async Task AddToQueue(BuildingDto building)
     {
-        if (ConstructionQueue.Count >= 5) return; // Max 5 buildings in queue
+        if (ConstructionQueue.Count >= 5) return; // Max 5 buildings in queue        
         ConstructionQueue.Add(building);
 
         if (CurrentBuilding == null || !CurrentBuilding.IsBuilding)
