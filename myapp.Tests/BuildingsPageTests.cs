@@ -1,7 +1,6 @@
 using Bunit;
 using myapp.Components.Pages;
 using Xunit;
-using System.Linq;
 using System.Collections.Generic;
 using System;
 namespace myapp.Tests
@@ -62,7 +61,7 @@ namespace myapp.Tests
             // Arrange
             var constructionQueue = new List<BuildingsPage.BuildingDto>();
             constructionQueue.Add(new BuildingsPage.BuildingDto
-            {
+            {                
                 Title = "Building 1",
                 ConstructionDuration = TimeSpan.FromSeconds(1)                
             });
@@ -72,6 +71,22 @@ namespace myapp.Tests
             // Assert
             var constructionQueueDiv = cut.Find("#construction-queue");
             Assert.NotNull(constructionQueueDiv);
+        }
+
+        [Fact]
+        public void BuildingsPage_Render_Construction_Queue_Items()
+        {
+            //Arrange
+            var constructionQueue = new List<BuildingsPage.BuildingDto>();
+            for (int i = 1; i <= 3; i++)
+            {
+                constructionQueue.Add(new BuildingsPage.BuildingDto { Title = $"Building {i}", ConstructionDuration = TimeSpan.FromSeconds(i) });
+            }
+            var cut = RenderComponent<BuildingsPage>(ComponentParameter.CreateParameter("ConstructionQueue", constructionQueue));
+
+            //Assert
+            var constructionQueueItems = cut.FindAll("#construction-queue .building-card");
+            Assert.Equal(3, constructionQueueItems.Count);
         }
 
         [Fact] 
