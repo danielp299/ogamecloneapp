@@ -1,4 +1,4 @@
-razor
+@* razor *@
 @page "/buildings"
 
 <style>
@@ -58,6 +58,7 @@ razor
         flex-direction: column; /* Added */
         justify-content: space-between; /* Added */               
         align-items: center;
+        position: relative; /* Add relative position to the building card */
     }
 
     .building-card img {
@@ -68,7 +69,7 @@ razor
         border: 2px solid #777;
         display: flex; /* Add this line */
         justify-content: center; /* Add this line */
-        align-items: center;
+        align-items: center;       
         border-radius: 5px;
         margin-bottom: 10px;
     }
@@ -78,11 +79,11 @@ razor
     }
    
     .building-card .level {
-        position: absolute;
+        position: absolute; /* Keep absolute positioning */
         top: 10px;
         right: 10px; /* Changed from left to right */
-        background-color: #555;
-        padding: 5px 10px;
+        background-color: #555;        
+        padding: 5px 10px; /* Adjusted padding for better readability */
         border-radius: 5px;
         font-weight: bold;
     }
@@ -120,7 +121,8 @@ razor
     @foreach (var building in Buildings)
     {
         <div class="building-card">
-            <span class="level">Level: @building.Level</span>
+              <div class="level">Level: @building.Level</div>
+
             <img src="@building.Image" alt="@building.Title" />
             <h3>@building.Title</h3>
             <p>@building.Description</p>            
