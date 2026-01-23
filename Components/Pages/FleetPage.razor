@@ -164,6 +164,9 @@ razor
         public int Speed { get; set; } = 10000; // Example speed
         public long FuelConsumption { get; set; } = 10; // Per unit
         public long Capacity { get; set; } = 5000; // Cargo
+        public int Attack { get; set; } = 0;
+        public int Shields { get; set; } = 0;
+        public int Armor { get; set; } = 0;
     }
 
     public class Fleet
@@ -176,16 +179,16 @@ razor
 
     private List<ShipDto> ships = new List<ShipDto>()
     {
-        new ShipDto { Title = "Small Cargo", Image = "smallCargo.jpg", Quantity = 10, Speed = 5000, FuelConsumption = 10, Capacity = 5000 },
+        new ShipDto { Title = "Small Cargo", Image = "smallCargo.jpg", Quantity = 10, Speed = 5000, FuelConsumption = 10, Capacity = 5000, Attack = 5, Shields = 10, Armor = 400 },
         new ShipDto { Title = "Large Cargo", Image = "largeCargo.jpg", Quantity = 5, Speed = 7500, FuelConsumption = 50, Capacity = 25000 },
-        new ShipDto { Title = "Light Fighter", Image = "lightFighter.jpg", Quantity = 20, Speed = 12500, FuelConsumption = 20, Capacity = 50 },
+        new ShipDto { Title = "Light Fighter", Image = "lightFighter.jpg", Quantity = 20, Speed = 12500, FuelConsumption = 20, Capacity = 50, Attack = 50, Shields = 10, Armor = 400 },
         new ShipDto { Title = "Heavy Fighter", Image = "heavyFighter.jpg", Quantity = 15, Speed = 10000, FuelConsumption = 75, Capacity = 100 },
-        new ShipDto { Title = "Cruiser", Image = "cruiser.jpg", Quantity = 8, Speed = 15000, FuelConsumption = 300, Capacity = 800 },
+        new ShipDto { Title = "Cruiser", Image = "cruiser.jpg", Quantity = 8, Speed = 15000, FuelConsumption = 300, Capacity = 800, Attack = 400, Shields = 50, Armor = 2700 },
         new ShipDto { Title = "Battleship", Image = "battleship.jpg", Quantity = 3, Speed = 10000, FuelConsumption = 500, Capacity = 1500 },
         new ShipDto { Title = "Colony Ship", Image = "colonyShip.jpg", Quantity = 1, Speed = 2500, FuelConsumption = 1000, Capacity = 7500 },
         new ShipDto { Title = "Recycler", Image = "recycler.jpg", Quantity = 2, Speed = 2000, FuelConsumption = 300, Capacity = 20000 },
         new ShipDto { Title = "Destroyer", Image = "destroyer.jpg", Quantity = 4, Speed = 5000, FuelConsumption = 1000, Capacity = 1000 },
-        new ShipDto { Title = "Death Star", Image = "deathstar.jpg", Quantity = 1, Speed = 100, FuelConsumption = 1, Capacity = 1000000 }
+        new ShipDto { Title = "Death Star", Image = "deathstar.jpg", Quantity = 1, Speed = 100, FuelConsumption = 1, Capacity = 1000000, Attack = 200000, Shields = 50000, Armor = 900000 }
     };
 
     private string SelectedMission = "Attack";
@@ -223,7 +226,81 @@ razor
                 ship.Quantity -= s.Quantity;
                 s.QuantityToSend = 0;
             }
+
+            // If mission is Attack, simulate combat on arrival
+            if (SelectedMission == "Attack")
+            {
+                // Simulate delay for flight
+                Task.Delay(FlightTime).ContinueWith(_ => ResolveCombat(fleet));
+            }
         }
+    }
+
+    private void ResolveCombat(Fleet attackingFleet)
+    {
+        // Simulate defender: random ships/defenses
+        var defendingShips = new List<ShipDto>
+        {
+            new ShipDto { Title = "Light Fighter", Quantity = 50, Attack = 50, Shields = 10, Armor = 400 },
+            new ShipDto { Title = "Rocket Launcher", Quantity = 100, Attack = 80, Shields = 20, Armor = 200 }
+        };
+
+        var result = SimulateCombat(attackingFleet.Ships, defendingShips);
+        // Log or display result
+        Console.WriteLine($"Combat Result: Winner - {result.Winner}, Debris - Metal: {result.DebrisMetal}, Crystal: {result.DebrisCrystal}");
+        // Remove fleet from active
+        ActiveFleets.Remove(attackingFleet);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private CombatResult SimulateCombat(List<ShipDto> attackers, List<ShipDto> defenders)
+    {
+        // Simplified combat simulation
+        int rounds = 0;
+        while (rounds < 6 && attackers.Sum(a => a.Quantity) > 0 && defenders.Sum(d => d.Quantity) > 0)
+        {
+            // Attackers fire
+            foreach (var att in attackers.Where(a => a.Quantity > 0))
+            {
+                foreach (var def in defenders.Where(d => d.Quantity > 0))
+                {
+                    int damage = att.Attack * att.Quantity - def.Shields;
+                    if (damage > 0)
+                    {
+                        int destroyed = Math.Min(def.Quantity, damage / def.Armor);
+                        def.Quantity -= destroyed;
+                    }
+                }
+            }
+            // Defenders fire (similar)
+            foreach (var def in defenders.Where(d => d.Quantity > 0))
+            {
+                foreach (var att in attackers.Where(a => a.Quantity > 0))
+                {
+                    int damage = def.Attack * def.Quantity - att.Shields;
+                    if (damage > 0)
+                    {
+                        int destroyed = Math.Min(att.Quantity, damage / att.Armor);
+                        att.Quantity -= destroyed;
+                    }
+                }
+            }
+            rounds++;
+        }
+
+        string winner = attackers.Sum(a => a.Quantity) > 0 ? "Attacker" : "Defender";
+        long debrisMetal = (attackers.Sum(a => (attackerShips[a.Title].Quantity - a.Quantity) * attackerShips[a.Title].MetalCost) +
+                           defenders.Sum(d => (defenderShips[d.Title]?.Quantity ?? d.Quantity) * (defenderShips[d.Title]?.MetalCost ?? 0))) * 0.7;
+        long debrisCrystal = debrisMetal; // Simplified
+
+        return new CombatResult { Winner = winner, DebrisMetal = (long)debrisMetal, DebrisCrystal = (long)debrisCrystal };
+    }
+
+    public class CombatResult
+    {
+        public string Winner { get; set; }
+        public long DebrisMetal { get; set; }
+        public long DebrisCrystal { get; set; }
     }
 
     private double CalculateDistance(int g, int s, int p)
