@@ -125,15 +125,23 @@ razor
 @code {
     public class TechnologyDto
     {
-        public Guid Id { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public int MetalCost { get; set; }
-        public int CrystalCost { get; set; }
-        public int DeuteriumCost { get; set; }
-        public string ResearchDuration { get; set; }
-        public string Image { get; set; }
-        public int Level { get; set; } = 1;
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Image { get; set; } = "";
+        public long BaseMetalCost { get; set; }
+        public long BaseCrystalCost { get; set; }
+        public long BaseDeuteriumCost { get; set; }
+        public TimeSpan BaseDuration { get; set; }
+        public int Level { get; set; } = 0;
+        public double Scaling { get; set; } = 2.0;
+        public List<string> Dependencies { get; set; } = new();
+
+        public long MetalCost => Title == "Astrophysics" ? (long)(BaseMetalCost * Math.Pow(1.75, Level)) : (long)(BaseMetalCost * Math.Pow(Scaling, Level));
+        public long CrystalCost => Title == "Astrophysics" ? (long)(BaseCrystalCost * Math.Pow(1.75, Level)) : (long)(BaseCrystalCost * Math.Pow(Scaling, Level));
+        public long DeuteriumCost => Title == "Astrophysics" ? (long)(BaseDeuteriumCost * Math.Pow(1.75, Level)) : (long)(BaseDeuteriumCost * Math.Pow(Scaling, Level));
+        public long GravitonCost => Title == "Graviton Technology" ? (long)(BaseMetalCost * Math.Pow(3, Level)) : 0; // Special
+
+        public TimeSpan Duration => TimeSpan.FromHours((BaseMetalCost + BaseCrystalCost) / (UniverseSpeed * 1000 * (1 + ResearchLabLevel + IntergalacticResearchNetworkLevel * 8)));
     }
 
     private List<TechnologyDto> technologies = new List<TechnologyDto>();
