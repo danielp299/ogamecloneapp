@@ -149,11 +149,13 @@
         public int MetalCost { get; set; }
         public int CrystalCost { get; set; }
         public int DeuteriumCost { get; set; }
-        public string ConstructionDuration { get; set; }
+        public TimeSpan BaseDuration { get; set; }
         public string Image { get; set; }
         public int Level { get; set; } = 1;
         public int Quantity { get; set; } = 0;
         public int QuantityToBuild { get; set; } = 1;
+        public List<string> Dependencies { get; set; } = new();
+        public TimeSpan Duration => TimeSpan.FromHours(BaseDuration.TotalHours / (2500 * (1 + ShipyardLevel) * Math.Pow(2, NaniteLevel)));
     }
 
     
@@ -169,22 +171,33 @@
     private int Crystal { get; set; } = 10000;
     private int Deuterium { get; set; } = 10000;
     private int maxQuantityToBuild = 10000;
+    private int ShipyardLevel { get; set; } = 1;
+    private int RoboticsLevel { get; set; } = 2; // Required for Shipyard
+    private int NaniteLevel { get; set; } = 0;
 
 
     public void AddToQueueQuantity(ShipDto ship, int quantity)
     {
-         if (quantity <= 0) return; // Avoid zero or negative quantity
-
+        if (quantity <= 0) return; // Avoid zero or negative quantity
+        // Check dependencies
+        if (ship.Dependencies.Contains("Shipyard") && ShipyardLevel < 1) return;
+        if (ship.Dependencies.Contains("Robotics Factory") && RoboticsLevel < 2) return;
+        // Add more as needed
         int totalMetalCost = ship.MetalCost * quantity;
         int totalCrystalCost = ship.CrystalCost * quantity;
         int totalDeuteriumCost = ship.DeuteriumCost * quantity;
-
         if (Metal >= totalMetalCost && Crystal >= totalCrystalCost && Deuterium >= totalDeuteriumCost)
         {
             for (int i = 0; i < quantity; i++)
             {
-                constructionQueue.Add(new QueueItemDto { Ship = ship, TimeRemaining = ship.ConstructionDuration });
+                constructionQueue.Add(new QueueItemDto { Ship = ship, TimeRemaining = ship.Duration.ToString() });
             }
+            Metal -= totalMetalCost;
+            Crystal -= totalCrystalCost;
+            Deuterium -= totalDeuteriumCost;
+            ship.Quantity += quantity; // Add to built
+        }
+    }
 
             Metal -= totalMetalCost;
             Crystal -= totalCrystalCost;
@@ -234,8 +247,9 @@ private void CreateShips()
         MetalCost = 2000,
         CrystalCost = 2000,
         DeuteriumCost = 0,
-        ConstructionDuration = "00:00:30",
-        Image = "smallCargo.jpg"
+        BaseDuration = TimeSpan.FromSeconds(30),
+        Image = "smallCargo.jpg",
+        Dependencies = new List<string> { "Shipyard" }
     });
     ships.Add(new ShipDto
     {
@@ -279,8 +293,9 @@ private void CreateShips()
         MetalCost = 20000,
         CrystalCost = 7000,
         DeuteriumCost = 2000,
-        ConstructionDuration = "00:03:00",
-        Image = "cruiser.jpg"
+        BaseDuration = TimeSpan.FromMinutes(3),
+        Image = "cruiser.jpg",
+        Dependencies = new List<string> { "Shipyard" } // Requires Shipyard 5, but simplified
     });
 
     ships.Add(new ShipDto
@@ -336,8 +351,9 @@ private void CreateShips()
         MetalCost = 5000000,
         CrystalCost = 4000000,
         DeuteriumCost = 1000000,
-        ConstructionDuration = "01:00:00",
-        Image = "deathstar.jpg"
+        BaseDuration = TimeSpan.FromHours(1),
+        Image = "deathstar.jpg",
+        Dependencies = new List<string> { "Shipyard", "Nanite Factory" } // High requirements
     });
 }
 
