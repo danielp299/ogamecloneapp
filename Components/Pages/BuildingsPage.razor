@@ -168,21 +168,23 @@
 @code{
     public class BuildingDto
     {
-        public Guid Id { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public int MetalCost { get; set; }
-        public int CrystalCost { get; set; }
-        public int DeuteriumCost { get; set; }
-        public TimeSpan ConstructionDuration { get; set; }
-
-        public string Image { get; set; }
-        public int Level { get; set; } = 1;
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Image { get; set; } = "";
+        public long BaseMetalCost { get; set; }
+        public long BaseCrystalCost { get; set; }
+        public long BaseDeuteriumCost { get; set; }
+        public TimeSpan BaseDuration { get; set; }
         public int EnergyConsumption { get; set; }
+        public int Level { get; set; } = 1;
+        public double Scaling { get; set; } = 2.0;
+        public List<string> Dependencies { get; set; } = new();
+        public int FieldsOccupied { get; set; } = 1;
 
-        public bool IsBuilding {get; set;} = false;
-
-        public TimeSpan TimeRemaining { get; set; }
+        public long MetalCost => (long)(BaseMetalCost * Math.Pow(Scaling, Level - 1));
+        public long CrystalCost => (long)(BaseCrystalCost * Math.Pow(Scaling, Level - 1));
+        public long DeuteriumCost => (long)(BaseDeuteriumCost * Math.Pow(Scaling, Level - 1));
+        public TimeSpan Duration => BaseDuration; // Simplified, could add formula
     }
 
     [Parameter]
@@ -190,6 +192,9 @@
 
     [Parameter]
     public List<BuildingDto> Buildings { get; set; } = new List<BuildingDto>();
+
+    private int UsedFields = 15;
+    private int MaxFields = 163;
 
     private BuildingDto CurrentBuilding { get; set; } = null;
 
