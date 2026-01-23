@@ -48,6 +48,32 @@ razor
 
     .ship-card h3 {
         color: white;
+    }
+
+    .send-fleet, .fleet-activity {
+        background-color: #222;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 10px;
+    }
+
+    .send-ships {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin: 10px 0;
+    }
+
+    .activity-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .activity-item {
+        background-color: #333;
+        padding: 10px;
+        border-radius: 5px;
+    }
         margin-bottom: 10px;
     }
     .ship-card .ship-counter{
@@ -66,29 +92,143 @@ razor
             <img src="@ship.Image" alt="@ship.Title" />
             <h3>@ship.Title</h3>
             <p class="ship-counter">Count: @ship.Quantity</p>
-        </div>
-    }
-</div>
+    </div>
+
+    <!-- Send Fleet Section -->
+    <div class="send-fleet">
+        <h2>Send Fleet</h2>
+        <form @onsubmit="SendFleet">
+            <label>Mission:</label>
+            <select @bind="SelectedMission">
+                <option value="Attack">Attack</option>
+                <option value="Transport">Transport</option>
+                <option value="Deploy">Deploy</option>
+                <option value="Spy">Spy</option>
+                <option value="Colonize">Colonize</option>
+                <option value="Recycle">Recycle</option>
+                <option value="Destroy">Destroy</option>
+                <option value="Expedition">Expedition</option>
+            </select>
+            <br>
+            <label>Target Galaxy:</label>
+            <input type="number" @bind="TargetGalaxy" />
+            <label>System:</label>
+            <input type="number" @bind="TargetSystem" />
+            <label>Position:</label>
+            <input type="number" @bind="TargetPosition" />
+            <br>
+            <label>Ships to Send:</label>
+            <div class="send-ships">
+                @foreach (var ship in ships)
+                {
+                    <div>
+                        <label>@ship.Title:</label>
+                        <input type="number" @bind="ship.QuantityToSend" min="0" max="@ship.Quantity" />
+                    </div>
+                }
+            </div>
+            <button type="submit">Send Fleet</button>
+        </form>
+        <p>Flight Time: @FlightTime.ToString(@"hh\:mm\:ss") | Fuel Consumption: @FuelConsumption</p>
+    </div>
+
+    <!-- Fleet Activity -->
+    <div class="fleet-activity">
+        <h2>Fleet Activity</h2>
+        @if (ActiveFleets.Count > 0)
+        {
+            <div class="activity-list">
+                @foreach (var fleet in ActiveFleets)
+                {
+                    <div class="activity-item">
+                        <p>Mission: @fleet.Mission | Target: [@fleet.Target] | Arrival: @fleet.ArrivalTime.ToString("HH:mm:ss")</p>
+                        <p>Ships: @string.Join(", ", fleet.Ships.Select(s => $"{s.Title}: {s.Quantity}"))</p>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <p>No active fleets.</p>
+        }
+    </div>
+}
 
 @code {
     public class ShipDto
     {
-        public string Title { get; set; }
-        public string Image { get; set; }
+        public string Title { get; set; } = "";
+        public string Image { get; set; } = "";
         public int Quantity { get; set; }
+        public int QuantityToSend { get; set; }
+        public int Speed { get; set; } = 10000; // Example speed
+        public long FuelConsumption { get; set; } = 10; // Per unit
+        public long Capacity { get; set; } = 5000; // Cargo
+    }
+
+    public class Fleet
+    {
+        public string Mission { get; set; } = "";
+        public string Target { get; set; } = "";
+        public DateTime ArrivalTime { get; set; }
+        public List<ShipDto> Ships { get; set; } = new();
     }
 
     private List<ShipDto> ships = new List<ShipDto>()
     {
-        new ShipDto { Title = "Small Cargo", Image = "smallCargo.jpg", Quantity = 10 },
-        new ShipDto { Title = "Large Cargo", Image = "largeCargo.jpg", Quantity = 5 },
-        new ShipDto { Title = "Light Fighter", Image = "lightFighter.jpg", Quantity = 20 },
-        new ShipDto { Title = "Heavy Fighter", Image = "heavyFighter.jpg", Quantity = 15 },
-        new ShipDto { Title = "Cruiser", Image = "cruiser.jpg", Quantity = 8 },
-        new ShipDto { Title = "Battleship", Image = "battleship.jpg", Quantity = 3 },
-        new ShipDto { Title = "Colony Ship", Image = "colonyShip.jpg", Quantity = 1 },
-        new ShipDto { Title = "Recycler", Image = "recycler.jpg", Quantity = 2 },
-        new ShipDto { Title = "Destroyer", Image = "destroyer.jpg", Quantity = 4 },
-        new ShipDto { Title = "Death Star", Image = "deathstar.jpg", Quantity = 1 }
+        new ShipDto { Title = "Small Cargo", Image = "smallCargo.jpg", Quantity = 10, Speed = 5000, FuelConsumption = 10, Capacity = 5000 },
+        new ShipDto { Title = "Large Cargo", Image = "largeCargo.jpg", Quantity = 5, Speed = 7500, FuelConsumption = 50, Capacity = 25000 },
+        new ShipDto { Title = "Light Fighter", Image = "lightFighter.jpg", Quantity = 20, Speed = 12500, FuelConsumption = 20, Capacity = 50 },
+        new ShipDto { Title = "Heavy Fighter", Image = "heavyFighter.jpg", Quantity = 15, Speed = 10000, FuelConsumption = 75, Capacity = 100 },
+        new ShipDto { Title = "Cruiser", Image = "cruiser.jpg", Quantity = 8, Speed = 15000, FuelConsumption = 300, Capacity = 800 },
+        new ShipDto { Title = "Battleship", Image = "battleship.jpg", Quantity = 3, Speed = 10000, FuelConsumption = 500, Capacity = 1500 },
+        new ShipDto { Title = "Colony Ship", Image = "colonyShip.jpg", Quantity = 1, Speed = 2500, FuelConsumption = 1000, Capacity = 7500 },
+        new ShipDto { Title = "Recycler", Image = "recycler.jpg", Quantity = 2, Speed = 2000, FuelConsumption = 300, Capacity = 20000 },
+        new ShipDto { Title = "Destroyer", Image = "destroyer.jpg", Quantity = 4, Speed = 5000, FuelConsumption = 1000, Capacity = 1000 },
+        new ShipDto { Title = "Death Star", Image = "deathstar.jpg", Quantity = 1, Speed = 100, FuelConsumption = 1, Capacity = 1000000 }
     };
+
+    private string SelectedMission = "Attack";
+    private int TargetGalaxy = 1;
+    private int TargetSystem = 1;
+    private int TargetPosition = 1;
+    private TimeSpan FlightTime = TimeSpan.Zero;
+    private long FuelConsumption = 0;
+    private List<Fleet> ActiveFleets = new();
+
+    private void SendFleet()
+    {
+        var fleet = new Fleet
+        {
+            Mission = SelectedMission,
+            Target = $"{TargetGalaxy}:{TargetSystem}:{TargetPosition}",
+            Ships = ships.Where(s => s.QuantityToSend > 0).Select(s => new ShipDto { Title = s.Title, Quantity = s.QuantityToSend }).ToList()
+        };
+
+        if (fleet.Ships.Any())
+        {
+            // Calculate flight time based on slowest ship
+            var slowestSpeed = fleet.Ships.Min(s => ships.First(ship => ship.Title == s.Title).Speed);
+            var distance = CalculateDistance(TargetGalaxy, TargetSystem, TargetPosition);
+            FlightTime = TimeSpan.FromHours(distance / slowestSpeed);
+            FuelConsumption = fleet.Ships.Sum(s => s.Quantity * ships.First(ship => ship.Title == s.Title).FuelConsumption);
+
+            fleet.ArrivalTime = DateTime.Now.Add(FlightTime);
+            ActiveFleets.Add(fleet);
+
+            // Deduct quantities
+            foreach (var s in fleet.Ships)
+            {
+                var ship = ships.First(sh => sh.Title == s.Title);
+                ship.Quantity -= s.Quantity;
+                s.QuantityToSend = 0;
+            }
+        }
+    }
+
+    private double CalculateDistance(int g, int s, int p)
+    {
+        // Placeholder distance calculation
+        return Math.Sqrt(g * g + s * s + p * p) * 1000;
+    }
 }
