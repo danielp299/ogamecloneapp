@@ -1,4 +1,7 @@
 @page "/defense"
+@using myapp.Services
+@inject ResourceService ResourceService
+@implements IDisposable
 
 <h2>Defense Page</h2>
 <style>
@@ -187,9 +190,7 @@
 
     private List<CannonDto> cannons = new List<CannonDto>();    
     private List<QueueItemDto> constructionQueue = new List<QueueItemDto>();    
-    private int Metal { get; set; } = 10000;    
-    private int Crystal { get; set; } = 10000;    
-    private int Deuterium { get; set; } = 10000;    
+    // Removed local Metal, Crystal, Deuterium properties to use ResourceService
     private int maxQuantityToBuild = 10000;
     
     public void AddToQueueQuantity(CannonDto cannon, int quantity)    
@@ -198,15 +199,16 @@
         int totalMetalCost = cannon.MetalCost * quantity;        
         int totalCrystalCost = cannon.CrystalCost * quantity;        
         int totalDeuteriumCost = cannon.DeuteriumCost * quantity;
-        if (Metal >= totalMetalCost && Crystal >= totalCrystalCost && Deuterium >= totalDeuteriumCost)        
-        {            
+
+        if (ResourceService.HasResources(totalMetalCost, totalCrystalCost, totalDeuteriumCost))        
+        {
+            ResourceService.ConsumeResources(totalMetalCost, totalCrystalCost, totalDeuteriumCost);
+            
             for (int i = 0; i < quantity; i++)            
             {                
                 constructionQueue.Add(new QueueItemDto { Cannon = cannon, TimeRemaining = cannon.ConstructionDuration });            
             }
-            Metal -= totalMetalCost;
-            Crystal -= totalCrystalCost;
-            Deuterium -= totalDeuteriumCost;
+            // Removed local variable deductions
             cannon.BuiltQuantity += quantity; // Add to built
         }    
     }
@@ -230,6 +232,11 @@
     protected override void OnInitialized()    
     {        
         CreateCannons();    
+        ResourceService.OnChange += StateHasChanged;
+    }
+    public void Dispose()
+    {
+        ResourceService.OnChange -= StateHasChanged;
     }
     private void OnQuantityToBuildInput(CannonDto cannon, ChangeEventArgs e)    
     {        

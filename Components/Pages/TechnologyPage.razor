@@ -1,5 +1,8 @@
 razor
 @page "/Technologies"
+@using myapp.Services
+@inject ResourceService ResourceService
+@implements IDisposable
 
 <style>
     .buildings-banner {
@@ -116,7 +119,7 @@ razor
             <p>Crystal: @tech.CrystalCost</p>
             <p>Deuterium: @tech.DeuteriumCost</p>
             <p>Research Duration: @tech.ResearchDuration</p>
-            <button>Research</button>
+            <button @onclick="() => Research(tech)">Research</button>
         </div>
     }
 </div>
@@ -144,8 +147,24 @@ razor
 
     private List<TechnologyDto> technologies = new List<TechnologyDto>();
 
+    private void Research(TechnologyDto tech)
+    {
+        if (ResourceService.HasResources((int)tech.MetalCost, (int)tech.CrystalCost, (int)tech.DeuteriumCost))
+        {
+            ResourceService.ConsumeResources((int)tech.MetalCost, (int)tech.CrystalCost, (int)tech.DeuteriumCost);
+            tech.Level++;
+            // TODO: Start research timer
+            Console.WriteLine($"Researched {tech.Title} to level {tech.Level}");
+        }
+        else
+        {
+             Console.WriteLine("Not enough resources!");
+        }
+    }
+
     protected override void OnInitialized()
     {
+        ResourceService.OnChange += StateHasChanged;
         technologies.Add(new TechnologyDto
             {
                 Title = "Espionage Technology",
@@ -257,5 +276,9 @@ razor
                 Image = "hyperspaceTech.jpg"
             });
             
+    }
+    public void Dispose()
+    {
+        ResourceService.OnChange -= StateHasChanged;
     }
 }

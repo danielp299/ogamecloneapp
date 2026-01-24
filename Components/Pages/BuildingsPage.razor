@@ -1,7 +1,10 @@
-@* razor *@
 @page "/buildings"
 @using Microsoft.AspNetCore.Components
+@using myapp.Services
 @inject NavigationManager Navigation
+@inject ResourceService ResourceService
+@inject BuildingService BuildingService
+@implements IDisposable
 
 <style>
     .construction-queue {
@@ -88,11 +91,11 @@
 <div class="buildings-banner">
     <h2>Buildings</h2>
 </div>
-@if(ConstructionQueue.Count > 0) {
+@if(BuildingService.ConstructionQueue.Count > 0) {
     @* Construction queue *@
     <h3>Construction Queue</h3>
     <div class="construction-queue" id="construction-queue">
-        @foreach (var item in ConstructionQueue)
+        @foreach (var item in BuildingService.ConstructionQueue)
         {
             <div class="building-card">
                 <h3>@item.Title</h3>
@@ -105,7 +108,7 @@
         </div>
 }
 <div class="buildings-grid" id="buildings-grid">
-    @foreach (var building in Buildings)
+    @foreach (var building in BuildingService.Buildings)
     {
         <div class="building-card">
               <div class="level">Level: @building.Level</div>
@@ -124,24 +127,23 @@
              </div>
 
 
-            <p>Duration: @building.ConstructionDuration.ToString()</p>
+            <p>Duration: @building.Duration.ToString()</p>
             <p>Energy Consumption: @building.EnergyConsumption</p>
             
-            <div class="card-footer">@if (!ConstructionQueue.Contains(building))
+            <div class="card-footer">@if (!BuildingService.ConstructionQueue.Contains(building))
             {
                  @if (building.Level < 1)
                  {
-                     <button id="construct-building-@building.Id" @onclick="() => AddToQueue(building)">Construct</button>
+                     <button id="construct-building-@building.Id" @onclick="() => BuildingService.AddToQueue(building)">Construct</button>
                  }
                  else
                  {
-                     <button id="dismantle-building-@building.Id" @onclick="() => Dismantle(building)">Dismantle</button>
-                     <button id="upgrade-building-@building.Id" @onclick="() => AddToQueue(building)">Upgrade</button>
+                     <button id="upgrade-building-@building.Id" @onclick="() => BuildingService.AddToQueue(building)">Upgrade</button>
                  }
             } else {
                  if(building.IsBuilding){
                     <p>Time remaining: @building.TimeRemaining.ToString()</p>
-                    <button @onclick="() => Cancel(building)">Cancel</button>
+                    <button @onclick="() => BuildingService.Cancel(building)">Cancel</button>
                 }
             }
             </div>
@@ -153,256 +155,15 @@
 
 
 @code{
-    public class BuildingDto
+    protected override void OnInitialized()
     {
-        public string Title { get; set; } = "";
-        public string Description { get; set; } = "";
-        public string Image { get; set; } = "";
-        public long BaseMetalCost { get; set; }
-        public long BaseCrystalCost { get; set; }
-        public long BaseDeuteriumCost { get; set; }
-        public TimeSpan BaseDuration { get; set; }
-        public int EnergyConsumption { get; set; }
-        public int Level { get; set; } = 1;
-        public double Scaling { get; set; } = 2.0;
-        public List<string> Dependencies { get; set; } = new();
-        public int FieldsOccupied { get; set; } = 1;
-        
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public TimeSpan ConstructionDuration { get; set; }
-        public bool IsBuilding { get; set; }
-        public TimeSpan TimeRemaining { get; set; }
-
-        public long MetalCost => (long)(BaseMetalCost * Math.Pow(Scaling, Level - 1));
-        public long CrystalCost => (long)(BaseCrystalCost * Math.Pow(Scaling, Level - 1));
-        public long DeuteriumCost => (long)(BaseDeuteriumCost * Math.Pow(Scaling, Level - 1));
-        public TimeSpan Duration => BaseDuration; // Simplified, could add formula
+        ResourceService.OnChange += StateHasChanged;
+        BuildingService.OnChange += StateHasChanged;
     }
 
-    [Parameter]
-    public List<BuildingDto> ConstructionQueue { get; set; } = new List<BuildingDto>();
-
-    [Parameter]
-    public List<BuildingDto> Buildings { get; set; } = new List<BuildingDto>();
-
-    private int UsedFields = 15;
-    private int MaxFields = 163;
-
-    private BuildingDto CurrentBuilding { get; set; } = null;
-
-    private async Task AddToQueue(BuildingDto building)
+    public void Dispose()
     {
-        if (ConstructionQueue.Count >= 5) return; // Max 5 buildings in queue        
-        ConstructionQueue.Add(building);
-
-        if (CurrentBuilding == null || !CurrentBuilding.IsBuilding)
-        {
-            await StartNextBuilding();
-        }
+        ResourceService.OnChange -= StateHasChanged;
+        BuildingService.OnChange -= StateHasChanged;
     }
-
-    private void Dismantle(BuildingDto building)
-    {
-        Console.WriteLine($"Dismantling {building.Title}");
-    }
-
-    private async Task StartNextBuilding()
-    {
-        if (ConstructionQueue.Count > 0)
-        {
-            CurrentBuilding = ConstructionQueue[0];            
-            CurrentBuilding.IsBuilding = true;           
-            CurrentBuilding.TimeRemaining = CurrentBuilding.ConstructionDuration;
-
-            while (CurrentBuilding.TimeRemaining > TimeSpan.Zero)
-            {
-                await Task.Delay(1000); // Wait for 1 second
-                CurrentBuilding.TimeRemaining = CurrentBuilding.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
-                await InvokeAsync(StateHasChanged);
-            }
-
-            CurrentBuilding.IsBuilding = false;            
-            ConstructionQueue.RemoveAt(0);
-            CurrentBuilding = null;
-            await InvokeAsync(StateHasChanged);
-
-            // Start the next building in the queue if there is one
-            await StartNextBuilding();            
-        }
-        else
-        {
-            CurrentBuilding = null;
-        }
-    }
-
-    private void Cancel(BuildingDto building) {
-        if(building == CurrentBuilding) CurrentBuilding = null;
-         ConstructionQueue.Remove(building);
-         building.IsBuilding = false;
-         building.TimeRemaining = TimeSpan.Zero;
-         StartNextBuilding();
-    }
-    
-    private List<BuildingDto> CreateDefaultBuildings() {
-        List<BuildingDto> defaultBuildings = new List<BuildingDto>();
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Metal Mine",
-            Description = "Produces Metal.",
-            BaseMetalCost = 60,
-            BaseCrystalCost = 15,
-            BaseDeuteriumCost = 0,
-            ConstructionDuration = TimeSpan.FromSeconds(10),
-            Image = "building1.jpg",
-            EnergyConsumption = 10
-        });
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Crystal Mine",
-            Description = "Produces Crystal.",
-            BaseMetalCost = 48,
-            BaseCrystalCost = 24,
-            BaseDeuteriumCost = 0,
-            ConstructionDuration = TimeSpan.FromSeconds(15),
-            Image = "building2.jpg",
-            EnergyConsumption = 8
-        });
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Deuterium Synthesizer",
-            Description = "Produces Deuterium.",
-            BaseMetalCost = 225,
-            BaseCrystalCost = 75,
-            BaseDeuteriumCost = 0,   
-            ConstructionDuration = TimeSpan.Parse("00:00:30"),
-            Image = "building3.jpg",
-            EnergyConsumption = 15
-        });
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Solar Plant",
-            Description = "Generates Energy.",
-            BaseMetalCost = 75,
-            BaseCrystalCost = 30,
-            BaseDeuteriumCost = 0,    
-            ConstructionDuration = TimeSpan.Parse("00:00:20"),
-            Image = "building4.jpg",
-            EnergyConsumption = -20
-        });
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Robotics Factory",
-            Description = "Builds robots.",
-            BaseMetalCost = 400,
-            BaseCrystalCost = 120,
-            BaseDeuteriumCost = 200,    
-            ConstructionDuration = TimeSpan.Parse("00:01:00"),
-            Image = "building5.jpg",
-            EnergyConsumption = 30
-        });
-
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Shipyard",
-            Description = "Builds ships.",
-            BaseMetalCost = 400,
-            BaseCrystalCost = 200,
-            BaseDeuteriumCost = 100,    
-            ConstructionDuration = TimeSpan.Parse("00:01:30"),
-            Image = "building6.jpg",
-            EnergyConsumption = 25
-        });
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Metal Storage",
-            Description = "Stores Metal.",
-            BaseMetalCost = 200,
-            BaseCrystalCost = 0,
-            BaseDeuteriumCost = 0,    
-            ConstructionDuration = TimeSpan.Parse("00:00:45"),
-            Image = "building7.jpg",
-            EnergyConsumption = 0
-        });
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Crystal Storage",
-            Description = "Stores Crystal.",
-            BaseMetalCost = 200,
-            BaseCrystalCost = 100,
-            BaseDeuteriumCost = 0,    
-            ConstructionDuration = TimeSpan.Parse("00:00:50"),
-            Image = "building8.jpg",
-            EnergyConsumption = 0
-        });
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Deuterium Storage",
-            Description = "Stores Deuterium.",
-            BaseMetalCost = 200,
-            BaseCrystalCost = 200,
-            BaseDeuteriumCost = 0,    
-            ConstructionDuration = TimeSpan.Parse("00:00:55"),
-            Image = "building9.jpg",
-            EnergyConsumption = 0
-        });
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Research Lab",
-            Description = "Allows to do Research.",
-            BaseMetalCost = 400,
-            BaseCrystalCost = 200,
-            BaseDeuteriumCost = 100,    
-            ConstructionDuration = TimeSpan.Parse("00:01:15"),
-            Image = "building10.jpg",
-            EnergyConsumption = 20
-        });
-
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Terraformer",
-            Description = "Allows to build more buildings.",
-            BaseMetalCost = 50000,
-            BaseCrystalCost = 100000,
-            BaseDeuteriumCost = 1000,    
-            ConstructionDuration = TimeSpan.Parse("01:00:00"),
-            Image = "building11.jpg",
-            EnergyConsumption = 50
-        });
-
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Missile Silo",
-            Description = "Stores interplantary missiles.",
-            BaseMetalCost = 20000,
-            BaseCrystalCost = 20000,
-            BaseDeuteriumCost = 1000,    
-            ConstructionDuration = TimeSpan.Parse("00:05:00"),
-            Image = "building12.jpg",
-            EnergyConsumption = 0
-        });
-        defaultBuildings.Add(new BuildingDto
-        {
-            Title = "Nanite Factory",
-            Description = "Increases Building speed.",
-            BaseMetalCost = 1000000,
-            BaseCrystalCost = 500000,
-            BaseDeuteriumCost = 100000,    
-            ConstructionDuration = TimeSpan.Parse("02:00:00"),
-            Image = "building13.jpg",
-            EnergyConsumption = 100
-        });
-
-        foreach (var item in defaultBuildings) item.Id = Guid.NewGuid();
-
-        return defaultBuildings;
-    }
-
-    protected override void OnParametersSet()
-    {
-        if (Buildings == null || Buildings.Count == 0)
-        {
-            Buildings = CreateDefaultBuildings();
-        }
-    }
-
 }

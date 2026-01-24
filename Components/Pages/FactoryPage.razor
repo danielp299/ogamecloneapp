@@ -1,4 +1,7 @@
 @page "/factory"
+@using myapp.Services
+@inject ResourceService ResourceService
+@implements IDisposable
 
 <style>
     .buildings-banner {
@@ -166,9 +169,6 @@
 
     private List<ShipDto> ships = new List<ShipDto>();
     private List<QueueItemDto> constructionQueue = new List<QueueItemDto>();
-    private int Metal { get; set; } = 10000;
-    private int Crystal { get; set; } = 10000;
-    private int Deuterium { get; set; } = 10000;
     private int maxQuantityToBuild = 10000;
     private int ShipyardLevel { get; set; } = 1;
     private int RoboticsLevel { get; set; } = 2; // Required for Shipyard
@@ -182,24 +182,31 @@
     public void AddToQueueQuantity(ShipDto ship, int quantity)
     {
         if (quantity <= 0) return; // Avoid zero or negative quantity
+        
         // Check dependencies
         if (ship.Dependencies.Contains("Shipyard") && ShipyardLevel < 1) return;
         if (ship.Dependencies.Contains("Robotics Factory") && RoboticsLevel < 2) return;
-        // Add more as needed
+        
         int totalMetalCost = ship.MetalCost * quantity;
         int totalCrystalCost = ship.CrystalCost * quantity;
         int totalDeuteriumCost = ship.DeuteriumCost * quantity;
-        if (Metal >= totalMetalCost && Crystal >= totalCrystalCost && Deuterium >= totalDeuteriumCost)
+
+        // Check global resources
+        if (!ResourceService.HasResources(totalMetalCost, totalCrystalCost, totalDeuteriumCost))
         {
-            for (int i = 0; i < quantity; i++)
-            {
-                constructionQueue.Add(new QueueItemDto { Ship = ship, TimeRemaining = GetDuration(ship).ToString() });
-            }
-            Metal -= totalMetalCost;
-            Crystal -= totalCrystalCost;
-            Deuterium -= totalDeuteriumCost;
-            ship.Quantity += quantity; // Add to built
+             Console.WriteLine("Not enough resources!");
+             return;
         }
+
+        // Consume global resources
+        ResourceService.ConsumeResources(totalMetalCost, totalCrystalCost, totalDeuteriumCost);
+
+        for (int i = 0; i < quantity; i++)
+        {
+            constructionQueue.Add(new QueueItemDto { Ship = ship, TimeRemaining = GetDuration(ship).ToString() });
+        }
+        
+        ship.Quantity += quantity; // Add to built (Immediate for now, should be queued really)
     }
 
     private void AddToQuantityToBuild(ShipDto ship, int quantity)
@@ -224,7 +231,13 @@
     
 protected override void OnInitialized()
 {
+    ResourceService.OnChange += StateHasChanged;
     CreateShips();
+}
+
+public void Dispose()
+{
+    ResourceService.OnChange -= StateHasChanged;
 }
 
 private void OnQuantityToBuildInput(ShipDto ship, ChangeEventArgs e)

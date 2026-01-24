@@ -1,4 +1,7 @@
 @page "/fleet"
+@using myapp.Services
+@inject ResourceService ResourceService
+@implements IDisposable
 
 <style>
     .fleet-banner {
@@ -98,6 +101,12 @@
 <!-- Send Fleet Section -->
     <div class="send-fleet">
         <h2>Send Fleet</h2>
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div style="color: red; margin-bottom: 10px; font-weight: bold;">
+                @errorMessage
+            </div>
+        }
         <form @onsubmit="SendFleet">
             <label>Mission:</label>
             <select @bind="SelectedMission">
@@ -200,40 +209,63 @@
     private long FuelConsumption = 0;
     private List<Fleet> ActiveFleets = new();
 
+    private string errorMessage = "";
+
     private void SendFleet()
     {
+        errorMessage = "";
+        
+        var shipsToSend = ships.Where(s => s.QuantityToSend > 0).ToList();
+
+        if (!shipsToSend.Any())
+        {
+            errorMessage = "No ships selected.";
+            return;
+        }
+
+        // Calculate flight time based on slowest ship
+        var slowestSpeed = shipsToSend.Min(s => ships.First(ship => ship.Title == s.Title).Speed);
+        var distance = CalculateDistance(TargetGalaxy, TargetSystem, TargetPosition);
+        FlightTime = TimeSpan.FromHours(distance / slowestSpeed);
+        
+        // Calculate total fuel consumption
+        FuelConsumption = shipsToSend.Sum(s => s.QuantityToSend * ships.First(ship => ship.Title == s.Title).FuelConsumption);
+
+        // check if user has enough deuterium
+        if (!ResourceService.HasResources(0, 0, (int)FuelConsumption))
+        {
+             errorMessage = $"Not enough Deuterium! Required: {FuelConsumption}";
+             return;
+        }
+
+        // Consume deuterium
+        ResourceService.ConsumeResources(0, 0, (int)FuelConsumption);
+
         var fleet = new Fleet
         {
             Mission = SelectedMission,
             Target = $"{TargetGalaxy}:{TargetSystem}:{TargetPosition}",
-            Ships = ships.Where(s => s.QuantityToSend > 0).Select(s => new ShipDto { Title = s.Title, Quantity = s.QuantityToSend }).ToList()
+            Ships = shipsToSend.Select(s => new ShipDto { Title = s.Title, Quantity = s.QuantityToSend }).ToList()
         };
 
-        if (fleet.Ships.Any())
+        fleet.ArrivalTime = DateTime.Now.Add(FlightTime);
+        ActiveFleets.Add(fleet);
+
+        // Deduct quantities
+        foreach (var s in fleet.Ships)
         {
-            // Calculate flight time based on slowest ship
-            var slowestSpeed = fleet.Ships.Min(s => ships.First(ship => ship.Title == s.Title).Speed);
-            var distance = CalculateDistance(TargetGalaxy, TargetSystem, TargetPosition);
-            FlightTime = TimeSpan.FromHours(distance / slowestSpeed);
-            FuelConsumption = fleet.Ships.Sum(s => s.Quantity * ships.First(ship => ship.Title == s.Title).FuelConsumption);
+            var ship = ships.First(sh => sh.Title == s.Title);
+            ship.Quantity -= s.Quantity;
+            // reset input
+            var inputShip = ships.First(sh => sh.Title == s.Title);
+            inputShip.QuantityToSend = 0;
+        }
 
-            fleet.ArrivalTime = DateTime.Now.Add(FlightTime);
-            ActiveFleets.Add(fleet);
-
-            // Deduct quantities
-            foreach (var s in fleet.Ships)
-            {
-                var ship = ships.First(sh => sh.Title == s.Title);
-                ship.Quantity -= s.Quantity;
-                s.QuantityToSend = 0;
-            }
-
-            // If mission is Attack, simulate combat on arrival
-            if (SelectedMission == "Attack")
-            {
-                // Simulate delay for flight
-                Task.Delay(FlightTime).ContinueWith(_ => ResolveCombat(fleet));
-            }
+        // If mission is Attack, simulate combat on arrival
+        if (SelectedMission == "Attack")
+        {
+            // Simulate delay for flight
+            Task.Delay(FlightTime).ContinueWith(_ => ResolveCombat(fleet));
         }
     }
 
@@ -290,7 +322,13 @@
         }
 
         string winner = attackers.Sum(a => a.Quantity) > 0 ? "Attacker" : "Defender";
-        long debrisMetal = 0;
+        
+        // Simple debris calculation logic based on remaining ships vs initial ships would be better,
+        // but since we don't have the initial state here easily without refactoring, 
+        // we will simulate debris based on a fraction of the winner's remaining fleet capacity for now
+        // to have a non-zero value, or simply leave it as 0 until we refactor the combat engine properly.
+        // For now, let's keep it safe and compiling.
+        long debrisMetal = 0; 
         long debrisCrystal = 0;
 
         return new CombatResult { Winner = winner, DebrisMetal = (long)debrisMetal, DebrisCrystal = (long)debrisCrystal };
@@ -307,5 +345,10 @@
     {
         // Placeholder distance calculation
         return Math.Sqrt(g * g + s * s + p * p) * 1000;
+    }
+
+    public void Dispose()
+    {
+        // Cleanup if needed
     }
 }

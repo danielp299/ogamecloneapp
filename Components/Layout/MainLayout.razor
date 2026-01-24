@@ -1,4 +1,6 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@inject myapp.Services.ResourceService ResourceService
+@implements IDisposable
 
 <style>
     .top-menu {
@@ -40,25 +42,29 @@
         <div class="top-menu">
             <div class="resource">
                 <label>Metal</label>
-                <span class="resource-value">10000</span>
+                <span class="resource-value">@ResourceService.Metal.ToString("N0")</span>
             </div>
             <div class="resource">
                 <label>Crystal</label>
-                <span class="resource-value">5000</span>
+                <span class="resource-value">@ResourceService.Crystal.ToString("N0")</span>
             </div>
             <div class="resource">
                 <label>Deuterium</label>
-                <span class="resource-value">2000</span>
+                <span class="resource-value">@ResourceService.Deuterium.ToString("N0")</span>
             </div>
             <div class="resource">
                 <label>Energy</label>
-                <span class="resource-value">0</span>
+                <span class="resource-value">@ResourceService.Energy.ToString("N0")</span>
             </div>
         </div>
 
         <article class="content px-4">
             @Body
         </article>
+
+        <div style="position: fixed; bottom: 0; right: 0; padding: 5px; color: #555; font-size: 0.8em; background-color: rgba(0,0,0,0.5);">
+            Build: @BuildDate
+        </div>
     </main>
 </div>
 
@@ -67,3 +73,17 @@
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
 </div>
+
+@code {
+    private string BuildDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+    protected override void OnInitialized()
+    {
+        ResourceService.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        ResourceService.OnChange -= StateHasChanged;
+    }
+}

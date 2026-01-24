@@ -1,7 +1,10 @@
 
 @page "/"
 @using Microsoft.AspNetCore.Components
+@using myapp.Services
 @inject NavigationManager Navigation
+@inject ResourceService ResourceService
+@implements IDisposable
 
 <PageTitle>Home</PageTitle>
 
@@ -118,17 +121,17 @@
     <div class="resource-bar">
         <div class="resource">
             <img src="metal.png" alt="Metal" />
-            <span>@Metal.ToString("N0") / @MetalCapacity.ToString("N0")</span>
+            <span>@ResourceService.Metal.ToString("N0") / @MetalCapacity.ToString("N0")</span>
             <span>Prod: +@MetalProduction.ToString("N0")/h</span>
         </div>
         <div class="resource">
             <img src="crystal.png" alt="Crystal" />
-            <span>@Crystal.ToString("N0") / @CrystalCapacity.ToString("N0")</span>
+            <span>@ResourceService.Crystal.ToString("N0") / @CrystalCapacity.ToString("N0")</span>
             <span>Prod: +@CrystalProduction.ToString("N0")/h</span>
         </div>
         <div class="resource">
             <img src="deuterium.png" alt="Deuterium" />
-            <span>@Deuterium.ToString("N0") / @DeuteriumCapacity.ToString("N0")</span>
+            <span>@ResourceService.Deuterium.ToString("N0") / @DeuteriumCapacity.ToString("N0")</span>
             <span>Prod: +@DeuteriumProduction.ToString("N0")/h</span>
         </div>
         <div class="resource">
@@ -226,15 +229,13 @@
 
 @code {
     // Resource Data
-    private long Metal = 10000;
+    // Metal, Crystal, Deuterium come from ResourceService now
     private long MetalCapacity = 100000;
     private long MetalProduction = 500;
 
-    private long Crystal = 5000;
     private long CrystalCapacity = 50000;
     private long CrystalProduction = 250;
 
-    private long Deuterium = 2000;
     private long DeuteriumCapacity = 20000;
     private long DeuteriumProduction = 100;
 
@@ -258,6 +259,8 @@
 
     protected override void OnInitialized()
     {
+        ResourceService.OnChange += StateHasChanged;
+
         // Initialize planets
         for (int i = 1; i <= 8; i++)
         {
@@ -277,6 +280,11 @@
         ActiveEvents.Add(new EventItem { Description = "Fleet returning from attack", ArrivalTime = DateTime.Now.AddMinutes(15) });
     }
 
+    public void Dispose()
+    {
+        ResourceService.OnChange -= StateHasChanged;
+    }
+
     private void CancelItem(QueueItem item)
     {
         ConstructionQueue.Remove(item);
@@ -294,7 +302,7 @@
 
     private void NavigateToTechnology()
     {
-        Navigation.NavigateTo("/technology");
+        Navigation.NavigateTo("/technologies");
     }
 
     private void NavigateToFleet()
