@@ -1,5 +1,4 @@
 @page "/factory"
-@rendermode InteractiveServer
 
 <style>
     .buildings-banner {
@@ -121,7 +120,7 @@
                 <p>Metal: @ship.MetalCost</p>
                 <p>Crystal: @ship.CrystalCost</p>
                 <p>Deuterium: @ship.DeuteriumCost</p>
-                <p>Construction Duration: @ship.ConstructionDuration</p>
+                <p>Construction Duration: @GetDuration(ship)</p>
             <div class="building-card-quantity-selector">
                 <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 10)">10</button>
                 <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 50)">50</button>
@@ -155,7 +154,7 @@
         public int Quantity { get; set; } = 0;
         public int QuantityToBuild { get; set; } = 1;
         public List<string> Dependencies { get; set; } = new();
-        public TimeSpan Duration => TimeSpan.FromHours(BaseDuration.TotalHours / (2500 * (1 + ShipyardLevel) * Math.Pow(2, NaniteLevel)));
+        public string ConstructionDuration { get; set; } = "00:00:00";
     }
 
     
@@ -176,6 +175,10 @@
     private int NaniteLevel { get; set; } = 0;
 
 
+    private TimeSpan GetDuration(ShipDto ship) {
+        return TimeSpan.FromHours(ship.BaseDuration.TotalHours / (2500 * (1 + ShipyardLevel) * Math.Pow(2, NaniteLevel)));
+    }
+
     public void AddToQueueQuantity(ShipDto ship, int quantity)
     {
         if (quantity <= 0) return; // Avoid zero or negative quantity
@@ -190,7 +193,7 @@
         {
             for (int i = 0; i < quantity; i++)
             {
-                constructionQueue.Add(new QueueItemDto { Ship = ship, TimeRemaining = ship.Duration.ToString() });
+                constructionQueue.Add(new QueueItemDto { Ship = ship, TimeRemaining = GetDuration(ship).ToString() });
             }
             Metal -= totalMetalCost;
             Crystal -= totalCrystalCost;
@@ -199,11 +202,6 @@
         }
     }
 
-            Metal -= totalMetalCost;
-            Crystal -= totalCrystalCost;
-            Deuterium -= totalDeuteriumCost;
-        }
-    }   
     private void AddToQuantityToBuild(ShipDto ship, int quantity)
     {
         if (ship.QuantityToBuild == 1)

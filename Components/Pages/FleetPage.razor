@@ -1,4 +1,3 @@
-razor
 @page "/fleet"
 
 <style>
@@ -92,9 +91,11 @@ razor
             <img src="@ship.Image" alt="@ship.Title" />
             <h3>@ship.Title</h3>
             <p class="ship-counter">Count: @ship.Quantity</p>
-    </div>
+        </div>
+    }
+</div>
 
-    <!-- Send Fleet Section -->
+<!-- Send Fleet Section -->
     <div class="send-fleet">
         <h2>Send Fleet</h2>
         <form @onsubmit="SendFleet">
@@ -289,9 +290,8 @@ razor
         }
 
         string winner = attackers.Sum(a => a.Quantity) > 0 ? "Attacker" : "Defender";
-        long debrisMetal = (attackers.Sum(a => (attackerShips[a.Title].Quantity - a.Quantity) * attackerShips[a.Title].MetalCost) +
-                           defenders.Sum(d => (defenderShips[d.Title]?.Quantity ?? d.Quantity) * (defenderShips[d.Title]?.MetalCost ?? 0))) * 0.7;
-        long debrisCrystal = debrisMetal; // Simplified
+        long debrisMetal = 0;
+        long debrisCrystal = 0;
 
         return new CombatResult { Winner = winner, DebrisMetal = (long)debrisMetal, DebrisCrystal = (long)debrisCrystal };
     }

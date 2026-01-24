@@ -1,6 +1,5 @@
 razor
 @page "/Technologies"
-@rendermode InteractiveServer
 
 <style>
     .buildings-banner {
@@ -135,13 +134,12 @@ razor
         public int Level { get; set; } = 0;
         public double Scaling { get; set; } = 2.0;
         public List<string> Dependencies { get; set; } = new();
+        public string ResearchDuration { get; set; } = "00:00:00";
 
-        public long MetalCost => Title == "Astrophysics" ? (long)(BaseMetalCost * Math.Pow(1.75, Level)) : (long)(BaseMetalCost * Math.Pow(Scaling, Level));
-        public long CrystalCost => Title == "Astrophysics" ? (long)(BaseCrystalCost * Math.Pow(1.75, Level)) : (long)(BaseCrystalCost * Math.Pow(Scaling, Level));
-        public long DeuteriumCost => Title == "Astrophysics" ? (long)(BaseDeuteriumCost * Math.Pow(1.75, Level)) : (long)(BaseDeuteriumCost * Math.Pow(Scaling, Level));
+        public long MetalCost { get; set; }
+        public long CrystalCost { get; set; }
+        public long DeuteriumCost { get; set; }
         public long GravitonCost => Title == "Graviton Technology" ? (long)(BaseMetalCost * Math.Pow(3, Level)) : 0; // Special
-
-        public TimeSpan Duration => TimeSpan.FromHours((BaseMetalCost + BaseCrystalCost) / (UniverseSpeed * 1000 * (1 + ResearchLabLevel + IntergalacticResearchNetworkLevel * 8)));
     }
 
     private List<TechnologyDto> technologies = new List<TechnologyDto>();

@@ -1,9 +1,12 @@
+
 @page "/"
-@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager Navigation
 
 <PageTitle>Home</PageTitle>
 
 <style>
+
     body {
         font-family: sans-serif;
         margin: 0;
@@ -176,13 +179,13 @@
             @if (ActiveEvents.Count > 0)
             {
                 <div class="events-list">
-                    @foreach (var event in ActiveEvents)
-                    {
-                        <div class="event-item">
-                            <p>@event.Description</p>
-                            <p>Arrival: @event.ArrivalTime.ToString("HH:mm:ss")</p>
-                        </div>
-                    }
+            @foreach (var ev in ActiveEvents)
+            {
+                <div class="event-item">
+                    <p>@ev.Description</p>
+                    <p>Arrival: @ev.ArrivalTime.ToString("HH:mm:ss")</p>
+                </div>
+            }
                 </div>
             }
             else
@@ -219,6 +222,7 @@
         <button @onclick="NavigateToConstellation">Constellation</button>
     </div>
 </div>
+
 
 @code {
     // Resource Data
@@ -332,4 +336,5 @@
         public int Temperature { get; set; }
     }
 }
+
 

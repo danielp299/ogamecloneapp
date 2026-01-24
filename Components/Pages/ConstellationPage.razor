@@ -1,6 +1,4 @@
-razor
 @page "/constellation"
-@rendermode InteractiveServer
 
 <style>
     .separator {
@@ -132,13 +130,25 @@ razor
 </div>
 
 @code {
+    private double CalculateDistance(int g, int s, int p)
+    {
+        return Math.Sqrt(g * g + s * s + p * p) * 1000;
+    }
+
     public class ConstellationPageDto
     {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string ImageUrl { get; set; } = "";
         public string Name { get; set; } = "";
         public string Image { get; set; } = "";
-        public int Difficulty { get; set; }
+        public int DifficultyInt { get; set; }
+        public string Difficulty { get; set; } = "";
         public int Resources { get; set; }
+        public int TotalResources { get; set; }
         public string Activity { get; set; } = "";
+        public string ActivityLevel { get; set; } = "";
+        public int InhabitedPlanets { get; set; }
+        public bool ShowPlanets { get; set; } = false;
         public List<PlanetDto> Planets { get; set; } = new();
         public bool Explored { get; set; } = false;
         public bool Spied { get; set; } = false; // Espionage level
@@ -154,13 +164,8 @@ razor
         public bool HasMoon { get; set; } = false;
         public string Owner { get; set; } = "Unknown";
         public string Alliance { get; set; } = "";
-    }
-    public class PlanetDto
-    {
         public Guid Id { get; set; }
-        public string ImageUrl { get; set; }
-        public int Size { get; set; }
-        public string Temperature { get; set; }
+        public string ImageUrl { get; set; } = "";
     }
 
     private List<ConstellationPageDto> constellations = new List<ConstellationPageDto>();
@@ -187,7 +192,7 @@ razor
                 constellation.Planets.Add(new PlanetDto
                 {
                     Name = $"Planet {j+1}",
-                    Image = "planet.jpg",
+                    ImageUrl = "planet.jpg",
                     Size = j * 100 + 50,
                     Temperature = 20 + j,
                     HasMoon = (j % 3 == 0),
@@ -197,10 +202,6 @@ razor
             }
             constellation.Distance = CalculateDistance(i + 1, 1, 1);
             constellations.Add(constellation);
-
-               constellations.Add(constellation);
-
-
         }
     }
         private void LikeConstellation(Guid id)

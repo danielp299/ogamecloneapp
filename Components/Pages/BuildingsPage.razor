@@ -1,20 +1,7 @@
 @* razor *@
 @page "/buildings"
-
-<style>
-    .material-icon {
-        width: 16px !important;
-        height: 16px !important;
-        margin-right: 4px;
-    }
-</style>
-<style>
-    .cost-item {
-        display: flex;
-        align-items: center;
-        margin-right: 10px; /* Adds space between cost items */    }
-</style>
-@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager Navigation
 
 <style>
     .construction-queue {
@@ -180,6 +167,11 @@
         public double Scaling { get; set; } = 2.0;
         public List<string> Dependencies { get; set; } = new();
         public int FieldsOccupied { get; set; } = 1;
+        
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public TimeSpan ConstructionDuration { get; set; }
+        public bool IsBuilding { get; set; }
+        public TimeSpan TimeRemaining { get; set; }
 
         public long MetalCost => (long)(BaseMetalCost * Math.Pow(Scaling, Level - 1));
         public long CrystalCost => (long)(BaseCrystalCost * Math.Pow(Scaling, Level - 1));
@@ -257,9 +249,9 @@
         {
             Title = "Metal Mine",
             Description = "Produces Metal.",
-            MetalCost = 60,
-            CrystalCost = 15,
-            DeuteriumCost = 0,
+            BaseMetalCost = 60,
+            BaseCrystalCost = 15,
+            BaseDeuteriumCost = 0,
             ConstructionDuration = TimeSpan.FromSeconds(10),
             Image = "building1.jpg",
             EnergyConsumption = 10
@@ -268,137 +260,137 @@
         {
             Title = "Crystal Mine",
             Description = "Produces Crystal.",
-            MetalCost = 48,
-            CrystalCost = 24,
-            DeuteriumCost = 0,
+            BaseMetalCost = 48,
+            BaseCrystalCost = 24,
+            BaseDeuteriumCost = 0,
             ConstructionDuration = TimeSpan.FromSeconds(15),
             Image = "building2.jpg",
             EnergyConsumption = 8
         });
         defaultBuildings.Add(new BuildingDto
         {
-                Title = "Deuterium Synthesizer",
-                Description = "Produces Deuterium.",
-                MetalCost = 225,
-                CrystalCost = 75,
-                DeuteriumCost = 0,   
-                ConstructionDuration = TimeSpan.Parse("00:00:30"),
-                Image = "building3.jpg",
-                EnergyConsumption = 15
-            });
-            defaultBuildings.Add(new BuildingDto
+            Title = "Deuterium Synthesizer",
+            Description = "Produces Deuterium.",
+            BaseMetalCost = 225,
+            BaseCrystalCost = 75,
+            BaseDeuteriumCost = 0,   
+            ConstructionDuration = TimeSpan.Parse("00:00:30"),
+            Image = "building3.jpg",
+            EnergyConsumption = 15
+        });
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Solar Plant",
-                Description = "Generates Energy.",
-                MetalCost = 75,
-                CrystalCost = 30,
-                DeuteriumCost = 0,    
-                ConstructionDuration = TimeSpan.Parse("00:00:20"),
-                Image = "building4.jpg",
-                EnergyConsumption = -20
-            });
-            defaultBuildings.Add(new BuildingDto
+            Title = "Solar Plant",
+            Description = "Generates Energy.",
+            BaseMetalCost = 75,
+            BaseCrystalCost = 30,
+            BaseDeuteriumCost = 0,    
+            ConstructionDuration = TimeSpan.Parse("00:00:20"),
+            Image = "building4.jpg",
+            EnergyConsumption = -20
+        });
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Robotics Factory",
-                Description = "Builds robots.",
-                MetalCost = 400,
-                CrystalCost = 120,
-                DeuteriumCost = 200,    
-                ConstructionDuration = TimeSpan.Parse("00:01:00"),
-                Image = "building5.jpg",
-                EnergyConsumption = 30
-            });
+            Title = "Robotics Factory",
+            Description = "Builds robots.",
+            BaseMetalCost = 400,
+            BaseCrystalCost = 120,
+            BaseDeuteriumCost = 200,    
+            ConstructionDuration = TimeSpan.Parse("00:01:00"),
+            Image = "building5.jpg",
+            EnergyConsumption = 30
+        });
 
-            defaultBuildings.Add(new BuildingDto
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Shipyard",
-                Description = "Builds ships.",
-                MetalCost = 400,
-                CrystalCost = 200,
-                DeuteriumCost = 100,    
-                ConstructionDuration = TimeSpan.Parse("00:01:30"),
-                Image = "building6.jpg",
-                EnergyConsumption = 25
-            });
-            defaultBuildings.Add(new BuildingDto
+            Title = "Shipyard",
+            Description = "Builds ships.",
+            BaseMetalCost = 400,
+            BaseCrystalCost = 200,
+            BaseDeuteriumCost = 100,    
+            ConstructionDuration = TimeSpan.Parse("00:01:30"),
+            Image = "building6.jpg",
+            EnergyConsumption = 25
+        });
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Metal Storage",
-                Description = "Stores Metal.",
-                MetalCost = 200,
-                CrystalCost = 0,
-                DeuteriumCost = 0,    
-                ConstructionDuration = TimeSpan.Parse("00:00:45"),
-                Image = "building7.jpg",
-                EnergyConsumption = 0
-            });
-            defaultBuildings.Add(new BuildingDto
+            Title = "Metal Storage",
+            Description = "Stores Metal.",
+            BaseMetalCost = 200,
+            BaseCrystalCost = 0,
+            BaseDeuteriumCost = 0,    
+            ConstructionDuration = TimeSpan.Parse("00:00:45"),
+            Image = "building7.jpg",
+            EnergyConsumption = 0
+        });
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Crystal Storage",
-                Description = "Stores Crystal.",
-                MetalCost = 200,
-                CrystalCost = 100,
-                DeuteriumCost = 0,    
-                ConstructionDuration = TimeSpan.Parse("00:00:50"),
-                Image = "building8.jpg",
-                EnergyConsumption = 0
-            });
-            defaultBuildings.Add(new BuildingDto
+            Title = "Crystal Storage",
+            Description = "Stores Crystal.",
+            BaseMetalCost = 200,
+            BaseCrystalCost = 100,
+            BaseDeuteriumCost = 0,    
+            ConstructionDuration = TimeSpan.Parse("00:00:50"),
+            Image = "building8.jpg",
+            EnergyConsumption = 0
+        });
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Deuterium Storage",
-                Description = "Stores Deuterium.",
-                MetalCost = 200,
-                CrystalCost = 200,
-                DeuteriumCost = 0,    
-                ConstructionDuration = TimeSpan.Parse("00:00:55"),
-                Image = "building9.jpg",
-                EnergyConsumption = 0
-            });
-            defaultBuildings.Add(new BuildingDto
+            Title = "Deuterium Storage",
+            Description = "Stores Deuterium.",
+            BaseMetalCost = 200,
+            BaseCrystalCost = 200,
+            BaseDeuteriumCost = 0,    
+            ConstructionDuration = TimeSpan.Parse("00:00:55"),
+            Image = "building9.jpg",
+            EnergyConsumption = 0
+        });
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Research Lab",
-                Description = "Allows to do Research.",
-                MetalCost = 400,
-                CrystalCost = 200,
-                DeuteriumCost = 100,    
-                ConstructionDuration = TimeSpan.Parse("00:01:15"),
-                Image = "building10.jpg",
-                EnergyConsumption = 20
-            });
+            Title = "Research Lab",
+            Description = "Allows to do Research.",
+            BaseMetalCost = 400,
+            BaseCrystalCost = 200,
+            BaseDeuteriumCost = 100,    
+            ConstructionDuration = TimeSpan.Parse("00:01:15"),
+            Image = "building10.jpg",
+            EnergyConsumption = 20
+        });
 
-            defaultBuildings.Add(new BuildingDto
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Terraformer",
-                Description = "Allows to build more buildings.",
-                MetalCost = 50000,
-                CrystalCost = 100000,
-                DeuteriumCost = 1000,    
-                ConstructionDuration = TimeSpan.Parse("01:00:00"),
-                Image = "building11.jpg",
-                EnergyConsumption = 50
-            });
+            Title = "Terraformer",
+            Description = "Allows to build more buildings.",
+            BaseMetalCost = 50000,
+            BaseCrystalCost = 100000,
+            BaseDeuteriumCost = 1000,    
+            ConstructionDuration = TimeSpan.Parse("01:00:00"),
+            Image = "building11.jpg",
+            EnergyConsumption = 50
+        });
 
-            defaultBuildings.Add(new BuildingDto
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Missile Silo",
-                Description = "Stores interplantary missiles.",
-                MetalCost = 20000,
-                CrystalCost = 20000,
-                DeuteriumCost = 1000,    
-                ConstructionDuration = TimeSpan.Parse("00:05:00"),
-                Image = "building12.jpg",
-                EnergyConsumption = 0
-            });
-            defaultBuildings.Add(new BuildingDto
+            Title = "Missile Silo",
+            Description = "Stores interplantary missiles.",
+            BaseMetalCost = 20000,
+            BaseCrystalCost = 20000,
+            BaseDeuteriumCost = 1000,    
+            ConstructionDuration = TimeSpan.Parse("00:05:00"),
+            Image = "building12.jpg",
+            EnergyConsumption = 0
+        });
+        defaultBuildings.Add(new BuildingDto
         {
-                Title = "Nanite Factory",
-                Description = "Increases Building speed.",
-                MetalCost = 1000000,
-                CrystalCost = 500000,
-                DeuteriumCost = 100000,    
-                ConstructionDuration = TimeSpan.Parse("02:00:00"),
-                Image = "building13.jpg",
-                EnergyConsumption = 100
-            });
+            Title = "Nanite Factory",
+            Description = "Increases Building speed.",
+            BaseMetalCost = 1000000,
+            BaseCrystalCost = 500000,
+            BaseDeuteriumCost = 100000,    
+            ConstructionDuration = TimeSpan.Parse("02:00:00"),
+            Image = "building13.jpg",
+            EnergyConsumption = 100
+        });
 
         foreach (var item in defaultBuildings) item.Id = Guid.NewGuid();
 
