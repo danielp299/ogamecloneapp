@@ -1,6 +1,8 @@
 @page "/factory"
 @using myapp.Services
 @inject ResourceService ResourceService
+@inject FleetService FleetService
+@inject BuildingService BuildingService
 @implements IDisposable
 
 <style>
@@ -32,14 +34,13 @@
         text-align: center;
         border: 1px solid #555;
         color: white;
-        display: flex; /* Added */
-        flex-direction: column; /* Added */
-        justify-content: space-between; /* Added */
-        position: relative; /* Added */
-        display: flex; /* Add this line */
-        flex-direction: column; /* Add this line */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
         align-items: center;
-        width: 300px;
+        width: 100%; /* Changed from fixed width */
+        gap: 10px;
     }
     .building-card-content{
         display:flex;
@@ -59,15 +60,11 @@
         height: 30px;
         background-color: #555;
         color: white;
-
         border: none;
         border-radius: 5px;
-
-
         padding: 5px;
         cursor: pointer;
-        width: 30px;
-        height: 30px;}
+    }
 
     .building-card img {
         width: 177px;
@@ -77,20 +74,11 @@
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         border-radius: 10px;
         margin-bottom: 10px;
-}
+    }
 
     .building-card h3 {
         color: white;
-    }
-
-    .building-card .level {
-        position: absolute;
-        top: 10px;
-        right: 10px; /* Changed from left to right */
-        background-color: #555;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-weight: bold;
+        margin: 5px 0;
     }
 
     .building-card input {
@@ -98,274 +86,142 @@
             text-align: center;
         }
 
-        .building-card button {
+    .building-card button {
         padding: 10px;
         background-color: #555;
         color: white;
         border: none;
         cursor: pointer;
     }
+    
+    .queue-container {
+        margin-bottom: 30px;
+        background-color: #222;
+        padding: 15px;
+        border-radius: 5px;
+        color: white;
+    }
+    
+    .queue-item {
+        padding: 5px;
+        border-bottom: 1px solid #444;
+    }
 </style>
 
 <div class="buildings-banner">
-    <h2>Factory</h2>
+    <h2>Shipyard</h2>
 </div>
 
-<div class="buildings-grid">
-    @foreach (var ship in ships)
-    {
-
-        <div class="building-card">
-            <span class="level">Level: @ship.Level</span>
-            <img src="@ship.Image" alt="@ship.Title" />
-            <h3>@ship.Title</h3>
-            <p>@ship.Description</p>
-                <p>Metal: @ship.MetalCost</p>
-                <p>Crystal: @ship.CrystalCost</p>
-                <p>Deuterium: @ship.DeuteriumCost</p>
-                <p>Construction Duration: @GetDuration(ship)</p>
-            <div class="building-card-quantity-selector">
-                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 10)">10</button>
-                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 50)">50</button>
-                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 200)">200</button>
-                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(ship, 800)">800</button>
+<!-- Shipyard Queue Display -->
+@if (FleetService.ConstructionQueue.Any())
+{
+    <div class="queue-container">
+        <h3>Current Production</h3>
+        @foreach (var item in FleetService.ConstructionQueue)
+        {
+            <div class="queue-item">
+                <strong>@item.Ship.Name</strong>: @item.Quantity remaining. 
+                Next unit in: @item.TimeRemaining.ToString(@"hh\:mm\:ss")
             </div>
+        }
+    </div>
+}
+
+<div class="buildings-grid">
+    @foreach (var ship in FleetService.ShipDefinitions)
+    {
+        // Local view model to track input
+        var vm = GetViewModel(ship.Id);
+        
+        <div class="building-card">
+            <span style="position:absolute; top:10px; right:10px; font-weight:bold;">Hangar: @FleetService.GetShipCount(ship.Id)</span>
+            <img src="@ship.Image" alt="@ship.Name" />
+            <h3>@ship.Name</h3>
+            <p>@ship.Description</p>
+            
+            <div style="font-size: 0.9em; text-align: left; width: 100%; padding: 0 10px;">
+                <p>Metal: @ship.MetalCost.ToString("N0")</p>
+                <p>Crystal: @ship.CrystalCost.ToString("N0")</p>
+                @if(ship.DeuteriumCost > 0) { <p>Deuterium: @ship.DeuteriumCost.ToString("N0")</p> }
+                <p>Structure: @ship.Structure.ToString("N0")</p>
+                <p>Base Time: @ship.BaseDuration.ToString()</p>
+            </div>
+
+            <div class="building-card-quantity-selector">
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(vm, 10)">10</button>
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(vm, 50)">50</button>
+                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(vm, 100)">100</button>
+            </div>
+            
             <div class="building-card-content">
-                <input type="number" value="@ship.QuantityToBuild" @oninput="((ChangeEventArgs e) => OnQuantityToBuildInput(ship, e))" max="999999" maxlength="6"/>
-                <button class="btn btn-primary" @onclick="() => AddToQueueQuantity(ship, ship.QuantityToBuild)">Build</button>
-                <button class="btn btn-secondary" @onclick="() => ClearQuantityToBuild(ship)">Clear</button>
+                <input type="number" @bind="vm.QuantityInput" min="0" max="9999"/>
+                
+                @if(CanBuild(ship))
+                {
+                     <button class="btn btn-primary" @onclick="() => BuildShip(ship, vm)">Build</button>
+                }
+                else
+                {
+                     <button class="btn btn-secondary" disabled>Locked</button>
+                }
             </div>
          </div>
-        
-
-        
     }
 </div>
 
 @code {
-    public class ShipDto
+    // Simple ViewModel to hold input state for each ship
+    public class ShipViewModel
     {
-        public Guid Id { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public int MetalCost { get; set; }
-        public int CrystalCost { get; set; }
-        public int DeuteriumCost { get; set; }
-        public TimeSpan BaseDuration { get; set; }
-        public string Image { get; set; }
-        public int Level { get; set; } = 1;
-        public int Quantity { get; set; } = 0;
-        public int QuantityToBuild { get; set; } = 1;
-        public List<string> Dependencies { get; set; } = new();
-        public string ConstructionDuration { get; set; } = "00:00:00";
-    }
-
-    
-    public class QueueItemDto
-    {
-        public ShipDto Ship { get; set; }
-        public string TimeRemaining { get; set; }
-    }
-
-    private List<ShipDto> ships = new List<ShipDto>();
-    private List<QueueItemDto> constructionQueue = new List<QueueItemDto>();
-    private int maxQuantityToBuild = 10000;
-    private int ShipyardLevel { get; set; } = 1;
-    private int RoboticsLevel { get; set; } = 2; // Required for Shipyard
-    private int NaniteLevel { get; set; } = 0;
-
-
-    private TimeSpan GetDuration(ShipDto ship) {
-        return TimeSpan.FromHours(ship.BaseDuration.TotalHours / (2500 * (1 + ShipyardLevel) * Math.Pow(2, NaniteLevel)));
-    }
-
-    public void AddToQueueQuantity(ShipDto ship, int quantity)
-    {
-        if (quantity <= 0) return; // Avoid zero or negative quantity
-        
-        // Check dependencies
-        if (ship.Dependencies.Contains("Shipyard") && ShipyardLevel < 1) return;
-        if (ship.Dependencies.Contains("Robotics Factory") && RoboticsLevel < 2) return;
-        
-        int totalMetalCost = ship.MetalCost * quantity;
-        int totalCrystalCost = ship.CrystalCost * quantity;
-        int totalDeuteriumCost = ship.DeuteriumCost * quantity;
-
-        // Check global resources
-        if (!ResourceService.HasResources(totalMetalCost, totalCrystalCost, totalDeuteriumCost))
-        {
-             Console.WriteLine("Not enough resources!");
-             return;
-        }
-
-        // Consume global resources
-        ResourceService.ConsumeResources(totalMetalCost, totalCrystalCost, totalDeuteriumCost);
-
-        for (int i = 0; i < quantity; i++)
-        {
-            constructionQueue.Add(new QueueItemDto { Ship = ship, TimeRemaining = GetDuration(ship).ToString() });
-        }
-        
-        ship.Quantity += quantity; // Add to built (Immediate for now, should be queued really)
-    }
-
-    private void AddToQuantityToBuild(ShipDto ship, int quantity)
-    {
-        if (ship.QuantityToBuild == 1)
-        {
-            ship.QuantityToBuild = 0;
-        }
-        ship.QuantityToBuild += quantity; // Add the quantity to the existing value
-        if (ship.QuantityToBuild > maxQuantityToBuild)
-        {
-            ship.QuantityToBuild = maxQuantityToBuild;
-        }
-    }
-
-
-    private void ClearQuantityToBuild(ShipDto ship)
-    {
-        Console.WriteLine("ClearQuantityToBuild");
-        ship.QuantityToBuild = 1;
+        public string ShipId { get; set; }
+        public int QuantityInput { get; set; } = 0;
     }
     
-protected override void OnInitialized()
-{
-    ResourceService.OnChange += StateHasChanged;
-    CreateShips();
-}
+    private List<ShipViewModel> viewModels = new();
 
-public void Dispose()
-{
-    ResourceService.OnChange -= StateHasChanged;
-}
-
-private void OnQuantityToBuildInput(ShipDto ship, ChangeEventArgs e)
-{
-        if (int.TryParse(e.Value?.ToString(), out int parsedValue))
+    protected override void OnInitialized()
+    {
+        FleetService.OnChange += RefreshState;
+        ResourceService.OnChange += RefreshState;
+        
+        foreach(var ship in FleetService.ShipDefinitions)
         {
-            ship.QuantityToBuild = parsedValue;
+            viewModels.Add(new ShipViewModel { ShipId = ship.Id });
         }
-}
+    }
+    
+    private async void RefreshState()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
 
-private void CreateShips()
-{
-    ships.Add(new ShipDto
+    public void Dispose()
     {
-        Id = Guid.NewGuid(),
-        Title = "Small Cargo",
-        Description = "Small cargo ship.",
-        MetalCost = 2000,
-        CrystalCost = 2000,
-        DeuteriumCost = 0,
-        BaseDuration = TimeSpan.FromSeconds(30),
-        Image = "smallCargo.jpg",
-        Dependencies = new List<string> { "Shipyard" }
-    });
-    ships.Add(new ShipDto
-    {
-        Id = Guid.NewGuid(),
-        Title = "Large Cargo",
-        Description = "Large cargo ship.",
-        MetalCost = 6000,
-        CrystalCost = 6000,
-        DeuteriumCost = 0,
-        ConstructionDuration = "00:01:00",
-        Image = "largeCargo.jpg"
-    });
-    ships.Add(new ShipDto
-    {
-        Id = Guid.NewGuid(),
-        Title = "Light Fighter",
-        Description = "Light combat ship.",
-        MetalCost = 3000,
-        CrystalCost = 1000,
-        DeuteriumCost = 0,
-        ConstructionDuration = "00:00:45",
-        Image = "lightFighter.jpg"
-    });
-    ships.Add(new ShipDto
-    {
-        Id = Guid.NewGuid(),
-        Title = "Heavy Fighter",
-        Description = "Heavy combat ship.",
-        MetalCost = 6000,
-        CrystalCost = 3000,
-        DeuteriumCost = 0,
-        ConstructionDuration = "00:01:30",
-        Image = "heavyFighter.jpg"
-    });
+        FleetService.OnChange -= RefreshState;
+        ResourceService.OnChange -= RefreshState;
+    }
+    
+    private ShipViewModel GetViewModel(string shipId) => viewModels.First(v => v.ShipId == shipId);
 
-    ships.Add(new ShipDto
+    private void AddToQuantityToBuild(ShipViewModel vm, int amount)
     {
-        Id = Guid.NewGuid(),
-        Title = "Cruiser",
-        Description = "Large combat ship.",
-        MetalCost = 20000,
-        CrystalCost = 7000,
-        DeuteriumCost = 2000,
-        BaseDuration = TimeSpan.FromMinutes(3),
-        Image = "cruiser.jpg",
-        Dependencies = new List<string> { "Shipyard" } // Requires Shipyard 5, but simplified
-    });
+        vm.QuantityInput += amount;
+    }
 
-    ships.Add(new ShipDto
+    private void BuildShip(Ship ship, ShipViewModel vm)
     {
-        Id = Guid.NewGuid(),
-        Title = "Battleship",
-        Description = "Huge combat ship.",
-        MetalCost = 45000,
-        CrystalCost = 15000,
-        DeuteriumCost = 0,
-        ConstructionDuration = "00:06:00",
-        Image = "battleship.jpg"
-    });
-    ships.Add(new ShipDto
+        FleetService.AddToQueue(ship, vm.QuantityInput);
+        vm.QuantityInput = 0; // Reset after adding
+    }
+    
+    private bool CanBuild(Ship ship)
     {
-        Id = Guid.NewGuid(),
-        Title = "Colony Ship",
-        Description = "Ship to colonize planets.",
-        MetalCost = 75000,
-        CrystalCost = 30000,
-        DeuteriumCost = 15000,
-        ConstructionDuration = "00:08:00",
-        Image = "colonyShip.jpg"
-    });
-
-    ships.Add(new ShipDto
-    {
-        Id = Guid.NewGuid(),
-        Title = "Recycler",
-        Description = "Ship to recycle fleets.",
-        MetalCost = 10000,
-        CrystalCost = 6000,
-        DeuteriumCost = 2000,
-        ConstructionDuration = "00:02:00",
-        Image = "recycler.jpg"
-    });
-    ships.Add(new ShipDto
-    {
-        Id = Guid.NewGuid(),
-        Title = "Destroyer",
-        Description = "Strong combat ship.",
-        MetalCost = 60000,
-        CrystalCost = 25000,
-        DeuteriumCost = 10000,
-        ConstructionDuration = "00:07:00",
-        Image = "destroyer.jpg"
-    });
-    ships.Add(new ShipDto
-    {
-        Id = Guid.NewGuid(),
-        Title = "Death Star",
-        Description = "The strongest ship.",
-        MetalCost = 5000000,
-        CrystalCost = 4000000,
-        DeuteriumCost = 1000000,
-        BaseDuration = TimeSpan.FromHours(1),
-        Image = "deathstar.jpg",
-        Dependencies = new List<string> { "Shipyard", "Nanite Factory" } // High requirements
-    });
-}
-
+        // Simple check: Shipyard must exist
+        // In reality, check all Requirements
+        // For now, let's just assume if Shipyard > 0 we can see/build basics
+        // Or implement detailed requirement check
+        
+        // Simplified: Check level 1 shipyard for all
+        return BuildingService.GetBuildingLevel("Shipyard") >= 1; 
+    }
 }

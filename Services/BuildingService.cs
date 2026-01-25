@@ -456,4 +456,10 @@ public class BuildingService
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
+
+    public int GetBuildingLevel(string buildingName)
+    {
+        var building = Buildings.FirstOrDefault(b => b.Title == buildingName);
+        return building?.Level ?? 0;
+    }
 }
