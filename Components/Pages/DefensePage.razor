@@ -1,9 +1,10 @@
 @page "/defense"
 @using myapp.Services
 @inject ResourceService ResourceService
+@inject DefenseService DefenseService
+@inject BuildingService BuildingService
 @implements IDisposable
 
-<h2>Defense Page</h2>
 <style>
     .buildings-banner {
         background-image: url('buildings-banner.jpg'); /* Replace with your image path */
@@ -30,14 +31,13 @@
         text-align: center;
         border: 1px solid #555;
         color: white;
-        display: flex; /* Added */
-        flex-direction: column; /* Added */
-        justify-content: space-between; /* Added */
-        position: relative; /* Added */
-        display: flex; /* Add this line */
-        flex-direction: column; /* Add this line */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
         align-items: center;
-        width: 300px;
+        width: 100%;
+        gap: 10px;
     }    
     .building-card-content{
         display:flex;
@@ -52,24 +52,6 @@
         width: 100%;
         margin-bottom: 10px;
     }
-
-    .built-defenses {
-        background-color: #222;
-        padding: 20px;
-        margin-top: 20px;
-        border-radius: 10px;
-    }
-
-    .defense-list {
-        display: grid;
-        gap: 10px;
-    }
-
-    .defense-item {
-        background-color: #333;
-        padding: 10px;
-        border-radius: 5px;
-    }    
     .quantity-button {
         width: 30px;
         height: 30px;
@@ -79,8 +61,7 @@
         border-radius: 5px;
         padding: 5px;
         cursor: pointer;
-        width: 30px;
-        height: 30px;}    
+    }    
     .building-card img {
         width: 177px;
         height: 177px;
@@ -92,18 +73,10 @@
     }
     .building-card h3 {
         color: white;
-    }
-    .building-card .level {
-        position: absolute;
-        top: 10px;
-        right: 10px; /* Changed from left to right */
-        background-color: #555;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-weight: bold;
+        margin: 5px 0;
     }
     .building-card input {
-            width: 80px;
+        width: 80px;
         text-align: center;
     }
     .building-card button {
@@ -113,178 +86,126 @@
         border: none;
         cursor: pointer;
     }    
+    
+    .queue-container {
+        margin-bottom: 30px;
+        background-color: #222;
+        padding: 15px;
+        border-radius: 5px;
+        color: white;
+    }
+    .queue-item {
+        padding: 5px;
+        border-bottom: 1px solid #444;
+    }
 </style>
 
 <div class="buildings-banner">
-    <h2>Defense Page</h2>
+    <h2>Defense</h2>
 </div>
 
+<!-- Queue Display -->
+@if (DefenseService.ConstructionQueue.Any())
+{
+    <div class="queue-container">
+        <h3>Current Production</h3>
+        @foreach (var item in DefenseService.ConstructionQueue)
+        {
+            <div class="queue-item">
+                <strong>@item.Unit.Name</strong>: @item.Quantity remaining. 
+                Next unit in: @item.TimeRemaining.ToString(@"hh\:mm\:ss")
+            </div>
+        }
+    </div>
+}
+
 <div class="buildings-grid">    
-    @foreach (var cannon in cannons)    
-    {        
+    @foreach (var unit in DefenseService.DefenseDefinitions)    
+    {
+        var vm = GetViewModel(unit.Id);
+        
         <div class="building-card">            
-            <span class="level">Level: @cannon.Level</span>            
-            <img src="@cannon.Image" alt="@cannon.Title" />            
-            <h3>@cannon.Title</h3>            
-            <p>@cannon.Description</p>            
-            <p>Metal: @cannon.MetalCost</p>            
-            <p>Crystal: @cannon.CrystalCost</p>            
-            <p>Deuterium: @cannon.DeuteriumCost</p>            
-            <p>Construction Duration: @cannon.ConstructionDuration</p>            
+            <span style="position:absolute; top:10px; right:10px; font-weight:bold;">Built: @DefenseService.GetDefenseCount(unit.Id)</span>
+            <img src="@unit.Image" alt="@unit.Name" />            
+            <h3>@unit.Name</h3>            
+            <p>@unit.Description</p>   
+            
+            <div style="font-size: 0.9em; text-align: left; width: 100%; padding: 0 10px;">
+                <p>Metal: @unit.MetalCost.ToString("N0")</p>            
+                <p>Crystal: @unit.CrystalCost.ToString("N0")</p>            
+                @if(unit.DeuteriumCost > 0) { <p>Deuterium: @unit.DeuteriumCost.ToString("N0")</p> }
+                <p>Structure: @unit.Structure.ToString("N0") | Attack: @unit.Attack.ToString("N0")</p>
+                <p>Base Time: @unit.BaseDuration.ToString()</p> 
+            </div>
+            
             <div class="building-card-quantity-selector">                
-                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(cannon, 10)">10</button>                
-                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(cannon, 50)">50</button>                
-                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(cannon, 200)">200</button>                
-                <button class="quantity-button" @onclick="() => AddToQuantityToBuild(cannon, 800)">800</button>            
+                <button class="quantity-button" @onclick="() => AddToQuantity(vm, 10)">10</button>                
+                <button class="quantity-button" @onclick="() => AddToQuantity(vm, 50)">50</button>                
+                <button class="quantity-button" @onclick="() => AddToQuantity(vm, 100)">100</button>            
             </div>            
             <div class="building-card-content">                
-                <input type="number" value="@cannon.QuantityToBuild" @oninput="((ChangeEventArgs e) => OnQuantityToBuildInput(cannon, e))" max="999999" maxlength="6" />                
-                <button class="btn btn-primary" @onclick="() => AddToQueueQuantity(cannon, cannon.QuantityToBuild)">Build</button>                
-                <button class="btn btn-secondary" @onclick="() => ClearQuantityToBuild(cannon)">Clear</button>            
+                <input type="number" @bind="vm.QuantityInput" min="0" max="9999" />                
+                
+                @if(CanBuild(unit))
+                {
+                    <button class="btn btn-primary" @onclick="() => BuildDefense(unit, vm)">Build</button>                
+                }
+                else
+                {
+                    <button class="btn btn-secondary" disabled>Locked</button>
+                }
             </div>        
         </div>    
     }
-    </div>
-
-    <!-- Built Defenses -->
-    <div class="built-defenses">
-        <h3>Built Defenses</h3>
-        @if (cannons.Any(c => c.BuiltQuantity > 0))
-        {
-            <div class="defense-list">
-                @foreach (var cannon in cannons.Where(c => c.BuiltQuantity > 0))
-                {
-                    <div class="defense-item">
-                        <p>@cannon.Title: @cannon.BuiltQuantity built</p>
-                    </div>
-                }
-            </div>
-        }
-        else
-        {
-            <p>No defenses built.</p>
-        }
-        <button @onclick="SimulateBattle">Simulate Battle (Test Reconstruction)</button>
-    </div>
+</div>
 
 @code{
-    public class CannonDto    {
-        public Guid Id { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public int MetalCost { get; set; }
-        public int CrystalCost { get; set; }
-        public int DeuteriumCost { get; set; }
-        public string ConstructionDuration { get; set; }
-        public string Image { get; set; }
-        public int Level { get; set; } = 1;
-        public int Quantity { get; set; } = 0;
-        public int QuantityToBuild { get; set; } = 1;
-        public int BuiltQuantity { get; set; } = 0; // Added for built defenses
+    public class DefenseViewModel
+    {
+        public string UnitId { get; set; }
+        public int QuantityInput { get; set; } = 0;
     }
-
-    public class QueueItemDto {        
-        public CannonDto Cannon { get; set; }        
-        public string TimeRemaining { get; set; }    
-    }
-
-    private List<CannonDto> cannons = new List<CannonDto>();    
-    private List<QueueItemDto> constructionQueue = new List<QueueItemDto>();    
-    // Removed local Metal, Crystal, Deuterium properties to use ResourceService
-    private int maxQuantityToBuild = 10000;
     
-    public void AddToQueueQuantity(CannonDto cannon, int quantity)    
-    {        
-        if (quantity <= 0) return; // Avoid zero or negative quantity
-        int totalMetalCost = cannon.MetalCost * quantity;        
-        int totalCrystalCost = cannon.CrystalCost * quantity;        
-        int totalDeuteriumCost = cannon.DeuteriumCost * quantity;
+    private List<DefenseViewModel> viewModels = new();
 
-        if (ResourceService.HasResources(totalMetalCost, totalCrystalCost, totalDeuteriumCost))        
-        {
-            ResourceService.ConsumeResources(totalMetalCost, totalCrystalCost, totalDeuteriumCost);
-            
-            for (int i = 0; i < quantity; i++)            
-            {                
-                constructionQueue.Add(new QueueItemDto { Cannon = cannon, TimeRemaining = cannon.ConstructionDuration });            
-            }
-            // Removed local variable deductions
-            cannon.BuiltQuantity += quantity; // Add to built
-        }    
-    }
-    private void AddToQuantityToBuild(CannonDto cannon, int quantity)    
-    {        
-        if (cannon.QuantityToBuild == 1)        
-        {            
-            cannon.QuantityToBuild = 0;        
-        }        
-        cannon.QuantityToBuild += quantity; // Add the quantity to the existing value        
-        if (cannon.QuantityToBuild > maxQuantityToBuild)        
-        {            
-            cannon.QuantityToBuild = maxQuantityToBuild;        
-        }    
-    }
-    private void ClearQuantityToBuild(CannonDto cannon)    
-    {        
-        Console.WriteLine("ClearQuantityToBuild");        
-        cannon.QuantityToBuild = 1;    
-    }
     protected override void OnInitialized()    
     {        
-        CreateCannons();    
-        ResourceService.OnChange += StateHasChanged;
-    }
-    public void Dispose()
-    {
-        ResourceService.OnChange -= StateHasChanged;
-    }
-    private void OnQuantityToBuildInput(CannonDto cannon, ChangeEventArgs e)    
-    {        
-        if (int.TryParse(e.Value?.ToString(), out int parsedValue))        
-        {            
-            cannon.QuantityToBuild = parsedValue;        
-        }    
-    }
-    private void SimulateBattle()
-    {
-        var random = new Random();
-        foreach (var cannon in cannons)
+        DefenseService.OnChange += RefreshState;
+        ResourceService.OnChange += RefreshState;
+        
+        foreach(var unit in DefenseService.DefenseDefinitions)
         {
-            if (cannon.BuiltQuantity > 0)
-            {
-                int damage = random.Next(0, cannon.BuiltQuantity / 2 + 1); // Random damage up to half
-                cannon.BuiltQuantity -= damage;
-                // Rebuild 70% of destroyed
-                int rebuild = (int)(damage * 0.7);
-                cannon.BuiltQuantity += rebuild;
-                if (cannon.BuiltQuantity < 0) cannon.BuiltQuantity = 0;
-            }
+            viewModels.Add(new DefenseViewModel { UnitId = unit.Id });
         }
     }
-
-    private void CreateCannons()
+    
+    private void RefreshState()
     {
-        cannons.Add(new CannonDto
-        {
-            Id = Guid.NewGuid(),
-            Title = "Rocket Launcher",
-            Description = "A basic defense unit.",
-            MetalCost = 2000,
-            CrystalCost = 0,
-            DeuteriumCost = 0,
-            ConstructionDuration = "00:00:30",
-            Image = "rocketLauncher.jpg"
-        });
-        cannons.Add(new CannonDto
-        {
-            Id = Guid.NewGuid(),
-            Title = "Laser Cannon",
-            Description = "A more advanced defense unit.",
-            MetalCost = 3000,
-            CrystalCost = 1000,
-            DeuteriumCost = 0,
-            ConstructionDuration = "00:01:00",
-            Image = "laserCannon.jpg"
-        });
+        InvokeAsync(StateHasChanged);
+    }
+    
+    public void Dispose()
+    {
+        DefenseService.OnChange -= RefreshState;
+        ResourceService.OnChange -= RefreshState;
+    }
+    
+    private DefenseViewModel GetViewModel(string id) => viewModels.First(v => v.UnitId == id);
+    
+    private void AddToQuantity(DefenseViewModel vm, int amount)
+    {
+        vm.QuantityInput += amount;
+    }
+    
+    private void BuildDefense(DefenseUnit unit, DefenseViewModel vm)
+    {
+        DefenseService.AddToQueue(unit, vm.QuantityInput);
+        vm.QuantityInput = 0;
+    }
+    
+    private bool CanBuild(DefenseUnit unit)
+    {
+        // Simple check: Shipyard must exist
+        return BuildingService.GetBuildingLevel("Shipyard") >= 1; 
     }
 }

@@ -11,6 +11,8 @@ builder.Services.AddSingleton<ResourceService>();
 builder.Services.AddSingleton<BuildingService>();
 builder.Services.AddSingleton<TechnologyService>();
 builder.Services.AddSingleton<FleetService>();
+builder.Services.AddSingleton<DefenseService>();
+
 
 
 builder.Services.AddCors(options =>
