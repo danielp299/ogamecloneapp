@@ -23,6 +23,7 @@ public class FleetMission
     public DateTime ReturnTime { get; set; }
     public FleetStatus Status { get; set; }
     public long FuelConsumed { get; set; }
+    public Dictionary<string, long> Cargo { get; set; } = new();
 }
 
 public class Ship
@@ -65,6 +66,8 @@ public class FleetService
     private readonly ResourceService _resourceService;
     private readonly BuildingService _buildingService;
     private readonly TechnologyService _technologyService;
+    private readonly GalaxyService _galaxyService;
+    private readonly MessageService _messageService;
 
     public List<Ship> ShipDefinitions { get; private set; } = new();
     
@@ -81,11 +84,13 @@ public class FleetService
 
     private bool _isProcessingQueue = false;
 
-    public FleetService(ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService)
+    public FleetService(ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, MessageService messageService)
     {
         _resourceService = resourceService;
         _buildingService = buildingService;
         _technologyService = technologyService;
+        _galaxyService = galaxyService;
+        _messageService = messageService;
         
         InitializeShips();
         
@@ -313,8 +318,9 @@ public class FleetService
                     if (now >= mission.ArrivalTime)
                     {
                         // Arrived!
-                        // Logic: Process Mission (Combat, Transport, etc)
-                        // For now: Just turn around
+                        ProcessMissionArrival(mission);
+                        
+                        // Turn around
                         mission.Status = FleetStatus.Return;
                         NotifyStateChanged();
                     }
@@ -329,6 +335,19 @@ public class FleetService
                             if (!DockedShips.ContainsKey(kvp.Key)) DockedShips[kvp.Key] = 0;
                             DockedShips[kvp.Key] += kvp.Value;
                         }
+
+                        // Unload Cargo
+                        if (mission.Cargo.Count > 0)
+                        {
+                            long m = mission.Cargo.ContainsKey("Metal") ? mission.Cargo["Metal"] : 0;
+                            long c = mission.Cargo.ContainsKey("Crystal") ? mission.Cargo["Crystal"] : 0;
+                            long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
+                            _resourceService.AddResources(m, c, d);
+                        }
+                        
+                        _messageService.AddMessage("Fleet Return", 
+                            $"Your fleet from {mission.TargetCoordinates} has returned to base.", 
+                            "General");
                         
                         completedMissions.Add(mission);
                         NotifyStateChanged();
@@ -344,6 +363,213 @@ public class FleetService
             
             await Task.Delay(1000);
         }
+    }
+
+    private void ProcessMissionArrival(FleetMission mission)
+    {
+        // Parse coords
+        var parts = mission.TargetCoordinates.Split(':');
+        int g = int.Parse(parts[0]);
+        int s = int.Parse(parts[1]);
+        int p = int.Parse(parts[2]);
+
+        // Get target info
+        var system = _galaxyService.GetSystem(g, s);
+        var planet = system.FirstOrDefault(pl => pl.Position == p);
+        
+        // Handle Missions
+        switch (mission.MissionType)
+        {
+            case "Espionage":
+                HandleEspionage(mission, planet);
+                break;
+            case "Attack":
+                HandleCombat(mission, planet);
+                break;
+            case "Colonize":
+                HandleColonization(mission, planet);
+                break;
+            case "Recycle":
+                HandleRecycle(mission, planet);
+                break;
+            default:
+                 _messageService.AddMessage("Fleet Reached Destination", 
+                     $"Your fleet arrived at {mission.TargetCoordinates} and is returning.", "General");
+                break;
+        }
+    }
+
+    private void HandleEspionage(FleetMission mission, GalaxyPlanet planet)
+    {
+        if (planet == null || !planet.IsOccupied)
+        {
+             _messageService.AddMessage("Espionage Report", 
+                 $"Sector {mission.TargetCoordinates} is empty.", "Espionage");
+             return;
+        }
+
+        // Mock Report
+        var rand = new Random();
+        long m = rand.Next(1000, 500000);
+        long c = rand.Next(1000, 500000);
+        long d = rand.Next(0, 100000);
+        
+        string body = $@"
+            <strong>Target:</strong> {planet.Name} ({planet.PlayerName})<br/>
+            <strong>Resources:</strong><br/>
+            Metal: {m:N0}<br/>
+            Crystal: {c:N0}<br/>
+            Deuterium: {d:N0}<br/>
+            <br/>
+            <strong>Defense:</strong><br/>
+            Rocket Launcher: {rand.Next(0, 100)}<br/>
+            Laser Cannon: {rand.Next(0, 50)}<br/>
+        ";
+        
+        _messageService.AddMessage($"Spy Report [{mission.TargetCoordinates}]", body, "Espionage");
+    }
+
+    private void HandleColonization(FleetMission mission, GalaxyPlanet planet)
+    {
+        if (planet.IsOccupied)
+        {
+            _messageService.AddMessage("Colonization Failed", 
+                 $"Planet {mission.TargetCoordinates} is already occupied!", "General");
+             return;
+        }
+
+        // Check for Colony Ship
+        if (!mission.Ships.ContainsKey("CS") || mission.Ships["CS"] < 1)
+        {
+            _messageService.AddMessage("Colonization Failed", 
+                 "No Colony Ship present in the fleet.", "General");
+             return;
+        }
+
+        // Consume Colony Ship
+        mission.Ships["CS"]--;
+        if (mission.Ships["CS"] <= 0) mission.Ships.Remove("CS");
+        
+        // Update Galaxy
+        planet.IsOccupied = true;
+        planet.IsMyPlanet = true;
+        planet.Name = "Colony";
+        planet.PlayerName = "Commander";
+        planet.Image = "planet_colony.jpg";
+        
+        _messageService.AddMessage("Colonization Successful", 
+            $"You have successfully colonized position {mission.TargetCoordinates}!", "General");
+    }
+
+    private void HandleRecycle(FleetMission mission, GalaxyPlanet planet)
+    {
+        if (!planet.HasDebris)
+        {
+            _messageService.AddMessage("Recycle Report", 
+                 $"No debris found at {mission.TargetCoordinates}.", "General");
+             return;
+        }
+        
+        // Calculate Capacity
+        long capacity = 0;
+        foreach(var s in mission.Ships)
+        {
+            var def = ShipDefinitions.FirstOrDefault(x => x.Id == s.Key);
+            if (def != null && def.Id == "REC") // Only recyclers works effectively? For now any ship can carry
+            {
+                capacity += def.Capacity * s.Value;
+            }
+            else if(def != null)
+            {
+                 // Normal ships can assume some cargo? Let's say yes for simplicity
+                 capacity += def.Capacity * s.Value;
+            }
+        }
+        
+        long gatheredMetal = Math.Min(planet.DebrisMetal, capacity);
+        capacity -= gatheredMetal;
+        long gatheredCrystal = Math.Min(planet.DebrisCrystal, capacity);
+        
+        // Update Debris
+        planet.DebrisMetal -= gatheredMetal;
+        planet.DebrisCrystal -= gatheredCrystal;
+        if (planet.DebrisMetal <= 0 && planet.DebrisCrystal <= 0) planet.HasDebris = false;
+        
+        // Add to Fleet Cargo
+        if (!mission.Cargo.ContainsKey("Metal")) mission.Cargo["Metal"] = 0;
+        mission.Cargo["Metal"] += gatheredMetal;
+
+        if (!mission.Cargo.ContainsKey("Crystal")) mission.Cargo["Crystal"] = 0;
+        mission.Cargo["Crystal"] += gatheredCrystal;
+
+        _messageService.AddMessage("Harvest Report", 
+            $"Harvested {gatheredMetal:N0} Metal and {gatheredCrystal:N0} Crystal from debris field.", "General");
+    }
+
+    private void HandleCombat(FleetMission mission, GalaxyPlanet planet)
+    {
+        if (!planet.IsOccupied)
+        {
+            _messageService.AddMessage("Combat Report", "Planet is uninhabited. No combat occurred.", "Combat");
+            return;
+        }
+        
+        if (planet.IsMyPlanet)
+        {
+             _messageService.AddMessage("Combat Report", "You cannot attack your own planet.", "Combat");
+             return;
+        }
+
+        // Simple Combat Simulation
+        // Attacker Power = Sum(Attack * Count)
+        long attackerPower = 0;
+        foreach(var s in mission.Ships)
+        {
+             var def = ShipDefinitions.FirstOrDefault(x => x.Id == s.Key);
+             if(def != null) attackerPower += def.Attack * s.Value;
+        }
+        
+        // Defender Power (Random for now)
+        var rand = new Random();
+        long defenderPower = rand.Next(1000, 50000); // Random defense power
+        
+        string result = "";
+        if (attackerPower > defenderPower)
+        {
+            // Win
+            long lootM = rand.Next(5000, 50000);
+            long lootC = rand.Next(5000, 50000);
+            long lootD = rand.Next(0, 10000);
+            
+            // Add to Cargo
+            if (!mission.Cargo.ContainsKey("Metal")) mission.Cargo["Metal"] = 0;
+            mission.Cargo["Metal"] += lootM;
+
+            if (!mission.Cargo.ContainsKey("Crystal")) mission.Cargo["Crystal"] = 0;
+            mission.Cargo["Crystal"] += lootC;
+            
+            if (!mission.Cargo.ContainsKey("Deuterium")) mission.Cargo["Deuterium"] = 0;
+            mission.Cargo["Deuterium"] += lootD;
+            
+            result = $"<span style='color:green'>VICTORY!</span><br/>" +
+                     $"Attacker Power: {attackerPower:N0}<br/>" +
+                     $"Defender Power: {defenderPower:N0}<br/><br/>" +
+                     $"Loot captured: <br/>" +
+                     $"Metal: {lootM:N0}<br/>" +
+                     $"Crystal: {lootC:N0}<br/>" +
+                     $"Deuterium: {lootD:N0}";
+        }
+        else
+        {
+            // Loss - Lose ships?
+            // For MVP simplicity, just retreat with no loot.
+             result = $"<span style='color:red'>DEFEAT!</span><br/>" +
+                     $"Attacker Power: {attackerPower:N0}<br/>" +
+                     $"Defender Power: {defenderPower:N0}<br/><br/>" +
+                     $"Your fleet was forced to retreat.";
+        }
+        
+        _messageService.AddMessage($"Combat Report [{mission.TargetCoordinates}]", result, "Combat");
     }
 
     public void AddToQueue(Ship ship, int quantity)

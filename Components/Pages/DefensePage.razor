@@ -3,6 +3,7 @@
 @inject ResourceService ResourceService
 @inject DefenseService DefenseService
 @inject BuildingService BuildingService
+@inject RequirementService RequirementService
 @implements IDisposable
 
 <style>
@@ -21,7 +22,7 @@
     }
     .buildings-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 20px;
     }
     .building-card {
@@ -38,7 +39,19 @@
         align-items: center;
         width: 100%;
         gap: 10px;
+        height: 100%;
     }    
+    .building-count-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: rgba(0,0,0,0.7);
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        border: 1px solid #777;
+        z-index: 2;
+    }
     .building-card-content{
         display:flex;
         flex-direction: row;
@@ -125,7 +138,7 @@
         var vm = GetViewModel(unit.Id);
         
         <div class="building-card">            
-            <span style="position:absolute; top:10px; right:10px; font-weight:bold;">Built: @DefenseService.GetDefenseCount(unit.Id)</span>
+            <div class="building-count-badge">Built: @DefenseService.GetDefenseCount(unit.Id)</div>
             <img src="@unit.Image" alt="@unit.Name" />            
             <h3>@unit.Name</h3>            
             <p>@unit.Description</p>   
@@ -205,7 +218,6 @@
     
     private bool CanBuild(DefenseUnit unit)
     {
-        // Simple check: Shipyard must exist
-        return BuildingService.GetBuildingLevel("Shipyard") >= 1; 
+        return RequirementService.IsUnlocked(unit.Requirements);
     }
 }

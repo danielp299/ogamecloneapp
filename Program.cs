@@ -10,8 +10,11 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<ResourceService>();
 builder.Services.AddSingleton<BuildingService>();
 builder.Services.AddSingleton<TechnologyService>();
+builder.Services.AddSingleton<RequirementService>();
 builder.Services.AddSingleton<FleetService>();
 builder.Services.AddSingleton<DefenseService>();
+builder.Services.AddSingleton<GalaxyService>();
+builder.Services.AddSingleton<MessageService>();
 
 
 

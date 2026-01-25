@@ -1,0 +1,52 @@
+@implements IDisposable
+@inject myapp.Services.ResourceService ResourceService
+@inject myapp.Services.BuildingService BuildingService
+
+<div class="top-menu">
+    <div class="resource" title="Total Production: @BuildingService.MetalHourlyProduction.ToString("N0")/h
+Energy Use: @BuildingService.MetalMineEnergyConsumption
+Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
+        <label>Metal</label>
+        <span class="resource-value">@ResourceService.Metal.ToString("N0")</span>
+    </div>
+    <div class="resource" title="Total Production: @BuildingService.CrystalHourlyProduction.ToString("N0")/h
+Energy Use: @BuildingService.CrystalMineEnergyConsumption
+Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
+        <label>Crystal</label>
+        <span class="resource-value">@ResourceService.Crystal.ToString("N0")</span>
+    </div>
+    <div class="resource" title="Total Production: @BuildingService.DeuteriumHourlyProduction.ToString("N0")/h
+Energy Use: @BuildingService.DeuteriumSynthesizerEnergyConsumption
+Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
+        <label>Deuterium</label>
+        <span class="resource-value">@ResourceService.Deuterium.ToString("N0")</span>
+    </div>
+    <div class="resource">
+        <label>Energy</label>
+        <span class="resource-value">@ResourceService.Energy.ToString("N0")</span>
+    </div>
+</div>
+
+@code {
+    private System.Threading.Timer? _timer;
+
+    protected override void OnInitialized()
+    {
+        // Initialize timer to tick every second
+        _timer = new System.Threading.Timer(Tick, null, 0, 1000);
+    }
+
+    private void Tick(object? state)
+    {
+        // Update production logic to accrue resources based on elapsed time
+        BuildingService.UpdateProduction();
+        
+        // Update the UI
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

@@ -3,6 +3,7 @@
 @inject ResourceService ResourceService
 @inject FleetService FleetService
 @inject BuildingService BuildingService
+@inject RequirementService RequirementService
 @implements IDisposable
 
 <style>
@@ -23,7 +24,7 @@
 
     .buildings-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 20px;
     }
 
@@ -39,8 +40,21 @@
         justify-content: space-between;
         position: relative;
         align-items: center;
-        width: 100%; /* Changed from fixed width */
+        width: 100%;
         gap: 10px;
+        height: 100%;
+    }
+    
+    .building-count-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: rgba(0,0,0,0.7);
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        border: 1px solid #777;
+        z-index: 2;
     }
     .building-card-content{
         display:flex;
@@ -134,7 +148,7 @@
         var vm = GetViewModel(ship.Id);
         
         <div class="building-card">
-            <span style="position:absolute; top:10px; right:10px; font-weight:bold;">Hangar: @FleetService.GetShipCount(ship.Id)</span>
+            <div class="building-count-badge">Hangar: @FleetService.GetShipCount(ship.Id)</div>
             <img src="@ship.Image" alt="@ship.Name" />
             <h3>@ship.Name</h3>
             <p>@ship.Description</p>
@@ -216,12 +230,6 @@
     
     private bool CanBuild(Ship ship)
     {
-        // Simple check: Shipyard must exist
-        // In reality, check all Requirements
-        // For now, let's just assume if Shipyard > 0 we can see/build basics
-        // Or implement detailed requirement check
-        
-        // Simplified: Check level 1 shipyard for all
-        return BuildingService.GetBuildingLevel("Shipyard") >= 1; 
+        return RequirementService.IsUnlocked(ship.Requirements);
     }
 }

@@ -1,224 +1,247 @@
 @page "/constellation"
+@using myapp.Services
+@inject GalaxyService GalaxyService
+@inject NavigationManager Navigation
 
 <style>
-    .separator {
-        width: 90%;
-        border: 1px solid lightgray;
-        margin-top: 20px;
-        margin-bottom: 20px;
-    }
-     .planet-separator {
-        width: 75%;
-        width: 90%;
-        border: 1px solid lightgray;
-        margin-top: 20px;
-        margin-bottom: 20px;
+    .galaxy-container {
+        color: white;
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
     }
 
-.constellation-page {
-    align-items: center;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-}
-  .constellation-card{
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;        border: 2px solid lightgray;
-        padding: 20px;    
+    .nav-panel {
+        background-color: #222;
+        padding: 15px;
+        border-radius: 10px;
         margin-bottom: 20px;
-        border-radius: 15px;
-    }
-    .constellation-image {
-        width: 250px;
-        height: 250px;
-        aspect-ratio: 1/1;
-        object-fit: cover;
-        border: 2px solid white;
-        border-radius: 15px;
-    }  
-    .constellation-buttons {
         display: flex;
         justify-content: center;
-        gap: 3%;    
+        align-items: center;
+        gap: 20px;
+        border: 1px solid #444;
     }
-    .planet-grid {
-        gap: 10px;
-        display: grid;
-        grid-template-columns: 1fr;
-    }
-        .constellation-buttons button {
+
+    .nav-panel input {
+        width: 60px;
+        padding: 5px;
+        background-color: #333;
         color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 10px 20px;
-        width: 100%;
-    }
-    .constellation-stats {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;        
-    }
-    .constellation-stat {
         border: 1px solid #555;
-        padding: 10px;
-        border-radius: 5px;
-    }    
-    .planet-card{
         text-align: center;
     }
-    .planet-card img {
-        width: 250px;
-        height: 250px;
-        border: 2px solid white;
-        aspect-ratio: 1 / 1;
-        object-position: center;
+
+    .nav-button {
+        background-color: #444;
+        border: none;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+
+    .nav-button:hover {
+        background-color: #666;
+    }
+
+    .galaxy-table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: #1a1a1a;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .galaxy-table th {
+        background-color: #333;
+        padding: 15px;
+        text-align: left;
+    }
+
+    .galaxy-table td {
+        padding: 10px 15px;
+        border-bottom: 1px solid #333;
+        vertical-align: middle;
+    }
+
+    .planet-row:hover {
+        background-color: #2a2a2a;
+    }
+
+    .planet-img {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
         object-fit: cover;
-        border-radius: 15px;    aspect-ratio: 1 / 1;    object-position: center;}
-    .planet-card-buttons {        display: flex;
         border: 1px solid #555;
-        padding: 10px;                
-    }   
+    }
+
+    .status-vacant {
+        color: #666;
+        font-style: italic;
+    }
+
+    .status-occupied {
+        color: #4CAF50;
+        font-weight: bold;
+    }
+    
+    .status-enemy {
+        color: #FF5252;
+        font-weight: bold;
+    }
+
+    .action-btn {
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.8em;
+        margin-right: 5px;
+    }
+    
+    .debris-info {
+        font-size: 0.8em;
+        color: #aaa;
+    }
 </style>
 
-
-<div class="constellation-page">
-    @foreach (var constellation in constellations)
-    {
-        <div class="constellation-card">
-            <img src="@constellation.ImageUrl" alt="Constellation" class="constellation-image" />
-            <div class="constellation-buttons">                
-                <button @onclick="(e => LikeConstellation(constellation.Id))">Like</button>
-                <button @onclick="(e => ScoutConstellation(constellation.Id))">Scout</button>
-                <button @onclick="(e => ExploreConstellation(constellation))">Explore</button>
-                <button @onclick="(e => ForgetConstellation(constellation.Id))">Forget</button>
-               
-            </div>
-            
-              <div class="constellation-stats">
-                <div class="constellation-stat">Number of Inhabited Planets: @constellation.InhabitedPlanets</div>
-                <div class="constellation-stat">Difficulty: @constellation.Difficulty</div>
-                <div class="constellation-stat">Total Resources: @constellation.TotalResources</div>
-                <div class="constellation-stat">Activity Level: @constellation.ActivityLevel</div>
-            </div>
-             @if (constellation.ShowPlanets)
-             {
-                 <hr class="separator" />
-             <div class="planets-container">
-                <div class="planet-grid">
-                    @foreach (var planet in constellation.Planets)
-                    {
-                        <div class="planet-card">
-                            <img src="@planet.ImageUrl" alt="Planet Image" />
-                            <div class="planet-card-buttons">
-                                <button >Scout</button>
-                                <button>Attack</button>
-                                <button>Harvest</button>
-                            </div>
-                            <p>Size: @planet.Size</p>
-                            <p>Temperature: @planet.Temperature</p>
-                        </div>
-                        <hr class="planet-separator" />
-                    }
-                </div>
-           </div>
-           <button @onclick="(e => ExploreConstellation(constellation))">Hide</button>
-            }
+<div class="galaxy-container">
+    <div class="nav-panel">
+        <button class="nav-button" @onclick="PrevSystem">&lt;</button>
+        <div>
+            <label>Galaxy</label>
+            <input type="number" min="1" max="9" @bind="CurrentGalaxy" />
+            <label>System</label>
+            <input type="number" min="1" max="499" @bind="CurrentSystem" />
+            <button class="nav-button" @onclick="LoadSystem">Go</button>
         </div>
-    }    
+        <button class="nav-button" @onclick="NextSystem">&gt;</button>
+    </div>
+
+    <table class="galaxy-table">
+        <thead>
+            <tr>
+                <th>Pos</th>
+                <th>Image</th>
+                <th>Planet Name</th>
+                <th>Player (Status)</th>
+                <th>Alliance</th>
+                <th>Debris</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (CurrentPlanets != null)
+            {
+                @foreach (var planet in CurrentPlanets)
+                {
+                    <tr class="planet-row">
+                        <td>@planet.Position</td>
+                        <td>
+                            @if (planet.IsOccupied)
+                            {
+                                <img src="@planet.Image" class="planet-img" />
+                            }
+                        </td>
+                        <td>
+                            @if (planet.IsOccupied)
+                            {
+                                <span class="@(planet.IsMyPlanet ? "status-occupied" : "status-enemy")">@planet.Name</span>
+                            }
+                            else
+                            {
+                                <span class="status-vacant">Empty Space</span>
+                            }
+                        </td>
+                        <td>
+                            @if (planet.IsOccupied)
+                            {
+                                <span>@planet.PlayerName</span>
+                            }
+                        </td>
+                        <td>@planet.Alliance</td>
+                        <td>
+                            @if (planet.HasDebris)
+                            {
+                                <div class="debris-info">
+                                    M: @planet.DebrisMetal<br/>
+                                    C: @planet.DebrisCrystal
+                                </div>
+                            }
+                        </td>
+                        <td>
+                            @if (planet.IsOccupied && !planet.IsMyPlanet)
+                            {
+                                <button class="action-btn" @onclick="() => SendFleet(planet.Position, 1)">Attack</button>
+                                <button class="action-btn" @onclick="() => SendFleet(planet.Position, 2)">Espionage</button>
+                            }
+                            else if (!planet.IsOccupied)
+                            {
+                                <button class="action-btn" style="background-color: #FF9800" @onclick="() => SendFleet(planet.Position, 3)">Colonize</button>
+                            }
+                            
+                            @if (planet.HasDebris)
+                            {
+                                <button class="action-btn" style="background-color: #9C27B0" @onclick="() => SendFleet(planet.Position, 4)">Recycle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
 </div>
 
 @code {
-    private double CalculateDistance(int g, int s, int p)
-    {
-        return Math.Sqrt(g * g + s * s + p * p) * 1000;
-    }
-
-    public class ConstellationPageDto
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string ImageUrl { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Image { get; set; } = "";
-        public int DifficultyInt { get; set; }
-        public string Difficulty { get; set; } = "";
-        public int Resources { get; set; }
-        public int TotalResources { get; set; }
-        public string Activity { get; set; } = "";
-        public string ActivityLevel { get; set; } = "";
-        public int InhabitedPlanets { get; set; }
-        public bool ShowPlanets { get; set; } = false;
-        public List<PlanetDto> Planets { get; set; } = new();
-        public bool Explored { get; set; } = false;
-        public bool Spied { get; set; } = false; // Espionage level
-        public double Distance { get; set; } // Distance from home
-    }
-
-    public class PlanetDto
-    {
-        public string Name { get; set; } = "";
-        public string Image { get; set; } = "";
-        public int Size { get; set; }
-        public int Temperature { get; set; }
-        public bool HasMoon { get; set; } = false;
-        public string Owner { get; set; } = "Unknown";
-        public string Alliance { get; set; } = "";
-        public Guid Id { get; set; }
-        public string ImageUrl { get; set; } = "";
-    }
-
-    private List<ConstellationPageDto> constellations = new List<ConstellationPageDto>();
     private int CurrentGalaxy = 1;
     private int CurrentSystem = 1;
-    private int CurrentPosition = 1;
+    private List<GalaxyPlanet> CurrentPlanets;
 
     protected override void OnInitialized()
     {
-        for (int i = 0; i < 3; i++)
-        {
-            var constellation = new ConstellationPageDto
-            {
-                Id = Guid.NewGuid(),
-                ImageUrl = "constellation.jpg",
-                InhabitedPlanets = i + 10,
-                Difficulty = "Normal",
-                TotalResources = i * 1000,
-                ActivityLevel = "High",
+        LoadSystem();
+    }
 
-            };
-            for (int j = 0; j < 9; j++)
-            {
-                constellation.Planets.Add(new PlanetDto
-                {
-                    Name = $"Planet {j+1}",
-                    ImageUrl = "planet.jpg",
-                    Size = j * 100 + 50,
-                    Temperature = 20 + j,
-                    HasMoon = (j % 3 == 0),
-                    Owner = j % 2 == 0 ? "Player" : "Inactive",
-                    Alliance = j % 4 == 0 ? "Alliance X" : ""
-                });
-            }
-            constellation.Distance = CalculateDistance(i + 1, 1, 1);
-            constellations.Add(constellation);
+    private void LoadSystem()
+    {
+        CurrentPlanets = GalaxyService.GetSystem(CurrentGalaxy, CurrentSystem);
+    }
+
+    private void PrevSystem()
+    {
+        if (CurrentSystem > 1)
+        {
+            CurrentSystem--;
+            LoadSystem();
         }
     }
-        private void LikeConstellation(Guid id)
-        {
-            Console.WriteLine($"LikeConstellation: {id}");
-        }
-        private void ScoutConstellation(Guid id)
-        {
-            Console.WriteLine($"ScoutConstellation: {id}");
-        }
-        private void ForgetConstellation(Guid id)
-        {
-            Console.WriteLine($"ForgetConstellation: {id}");
-        }
-        private void ExploreConstellation(ConstellationPageDto constellation)
-        {
-            constellation.ShowPlanets = !constellation.ShowPlanets;
-        }
-}
 
+    private void NextSystem()
+    {
+        if (CurrentSystem < 499)
+        {
+            CurrentSystem++;
+            LoadSystem();
+        }
+    }
+
+    private void SendFleet(int position, int missionCode)
+    {
+        // 1=Attack, 2=Espionage, 3=Colonize, 4=Recycle
+        // We will pass parameters via Query String to Fleet Page
+        string mission = missionCode switch 
+        {
+            1 => "Attack",
+            2 => "Espionage",
+            3 => "Colonize",
+            4 => "Recycle",
+            _ => "Attack"
+        };
+        
+        Navigation.NavigateTo($"/fleet?galaxy={CurrentGalaxy}&system={CurrentSystem}&position={position}&mission={mission}");
+    }
+}

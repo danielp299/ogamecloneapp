@@ -4,3 +4,4 @@
 /obj
 myapp.Tests/bin/
 myapp.Tests/obj/
+.DS_Store

@@ -22,10 +22,8 @@
 
     .fleet-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 20px;
-        max-width: 1200px;
-        margin: 0 auto;
     }
 
     .ship-card {
@@ -37,7 +35,24 @@
         color: white;
         display: flex;
         flex-direction: column;
+        justify-content: space-between;
+        position: relative;
         align-items: center;
+        width: 100%;
+        height: 100%;
+        gap: 10px;
+    }
+    
+    .building-count-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: rgba(0,0,0,0.7);
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        border: 1px solid #777;
+        z-index: 2;
     }
 
     .ship-card img {
@@ -108,6 +123,14 @@
                             <span>@s.Key: @s.Value | </span>
                         }
                     </p>
+                    @if(mission.Cargo.Count > 0)
+                    {
+                        <p>Cargo: 
+                           @if(mission.Cargo.ContainsKey("Metal")) { <span>M: @mission.Cargo["Metal"].ToString("N0") | </span> }
+                           @if(mission.Cargo.ContainsKey("Crystal")) { <span>C: @mission.Cargo["Crystal"].ToString("N0") | </span> }
+                           @if(mission.Cargo.ContainsKey("Deuterium")) { <span>D: @mission.Cargo["Deuterium"].ToString("N0")</span> }
+                        </p>
+                    }
                 </div>
             }
         </div>
@@ -183,6 +206,20 @@
 </div>
 
 @code {
+    @inject NavigationManager Navigation
+    
+    [SupplyParameterFromQuery]
+    public int? Galaxy { get; set; }
+    
+    [SupplyParameterFromQuery]
+    public int? System { get; set; }
+    
+    [SupplyParameterFromQuery]
+    public int? Position { get; set; }
+    
+    [SupplyParameterFromQuery]
+    public string? Mission { get; set; }
+
     private int TargetGalaxy = 1;
     private int TargetSystem = 1;
     private int TargetPosition = 2;
@@ -210,6 +247,11 @@
         {
             inputs.Add(new FleetInputModel { ShipId = s.Id });
         }
+        
+        if (Galaxy.HasValue) TargetGalaxy = Galaxy.Value;
+        if (System.HasValue) TargetSystem = System.Value;
+        if (Position.HasValue) TargetPosition = Position.Value;
+        if (!string.IsNullOrEmpty(Mission)) SelectedMission = Mission;
     }
     
     private FleetInputModel GetInputModel(string id) => inputs.First(i => i.ShipId == id);

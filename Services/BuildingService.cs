@@ -71,8 +71,8 @@ public class BuildingService
         // We'll use a simplified linear scaling for now: 30 * Level per hour
         // Per second: (30 * Level) / 3600
 
-        // Configuration Multiplier (x100 speed for testing/fast servers)
-        double speedMultiplier = 100.0;
+        // Configuration Multiplier (x1000 speed for testing/fast servers)
+        double speedMultiplier = 1000.0;
 
         double metalProduction = 0;
         double crystalProduction = 0;

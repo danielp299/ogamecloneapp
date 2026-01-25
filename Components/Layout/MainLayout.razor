@@ -1,5 +1,4 @@
 @inherits LayoutComponentBase
-@inject myapp.Services.ResourceService ResourceService
 @implements IDisposable
 
 <style>
@@ -39,24 +38,7 @@
     </div>
 
     <main>
-        <div class="top-menu">
-            <div class="resource">
-                <label>Metal</label>
-                <span class="resource-value">@ResourceService.Metal.ToString("N0")</span>
-            </div>
-            <div class="resource">
-                <label>Crystal</label>
-                <span class="resource-value">@ResourceService.Crystal.ToString("N0")</span>
-            </div>
-            <div class="resource">
-                <label>Deuterium</label>
-                <span class="resource-value">@ResourceService.Deuterium.ToString("N0")</span>
-            </div>
-            <div class="resource">
-                <label>Energy</label>
-                <span class="resource-value">@ResourceService.Energy.ToString("N0")</span>
-            </div>
-        </div>
+        <ResourceHeader />
 
         <article class="content px-4">
             @Body
@@ -79,11 +61,9 @@
 
     protected override void OnInitialized()
     {
-        ResourceService.OnChange += StateHasChanged;
     }
 
     public void Dispose()
     {
-        ResourceService.OnChange -= StateHasChanged;
     }
 }
