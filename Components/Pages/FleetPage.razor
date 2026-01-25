@@ -1,6 +1,7 @@
 @page "/fleet"
 @using myapp.Services
 @inject ResourceService ResourceService
+@inject FleetService FleetService
 @implements IDisposable
 
 <style>
@@ -21,10 +22,10 @@
 
     .fleet-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Responsive columns */
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
         gap: 20px;
-        max-width: 1200px; /* Example max width for the grid */
-        margin: 0 auto; /* Center the grid */
+        max-width: 1200px;
+        margin: 0 auto;
     }
 
     .ship-card {
@@ -57,6 +58,7 @@
         padding: 20px;
         margin: 20px 0;
         border-radius: 10px;
+        color:white;
     }
 
     .send-ships {
@@ -75,280 +77,198 @@
         background-color: #333;
         padding: 10px;
         border-radius: 5px;
+        color: white;
     }
-        margin-bottom: 10px;
-    }
+
     .ship-card .ship-counter{
         font-size: 1.2em;
+        font-weight: bold;
     }
 </style>
 
 <div class="fleet-banner">
-    <h2>Fleet</h2>
+    <h2>Fleet Command</h2>
 </div>
 
-<div class="fleet-grid">
-    @foreach (var ship in ships)
+<!-- Fleet Activity -->
+<div class="fleet-activity">
+    <h3>Fleet Movements</h3>
+    @if (FleetService.ActiveFleets.Any())
     {
-        <div class="ship-card">
-            <img src="@ship.Image" alt="@ship.Title" />
-            <h3>@ship.Title</h3>
-            <p class="ship-counter">Count: @ship.Quantity</p>
+        <div class="activity-list">
+            @foreach (var mission in FleetService.ActiveFleets)
+            {
+                <div class="activity-item">
+                    <p><strong>@mission.MissionType</strong> to [@mission.TargetCoordinates]</p>
+                    <p>Status: @mission.Status</p>
+                    <p>Arrival: @mission.ArrivalTime.ToString("HH:mm:ss") (Return: @mission.ReturnTime.ToString("HH:mm:ss"))</p>
+                    <p>Ships: 
+                        @foreach(var s in mission.Ships)
+                        {
+                            <span>@s.Key: @s.Value | </span>
+                        }
+                    </p>
+                </div>
+            }
         </div>
+    }
+    else
+    {
+        <p>No active fleet movements.</p>
     }
 </div>
 
 <!-- Send Fleet Section -->
-    <div class="send-fleet">
-        <h2>Send Fleet</h2>
-        @if (!string.IsNullOrEmpty(errorMessage))
-        {
-            <div style="color: red; margin-bottom: 10px; font-weight: bold;">
-                @errorMessage
-            </div>
-        }
-        <form @onsubmit="SendFleet">
-            <label>Mission:</label>
-            <select @bind="SelectedMission">
-                <option value="Attack">Attack</option>
-                <option value="Transport">Transport</option>
-                <option value="Deploy">Deploy</option>
-                <option value="Spy">Spy</option>
-                <option value="Colonize">Colonize</option>
-                <option value="Recycle">Recycle</option>
-                <option value="Destroy">Destroy</option>
-                <option value="Expedition">Expedition</option>
-            </select>
-            <br>
-            <label>Target Galaxy:</label>
-            <input type="number" @bind="TargetGalaxy" />
-            <label>System:</label>
-            <input type="number" @bind="TargetSystem" />
-            <label>Position:</label>
-            <input type="number" @bind="TargetPosition" />
-            <br>
-            <label>Ships to Send:</label>
-            <div class="send-ships">
-                @foreach (var ship in ships)
-                {
-                    <div>
-                        <label>@ship.Title:</label>
-                        <input type="number" @bind="ship.QuantityToSend" min="0" max="@ship.Quantity" />
-                    </div>
-                }
-            </div>
-            <button type="submit">Send Fleet</button>
-        </form>
-        <p>Flight Time: @FlightTime.ToString(@"hh\:mm\:ss") | Fuel Consumption: @FuelConsumption</p>
+<div class="send-fleet">
+    <h3>Send Fleet</h3>
+    
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="color: red; margin-bottom: 10px; font-weight: bold;">
+            @errorMessage
+        </div>
+    }
+    
+    <div style="margin-bottom: 15px;">
+        <label>Target:</label>
+        G:<input type="number" @bind="TargetGalaxy" style="width:50px" />
+        S:<input type="number" @bind="TargetSystem" style="width:50px" />
+        P:<input type="number" @bind="TargetPosition" style="width:50px" />
+        
+        <label style="margin-left: 20px;">Mission:</label>
+        <select @bind="SelectedMission">
+            <option value="Attack">Attack</option>
+            <option value="Transport">Transport</option>
+            <option value="Espionage">Espionage</option>
+            <option value="Deploy">Deploy</option>
+            <option value="Colonize">Colonize</option>
+            <option value="Recycle">Recycle</option>
+        </select>
     </div>
 
-    <!-- Fleet Activity -->
-    <div class="fleet-activity">
-        <h2>Fleet Activity</h2>
-        @if (ActiveFleets.Count > 0)
+    <div class="fleet-grid">
+        @foreach (var ship in FleetService.ShipDefinitions)
         {
-            <div class="activity-list">
-                @foreach (var fleet in ActiveFleets)
-                {
-                    <div class="activity-item">
-                        <p>Mission: @fleet.Mission | Target: [@fleet.Target] | Arrival: @fleet.ArrivalTime.ToString("HH:mm:ss")</p>
-                        <p>Ships: @string.Join(", ", fleet.Ships.Select(s => $"{s.Title}: {s.Quantity}"))</p>
-                    </div>
-                }
-            </div>
+            var count = FleetService.GetShipCount(ship.Id);
+            if(count > 0)
+            {
+                // Find or create input model
+                var input = GetInputModel(ship.Id);
+                
+                <div class="ship-card">
+                    <img src="@ship.Image" alt="@ship.Name" />
+                    <h3>@ship.Name</h3>
+                    <p class="ship-counter">Available: @count</p>
+                    <p>Speed: @ship.BaseSpeed</p>
+                    <input type="number" @bind="input.QuantityToSend" min="0" max="@count" />
+                    <button style="margin-top:5px;" @onclick="() => input.QuantityToSend = count">Max</button>
+                </div>
+            }
+        }
+    </div>
+    
+    <div style="margin-top: 20px; text-align: center;">
+        <button @onclick="CalculateFlight" style="padding: 10px 20px;">Calculate Flight</button>
+        
+        @if(calculatedFlightTime > TimeSpan.Zero)
+        {
+             <div style="margin-top: 10px;">
+                <p>Duration: @calculatedFlightTime.ToString(@"hh\:mm\:ss")</p>
+                <p>Fuel Consumption: @calculatedFuel.ToString("N0") Deuterium</p>
+                <button @onclick="LaunchFleet" style="padding: 10px 20px; background-color: green; color: white; font-weight: bold;">Launch Fleet</button>
+             </div>
+        }
+    </div>
+
+</div>
+
+@code {
+    private int TargetGalaxy = 1;
+    private int TargetSystem = 1;
+    private int TargetPosition = 2;
+    private string SelectedMission = "Attack";
+    private string errorMessage = "";
+    
+    private TimeSpan calculatedFlightTime;
+    private long calculatedFuel;
+
+    // View Model for inputs
+    public class FleetInputModel
+    {
+        public string ShipId { get; set; }
+        public int QuantityToSend { get; set; }
+    }
+    
+    private List<FleetInputModel> inputs = new();
+
+    protected override void OnInitialized()
+    {
+        FleetService.OnChange += RefreshState;
+        ResourceService.OnChange += RefreshState;
+        
+        foreach(var s in FleetService.ShipDefinitions)
+        {
+            inputs.Add(new FleetInputModel { ShipId = s.Id });
+        }
+    }
+    
+    private FleetInputModel GetInputModel(string id) => inputs.First(i => i.ShipId == id);
+    
+    private async void RefreshState()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+    
+    private Dictionary<string, int> GetSelectedShips()
+    {
+        var dict = new Dictionary<string, int>();
+        foreach(var i in inputs)
+        {
+            if (i.QuantityToSend > 0)
+            {
+                dict.Add(i.ShipId, i.QuantityToSend);
+            }
+        }
+        return dict;
+    }
+
+    private void CalculateFlight()
+    {
+        var ships = GetSelectedShips();
+        if (!ships.Any()) 
+        {
+            errorMessage = "No ships selected.";
+            calculatedFlightTime = TimeSpan.Zero;
+            return;
+        }
+        
+        errorMessage = "";
+        calculatedFlightTime = FleetService.CalculateFlightTime(ships, TargetGalaxy, TargetSystem, TargetPosition);
+        calculatedFuel = FleetService.CalculateFuelConsumption(ships, TargetGalaxy, TargetSystem, TargetPosition);
+    }
+    
+    private void LaunchFleet()
+    {
+        var ships = GetSelectedShips();
+        var error = FleetService.SendFleet(ships, TargetGalaxy, TargetSystem, TargetPosition, SelectedMission);
+        
+        if (error != null)
+        {
+            errorMessage = error;
         }
         else
         {
-            <p>No active fleets.</p>
+            // Success
+            errorMessage = "";
+            calculatedFlightTime = TimeSpan.Zero;
+            // Reset inputs
+            foreach(var i in inputs) i.QuantityToSend = 0;
         }
-    </div>
-}
-
-@code {
-    public class ShipDto
-    {
-        public string Title { get; set; } = "";
-        public string Image { get; set; } = "";
-        public int Quantity { get; set; }
-        public int QuantityToSend { get; set; }
-        public int Speed { get; set; } = 10000; // Example speed
-        public long FuelConsumption { get; set; } = 10; // Per unit
-        public long Capacity { get; set; } = 5000; // Cargo
-        public int Attack { get; set; } = 0;
-        public int Shields { get; set; } = 0;
-        public int Armor { get; set; } = 0;
-    }
-
-    public class Fleet
-    {
-        public string Mission { get; set; } = "";
-        public string Target { get; set; } = "";
-        public DateTime ArrivalTime { get; set; }
-        public List<ShipDto> Ships { get; set; } = new();
-    }
-
-    private List<ShipDto> ships = new List<ShipDto>()
-    {
-        new ShipDto { Title = "Small Cargo", Image = "smallCargo.jpg", Quantity = 10, Speed = 5000, FuelConsumption = 10, Capacity = 5000, Attack = 5, Shields = 10, Armor = 400 },
-        new ShipDto { Title = "Large Cargo", Image = "largeCargo.jpg", Quantity = 5, Speed = 7500, FuelConsumption = 50, Capacity = 25000 },
-        new ShipDto { Title = "Light Fighter", Image = "lightFighter.jpg", Quantity = 20, Speed = 12500, FuelConsumption = 20, Capacity = 50, Attack = 50, Shields = 10, Armor = 400 },
-        new ShipDto { Title = "Heavy Fighter", Image = "heavyFighter.jpg", Quantity = 15, Speed = 10000, FuelConsumption = 75, Capacity = 100 },
-        new ShipDto { Title = "Cruiser", Image = "cruiser.jpg", Quantity = 8, Speed = 15000, FuelConsumption = 300, Capacity = 800, Attack = 400, Shields = 50, Armor = 2700 },
-        new ShipDto { Title = "Battleship", Image = "battleship.jpg", Quantity = 3, Speed = 10000, FuelConsumption = 500, Capacity = 1500 },
-        new ShipDto { Title = "Colony Ship", Image = "colonyShip.jpg", Quantity = 1, Speed = 2500, FuelConsumption = 1000, Capacity = 7500 },
-        new ShipDto { Title = "Recycler", Image = "recycler.jpg", Quantity = 2, Speed = 2000, FuelConsumption = 300, Capacity = 20000 },
-        new ShipDto { Title = "Destroyer", Image = "destroyer.jpg", Quantity = 4, Speed = 5000, FuelConsumption = 1000, Capacity = 1000 },
-        new ShipDto { Title = "Death Star", Image = "deathstar.jpg", Quantity = 1, Speed = 100, FuelConsumption = 1, Capacity = 1000000, Attack = 200000, Shields = 50000, Armor = 900000 }
-    };
-
-    private string SelectedMission = "Attack";
-    private int TargetGalaxy = 1;
-    private int TargetSystem = 1;
-    private int TargetPosition = 1;
-    private TimeSpan FlightTime = TimeSpan.Zero;
-    private long FuelConsumption = 0;
-    private List<Fleet> ActiveFleets = new();
-
-    private string errorMessage = "";
-
-    private void SendFleet()
-    {
-        errorMessage = "";
-        
-        var shipsToSend = ships.Where(s => s.QuantityToSend > 0).ToList();
-
-        if (!shipsToSend.Any())
-        {
-            errorMessage = "No ships selected.";
-            return;
-        }
-
-        // Calculate flight time based on slowest ship
-        var slowestSpeed = shipsToSend.Min(s => ships.First(ship => ship.Title == s.Title).Speed);
-        var distance = CalculateDistance(TargetGalaxy, TargetSystem, TargetPosition);
-        FlightTime = TimeSpan.FromHours(distance / slowestSpeed);
-        
-        // Calculate total fuel consumption
-        FuelConsumption = shipsToSend.Sum(s => s.QuantityToSend * ships.First(ship => ship.Title == s.Title).FuelConsumption);
-
-        // check if user has enough deuterium
-        if (!ResourceService.HasResources(0, 0, (int)FuelConsumption))
-        {
-             errorMessage = $"Not enough Deuterium! Required: {FuelConsumption}";
-             return;
-        }
-
-        // Consume deuterium
-        ResourceService.ConsumeResources(0, 0, (int)FuelConsumption);
-
-        var fleet = new Fleet
-        {
-            Mission = SelectedMission,
-            Target = $"{TargetGalaxy}:{TargetSystem}:{TargetPosition}",
-            Ships = shipsToSend.Select(s => new ShipDto { Title = s.Title, Quantity = s.QuantityToSend }).ToList()
-        };
-
-        fleet.ArrivalTime = DateTime.Now.Add(FlightTime);
-        ActiveFleets.Add(fleet);
-
-        // Deduct quantities
-        foreach (var s in fleet.Ships)
-        {
-            var ship = ships.First(sh => sh.Title == s.Title);
-            ship.Quantity -= s.Quantity;
-            // reset input
-            var inputShip = ships.First(sh => sh.Title == s.Title);
-            inputShip.QuantityToSend = 0;
-        }
-
-        // If mission is Attack, simulate combat on arrival
-        if (SelectedMission == "Attack")
-        {
-            // Simulate delay for flight
-            Task.Delay(FlightTime).ContinueWith(_ => ResolveCombat(fleet));
-        }
-    }
-
-    private void ResolveCombat(Fleet attackingFleet)
-    {
-        // Simulate defender: random ships/defenses
-        var defendingShips = new List<ShipDto>
-        {
-            new ShipDto { Title = "Light Fighter", Quantity = 50, Attack = 50, Shields = 10, Armor = 400 },
-            new ShipDto { Title = "Rocket Launcher", Quantity = 100, Attack = 80, Shields = 20, Armor = 200 }
-        };
-
-        var result = SimulateCombat(attackingFleet.Ships, defendingShips);
-        // Log or display result
-        Console.WriteLine($"Combat Result: Winner - {result.Winner}, Debris - Metal: {result.DebrisMetal}, Crystal: {result.DebrisCrystal}");
-        // Remove fleet from active
-        ActiveFleets.Remove(attackingFleet);
-        InvokeAsync(StateHasChanged);
-    }
-
-    private CombatResult SimulateCombat(List<ShipDto> attackers, List<ShipDto> defenders)
-    {
-        // Simplified combat simulation
-        int rounds = 0;
-        while (rounds < 6 && attackers.Sum(a => a.Quantity) > 0 && defenders.Sum(d => d.Quantity) > 0)
-        {
-            // Attackers fire
-            foreach (var att in attackers.Where(a => a.Quantity > 0))
-            {
-                foreach (var def in defenders.Where(d => d.Quantity > 0))
-                {
-                    int damage = att.Attack * att.Quantity - def.Shields;
-                    if (damage > 0)
-                    {
-                        int destroyed = Math.Min(def.Quantity, damage / def.Armor);
-                        def.Quantity -= destroyed;
-                    }
-                }
-            }
-            // Defenders fire (similar)
-            foreach (var def in defenders.Where(d => d.Quantity > 0))
-            {
-                foreach (var att in attackers.Where(a => a.Quantity > 0))
-                {
-                    int damage = def.Attack * def.Quantity - att.Shields;
-                    if (damage > 0)
-                    {
-                        int destroyed = Math.Min(att.Quantity, damage / att.Armor);
-                        att.Quantity -= destroyed;
-                    }
-                }
-            }
-            rounds++;
-        }
-
-        string winner = attackers.Sum(a => a.Quantity) > 0 ? "Attacker" : "Defender";
-        
-        // Simple debris calculation logic based on remaining ships vs initial ships would be better,
-        // but since we don't have the initial state here easily without refactoring, 
-        // we will simulate debris based on a fraction of the winner's remaining fleet capacity for now
-        // to have a non-zero value, or simply leave it as 0 until we refactor the combat engine properly.
-        // For now, let's keep it safe and compiling.
-        long debrisMetal = 0; 
-        long debrisCrystal = 0;
-
-        return new CombatResult { Winner = winner, DebrisMetal = (long)debrisMetal, DebrisCrystal = (long)debrisCrystal };
-    }
-
-    public class CombatResult
-    {
-        public string Winner { get; set; }
-        public long DebrisMetal { get; set; }
-        public long DebrisCrystal { get; set; }
-    }
-
-    private double CalculateDistance(int g, int s, int p)
-    {
-        // Placeholder distance calculation
-        return Math.Sqrt(g * g + s * s + p * p) * 1000;
     }
 
     public void Dispose()
     {
-        // Cleanup if needed
+        FleetService.OnChange -= RefreshState;
+        ResourceService.OnChange -= RefreshState;
     }
 }

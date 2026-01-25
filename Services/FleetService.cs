@@ -5,6 +5,26 @@ using System.Threading.Tasks;
 
 namespace myapp.Services;
 
+public enum FleetStatus
+{
+    Flight,
+    Return,
+    Holding
+}
+
+public class FleetMission
+{
+    public Guid Id { get; set; }
+    public string MissionType { get; set; }
+    public string TargetCoordinates { get; set; }
+    public Dictionary<string, int> Ships { get; set; } = new();
+    public DateTime StartTime { get; set; }
+    public DateTime ArrivalTime { get; set; }
+    public DateTime ReturnTime { get; set; }
+    public FleetStatus Status { get; set; }
+    public long FuelConsumed { get; set; }
+}
+
 public class Ship
 {
     public string Id { get; set; } = "";
@@ -54,6 +74,9 @@ public class FleetService
     // Shipyard Queue
     public List<ShipyardItem> ConstructionQueue { get; private set; } = new();
 
+    // Active Fleets (Missions)
+    public List<FleetMission> ActiveFleets { get; private set; } = new();
+
     public event Action OnChange;
 
     private bool _isProcessingQueue = false;
@@ -66,8 +89,9 @@ public class FleetService
         
         InitializeShips();
         
-        // Start queue processor
+        // Start loops
         _ = ProcessQueueLoop();
+        _ = ProcessFleetLoop();
     }
 
     private void InitializeShips()
@@ -186,6 +210,140 @@ public class FleetService
     public int GetShipCount(string shipId)
     {
         return DockedShips.ContainsKey(shipId) ? DockedShips[shipId] : 0;
+    }
+
+    // --- Fleet Operations ---
+
+    public long CalculateFuelConsumption(Dictionary<string, int> shipsToSend, int targetGalaxy, int targetSystem, int targetPosition)
+    {
+        // Placeholder distance: 1 System = 1000 units, 1 Galaxy = 20000 units
+        // Current coordinates assumed 1:1:1 for simplicity
+        long distance = Math.Abs(targetGalaxy - 1) * 20000 + Math.Abs(targetSystem - 1) * 1000 + Math.Abs(targetPosition - 1) * 5 + 1000;
+        
+        long totalFuel = 0;
+        foreach(var kvp in shipsToSend)
+        {
+            var ship = ShipDefinitions.First(s => s.Id == kvp.Key);
+            // Simple formula: Consumption * Distance / 1000 * Quantity
+            totalFuel += (ship.FuelConsumption * distance / 1000) * kvp.Value;
+        }
+        
+        return Math.Max(1, totalFuel);
+    }
+
+    public TimeSpan CalculateFlightTime(Dictionary<string, int> shipsToSend, int targetGalaxy, int targetSystem, int targetPosition)
+    {
+        if (!shipsToSend.Any()) return TimeSpan.Zero;
+        
+        // Find slowest ship
+        int minSpeed = int.MaxValue;
+        foreach(var kvp in shipsToSend)
+        {
+             var ship = ShipDefinitions.First(s => s.Id == kvp.Key);
+             if (ship.BaseSpeed < minSpeed) minSpeed = ship.BaseSpeed;
+        }
+        
+        // Distance
+        long distance = Math.Abs(targetGalaxy - 1) * 20000 + Math.Abs(targetSystem - 1) * 1000 + Math.Abs(targetPosition - 1) * 5 + 1000;
+        
+        // Time = Distance / Speed * Factor (e.g. 100)
+        // With x100 speed universe, we divide result by 100
+        double hours = (double)distance / minSpeed;
+        double seconds = hours * 3600 / 100.0; // x100 Speed universe
+        
+        if (seconds < 10) seconds = 10; // Minimum flight time
+
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    public string SendFleet(Dictionary<string, int> shipsToSend, int g, int s, int p, string missionType)
+    {
+        if (!shipsToSend.Any()) return "No ships selected.";
+        
+        // 1. Check Ship Availability
+        foreach(var kvp in shipsToSend)
+        {
+            if (GetShipCount(kvp.Key) < kvp.Value) return $"Not enough {kvp.Key}.";
+        }
+        
+        // 2. Calculate Fuel & Check Deuterium
+        long fuel = CalculateFuelConsumption(shipsToSend, g, s, p);
+        if (!_resourceService.HasResources(0,0, fuel)) return "Not enough Deuterium for fuel.";
+        
+        // 3. Deduct Resources and Ships
+        _resourceService.ConsumeResources(0,0, fuel);
+        foreach(var kvp in shipsToSend)
+        {
+            DockedShips[kvp.Key] -= kvp.Value;
+        }
+        
+        // 4. Create Mission
+        var flightTime = CalculateFlightTime(shipsToSend, g, s, p);
+        var mission = new FleetMission
+        {
+            Id = Guid.NewGuid(),
+            MissionType = missionType,
+            TargetCoordinates = $"{g}:{s}:{p}",
+            Ships = new Dictionary<string, int>(shipsToSend),
+            StartTime = DateTime.Now,
+            ArrivalTime = DateTime.Now.Add(flightTime),
+            ReturnTime = DateTime.Now.Add(flightTime).Add(flightTime), // Simple return logic
+            Status = FleetStatus.Flight,
+            FuelConsumed = fuel
+        };
+        
+        ActiveFleets.Add(mission);
+        NotifyStateChanged();
+        
+        return null; // Success
+    }
+
+    private async Task ProcessFleetLoop()
+    {
+        while (true)
+        {
+            var now = DateTime.Now;
+            var completedMissions = new List<FleetMission>();
+            
+            // Iterate backwards or copy list to modify
+            foreach (var mission in ActiveFleets.ToList())
+            {
+                if (mission.Status == FleetStatus.Flight)
+                {
+                    if (now >= mission.ArrivalTime)
+                    {
+                        // Arrived!
+                        // Logic: Process Mission (Combat, Transport, etc)
+                        // For now: Just turn around
+                        mission.Status = FleetStatus.Return;
+                        NotifyStateChanged();
+                    }
+                }
+                else if (mission.Status == FleetStatus.Return)
+                {
+                    if (now >= mission.ReturnTime)
+                    {
+                        // Returned to base
+                        foreach(var kvp in mission.Ships)
+                        {
+                            if (!DockedShips.ContainsKey(kvp.Key)) DockedShips[kvp.Key] = 0;
+                            DockedShips[kvp.Key] += kvp.Value;
+                        }
+                        
+                        completedMissions.Add(mission);
+                        NotifyStateChanged();
+                    }
+                }
+            }
+            
+            if (completedMissions.Any())
+            {
+                foreach(var m in completedMissions) ActiveFleets.Remove(m);
+                NotifyStateChanged();
+            }
+            
+            await Task.Delay(1000);
+        }
     }
 
     public void AddToQueue(Ship ship, int quantity)
