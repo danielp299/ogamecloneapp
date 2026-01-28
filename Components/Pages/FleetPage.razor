@@ -209,6 +209,8 @@
 @code {
     @inject NavigationManager Navigation
     
+    private System.Threading.Timer? _timer;
+
     [SupplyParameterFromQuery]
     public int? Galaxy { get; set; }
     
@@ -244,6 +246,9 @@
         FleetService.OnChange += RefreshState;
         ResourceService.OnChange += RefreshState;
         
+        // Timer for UI updates (Fleet movements)
+        _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 0, 1000);
+
         foreach(var s in FleetService.ShipDefinitions)
         {
             inputs.Add(new FleetInputModel { ShipId = s.Id });
@@ -311,6 +316,7 @@
 
     public void Dispose()
     {
+        _timer?.Dispose();
         FleetService.OnChange -= RefreshState;
         ResourceService.OnChange -= RefreshState;
     }

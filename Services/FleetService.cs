@@ -260,7 +260,10 @@ public class FleetService
         double hours = (double)distance / minSpeed;
         double seconds = hours * 3600 / 100.0; // x100 Speed universe
         
-        if (seconds < 10) seconds = 10; // Minimum flight time
+        // Reduce attack time by 90%
+        seconds = seconds * 0.1;
+        
+        if (seconds < 2) seconds = 2; // Minimum flight time
 
         return TimeSpan.FromSeconds(seconds);
     }
