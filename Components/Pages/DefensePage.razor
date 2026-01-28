@@ -4,127 +4,21 @@
 @inject DefenseService DefenseService
 @inject BuildingService BuildingService
 @inject RequirementService RequirementService
+@inject TechnologyService TechnologyService
 @implements IDisposable
 
-<style>
-    .buildings-banner {
-        background-image: url('buildings-banner.jpg'); /* Replace with your image path */
-        background-size: cover;
-        background-position: center;
-        color: white;
-        text-align: center;
-        padding: 100px 20px;
-        margin-bottom: 20px;
-    }    
-    .buildings-banner h2 {
-        font-size: 3em;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    }
-    .buildings-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 20px;
-    }
-    .building-card {
-        background-color: #333;
-        border-radius: 5px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #555;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        position: relative;
-        align-items: center;
-        width: 100%;
-        gap: 10px;
-        height: 100%;
-    }    
-    .building-count-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(0,0,0,0.7);
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-weight: bold;
-        border: 1px solid #777;
-        z-index: 2;
-    }
-    .building-card-content{
-        display:flex;
-        flex-direction: row;
-        width: 100%;
-        justify-content: center;
-        gap: 10px;
-    }    
-    .building-card-quantity-selector {
-        display: flex;
-        justify-content: space-around;
-        width: 100%;
-        margin-bottom: 10px;
-    }
-    .quantity-button {
-        width: 30px;
-        height: 30px;
-        background-color: #555;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 5px;
-        cursor: pointer;
-    }    
-    .building-card img {
-        width: 177px;
-        height: 177px;
-        object-fit: cover;
-        border: 2px solid #777;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        border-radius: 10px;        
-        margin-bottom: 10px;
-    }
-    .building-card h3 {
-        color: white;
-        margin: 5px 0;
-    }
-    .building-card input {
-        width: 80px;
-        text-align: center;
-    }
-    .building-card button {
-        padding: 10px;
-        background-color: #555;
-        color: white;
-        border: none;
-        cursor: pointer;
-    }    
-    
-    .queue-container {
-        margin-bottom: 30px;
-        background-color: #222;
-        padding: 15px;
-        border-radius: 5px;
-        color: white;
-    }
-    .queue-item {
-        padding: 5px;
-        border-bottom: 1px solid #444;
-    }
-</style>
-
-<div class="buildings-banner">
+<div class="ogame-banner" style="background-image: url('buildings-banner.jpg');">
     <h2>Defense</h2>
 </div>
 
 <!-- Queue Display -->
 @if (DefenseService.ConstructionQueue.Any())
 {
-    <div class="queue-container">
+    <div class="ogame-queue-container">
         <h3>Current Production</h3>
         @foreach (var item in DefenseService.ConstructionQueue)
         {
-            <div class="queue-item">
+            <div class="ogame-queue-item">
                 <strong>@item.Unit.Name</strong>: @item.Quantity remaining. 
                 Next unit in: @item.TimeRemaining.ToString(@"hh\:mm\:ss")
             </div>
@@ -132,32 +26,52 @@
     </div>
 }
 
-<div class="buildings-grid">    
+<div class="ogame-grid">    
     @foreach (var unit in DefenseService.DefenseDefinitions)    
     {
         var vm = GetViewModel(unit.Id);
         
-        <div class="building-card">            
-            <div class="building-count-badge">Built: @DefenseService.GetDefenseCount(unit.Id)</div>
+        <div class="ogame-card">            
+            <div class="ogame-count-badge">Built: @DefenseService.GetDefenseCount(unit.Id)</div>
             <img src="@unit.Image" alt="@unit.Name" />            
             <h3>@unit.Name</h3>            
             <p>@unit.Description</p>   
             
-            <div style="font-size: 0.9em; text-align: left; width: 100%; padding: 0 10px;">
-                <p>Metal: @unit.MetalCost.ToString("N0")</p>            
-                <p>Crystal: @unit.CrystalCost.ToString("N0")</p>            
-                @if(unit.DeuteriumCost > 0) { <p>Deuterium: @unit.DeuteriumCost.ToString("N0")</p> }
-                <p>Structure: @unit.Structure.ToString("N0") | Attack: @unit.Attack.ToString("N0")</p>
-                <p>Base Time: @unit.BaseDuration.ToString()</p> 
+            <div class="ogame-cost-section">
+                <div class="ogame-cost-item">Metal: @unit.MetalCost.ToString("N0")</div>            
+                <div class="ogame-cost-item">Crystal: @unit.CrystalCost.ToString("N0")</div>            
+                @if(unit.DeuteriumCost > 0) { <div class="ogame-cost-item">Deuterium: @unit.DeuteriumCost.ToString("N0")</div> }
+                <div class="ogame-cost-item">Structure: @unit.Structure.ToString("N0") | Attack: @unit.Attack.ToString("N0")</div>
+                <div class="ogame-cost-item">Base Time: @unit.BaseDuration.ToString()</div> 
+
+                @if (unit.Requirements != null && unit.Requirements.Any())
+                {
+                    <div class="ogame-requirements-section">
+                        <strong>Requirements:</strong>
+                        <ul style="list-style-type: none; padding-left: 0; margin: 5px 0;">
+                            @foreach (var req in unit.Requirements)
+                            {
+                                var building = BuildingService.Buildings.FirstOrDefault(b => b.Title == req.Key);
+                                var tech = TechnologyService.Technologies.FirstOrDefault(t => t.Title == req.Key);
+                                int currentLevel = building?.Level ?? tech?.Level ?? 0;
+                                bool met = currentLevel >= req.Value;
+                                
+                                <li style="color: @(met ? "#00ff00" : "#ff6666")">
+                                    @req.Key (Lvl @req.Value) - <span style="font-size:0.8em">Current: @currentLevel</span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
             </div>
             
-            <div class="building-card-quantity-selector">                
-                <button class="quantity-button" @onclick="() => AddToQuantity(vm, 10)">10</button>                
-                <button class="quantity-button" @onclick="() => AddToQuantity(vm, 50)">50</button>                
-                <button class="quantity-button" @onclick="() => AddToQuantity(vm, 100)">100</button>            
+            <div class="ogame-quantity-selector">                
+                <button class="ogame-quantity-button" @onclick="() => AddToQuantity(vm, 10)">10</button>                
+                <button class="ogame-quantity-button" @onclick="() => AddToQuantity(vm, 50)">50</button>                
+                <button class="ogame-quantity-button" @onclick="() => AddToQuantity(vm, 100)">100</button>            
             </div>            
-            <div class="building-card-content">                
-                <input type="number" @bind="vm.QuantityInput" min="0" max="9999" />                
+            <div class="ogame-card-actions">                
+                <input type="number" class="ogame-input-quantity" @bind="vm.QuantityInput" min="0" max="9999" />                
                 
                 @if(CanBuild(unit))
                 {
@@ -165,7 +79,7 @@
                 }
                 else
                 {
-                    <button class="btn btn-secondary" disabled>Locked</button>
+                    
                 }
             </div>        
         </div>    

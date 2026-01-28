@@ -1,4 +1,3 @@
-razor
 @page "/technologies"
 @using myapp.Services
 @inject ResourceService ResourceService
@@ -6,159 +5,72 @@ razor
 @inject RequirementService RequirementService
 @implements IDisposable
 
-<style>
-    .buildings-banner {
-        background-image: url('buildings-banner.jpg'); /* Replace with your image path */
-        background-size: cover;
-        background-position: center;
-        color: white;
-        text-align: center;
-        padding: 100px 20px;
-        margin-bottom: 20px;
-    }
-
-    .buildings-banner h2 {
-        font-size: 3em;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .buildings-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 20px;
-    }
-
-    .technology-card {
-        background-color: #333;
-        border-radius: 5px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #555;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        position: relative;
-        align-items: center;
-        gap: 10px;
-        height: 100%;
-        width: 100%;
-    }
-
-    .technology-card img {
-        width: 177px;
-        height: 177px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0 auto;
-        object-fit: cover;
-        border: 2px solid #777;
-        border-radius: 5px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-    
-    .building-count-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(0,0,0,0.7);
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-weight: bold;
-        border: 1px solid #777;
-        z-index: 2;
-    }
-    
-    .technology-card h3 {
-        margin: 10px 0;
-    }
-
-    .technology-card button {
-        padding: 10px;
-        background-color: #555;
-        color: white;
-        border: none;
-        cursor: pointer;
-        border-radius: 5px;
-        width: 100%;
-        margin-top: auto;
-    }
-    
-    .cost-item {
-        font-size: 0.9em;
-        margin: 2px 0;
-    }
-    
-    .research-progress {
-        width: 100%;
-        background-color: #444;
-        border-radius: 5px;
-        padding: 10px;
-        margin-bottom: 20px;
-        text-align: center;
-    }
-</style>
-
-<div class="buildings-banner">
+<div class="ogame-banner" style="background-image: url('buildings-banner.jpg');">
     <h2>Technologies</h2>
 </div>
 
 @if(TechnologyService.CurrentResearch != null)
 {
-    <div class="research-progress">
+    <div class="ogame-queue-container">
         <h3>Researching: @TechnologyService.CurrentResearch.Title</h3>
         <p>Level: @(TechnologyService.CurrentResearch.Level + 1)</p>
         <p>Time Remaining: @TechnologyService.CurrentResearch.TimeRemaining.ToString(@"hh\:mm\:ss")</p>
-        <button @onclick="CancelResearch">Cancel</button>
+        <button class="btn btn-secondary" @onclick="CancelResearch">Cancel</button>
     </div>
 }
 
-<div class="buildings-grid">
+<div class="ogame-grid">
     @foreach (var tech in TechnologyService.Technologies)
     {
-        <div class="technology-card">
-            <div class="building-count-badge">Level: @tech.Level</div>
+        <div class="ogame-card">
+            <div class="ogame-count-badge">Level: @tech.Level</div>
             <img src="@tech.Image" alt="@tech.Title" />
             <h3>@tech.Title</h3>
             <p>@tech.Description</p>
             
-            <div class="costs">
-                @if(tech.MetalCost > 0) { <div class="cost-item">Metal: @tech.MetalCost.ToString("N0")</div> }
-                @if(tech.CrystalCost > 0) { <div class="cost-item">Crystal: @tech.CrystalCost.ToString("N0")</div> }
-                @if(tech.DeuteriumCost > 0) { <div class="cost-item">Deuterium: @tech.DeuteriumCost.ToString("N0")</div> }
-                @if(tech.EnergyCost > 0) { <div class="cost-item">Energy: @tech.EnergyCost.ToString("N0")</div> }
+            <div class="ogame-cost-section">
+                @if(tech.MetalCost > 0) { <div class="ogame-cost-item">Metal: @tech.MetalCost.ToString("N0")</div> }
+                @if(tech.CrystalCost > 0) { <div class="ogame-cost-item">Crystal: @tech.CrystalCost.ToString("N0")</div> }
+                @if(tech.DeuteriumCost > 0) { <div class="ogame-cost-item">Deuterium: @tech.DeuteriumCost.ToString("N0")</div> }
+                @if(tech.EnergyCost > 0) { <div class="ogame-cost-item">Energy: @tech.EnergyCost.ToString("N0")</div> }
+                
+                <div class="ogame-cost-item">Duration: @tech.Duration.ToString(@"hh\:mm\:ss")</div>
+
+                @if (tech.Requirements != null && tech.Requirements.Any())
+                {
+                     <div class="ogame-requirements-section">
+                        <strong>Requirements:</strong>
+                        <ul style="list-style-type: none; padding-left: 0; margin: 5px 0;">
+                            @foreach (var req in tech.Requirements)
+                            {
+                                 <li>@req.Name (Lvl @req.Level)</li>
+                            }
+                        </ul>
+                    </div>
+                }
             </div>
 
-            <p>Duration: @tech.Duration.ToString()</p>
-            
+            <div class="ogame-card-actions">
             @if (TechnologyService.CurrentResearch == null)
             {
-                // Convert List<string> to Dictionary for compatibility
-                // Assuming existence implies Level 1 requirement if not specified
-                var requirements = new Dictionary<string, int>();
-                foreach(var dep in tech.Dependencies) requirements.Add(dep, 1);
-
-                if (RequirementService.IsUnlocked(requirements))
+                if (TechnologyService.RequirementsMet(tech))
                 {
-                     <button @onclick="() => StartResearch(tech)">Research</button>
+                     <button class="btn btn-primary" @onclick="() => StartResearch(tech)">Research</button>
                 }
                 else
                 {
-                    <div style="color: #ff6666; font-size: 0.8em; margin-top: 5px;">
-                        Locked (Missing Requirements)
-                    </div>
-                     <button disabled style="opacity: 0.5; cursor: not-allowed;">Locked</button>
+                    
                 }
             }
             else if (TechnologyService.CurrentResearch == tech)
             {
-                <button disabled>Researching...</button>
+                <button class="btn btn-secondary" disabled>Researching...</button>
             }
             else
             {
-                 <button disabled>Queue Busy</button>
+                 <button class="btn btn-secondary" disabled>Queue Busy</button>
             }
+            </div>
         </div>
     }
 </div>

@@ -36,6 +36,7 @@ public class Building
 public class BuildingService
 {
     private readonly ResourceService _resourceService;
+    private readonly DevModeService _devModeService;
     public List<Building> Buildings { get; private set; } = new();
     public List<Building> ConstructionQueue { get; private set; } = new();
     
@@ -54,9 +55,10 @@ public class BuildingService
     
     public double ProductionFactor { get; private set; } = 1.0;
 
-    public BuildingService(ResourceService resourceService)
+    public BuildingService(ResourceService resourceService, DevModeService devModeService)
     {
         _resourceService = resourceService;
+        _devModeService = devModeService;
         InitializeBuildings();
         // Initial production calculation
         UpdateProduction();
@@ -384,8 +386,9 @@ public class BuildingService
             _resourceService.ConsumeResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
             
             // Set initial state for queue
-            building.ConstructionDuration = building.Duration; // Reset or calculate
-            building.TimeRemaining = building.ConstructionDuration;
+            var duration = _devModeService.GetDuration(building.Duration, 5);
+            building.ConstructionDuration = duration;
+            building.TimeRemaining = duration;
             
             ConstructionQueue.Add(building);
             NotifyStateChanged();

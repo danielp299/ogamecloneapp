@@ -41,6 +41,7 @@ public class DefenseService
     private readonly ResourceService _resourceService;
     private readonly BuildingService _buildingService;
     private readonly TechnologyService _technologyService;
+    private readonly DevModeService _devModeService;
 
     public List<DefenseUnit> DefenseDefinitions { get; private set; } = new();
     
@@ -52,11 +53,12 @@ public class DefenseService
 
     public event Action OnChange;
 
-    public DefenseService(ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService)
+    public DefenseService(ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService)
     {
         _resourceService = resourceService;
         _buildingService = buildingService;
         _technologyService = technologyService;
+        _devModeService = devModeService;
         
         InitializeDefenses();
         
@@ -207,12 +209,15 @@ public class DefenseService
             double durationSeconds = unit.BaseDuration.TotalSeconds / divisor / 100.0; // x100 speed
             if (durationSeconds < 1) durationSeconds = 1;
 
+            var finalDuration = TimeSpan.FromSeconds(durationSeconds);
+            finalDuration = _devModeService.GetDuration(finalDuration, 5);
+
             ConstructionQueue.Add(new DefenseQueueItem
             {
                 Unit = unit,
                 Quantity = quantity,
-                DurationPerUnit = TimeSpan.FromSeconds(durationSeconds),
-                TimeRemaining = TimeSpan.FromSeconds(durationSeconds)
+                DurationPerUnit = finalDuration,
+                TimeRemaining = finalDuration
             });
             
             NotifyStateChanged();

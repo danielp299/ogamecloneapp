@@ -1,36 +1,8 @@
 @inherits LayoutComponentBase
 @implements IDisposable
-
-<style>
-    .top-menu {
-        background-color: #333;
-        padding: 10px;
-        display: flex;
-        justify-content: space-around;
-    }
-
-    .resource {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin: 0 10px;
-    }
-
-    .resource label {
-        margin-bottom: 5px;
-    }
-
-    .resource-value {
-        font-weight: bold;
-    }
-    body {
-            font-family: sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #111;
-            color: #eee;
-        }
-</style>
+@using myapp.Services
+@inject DevModeService DevModeService
+@inject NavigationManager NavigationManager
 
 <div class="page">
     <div class="sidebar">
@@ -43,6 +15,17 @@
         <article class="content px-4">
             @Body
         </article>
+        
+        @if (IsLocalhost)
+        {
+            <div class="dev-switch">
+                <span style="margin-right: 10px; font-weight: bold; color: #aaa;">Dev Mode</span>
+                <label class="switch">
+                    <input type="checkbox" checked="@DevModeService.IsEnabled" @onchange="ToggleDevMode">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        }
 
         <div style="position: fixed; bottom: 0; right: 0; padding: 5px; color: #555; font-size: 0.8em; background-color: rgba(0,0,0,0.5);">
             Build: @BuildDate
@@ -58,12 +41,27 @@
 
 @code {
     private string BuildDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+    private bool IsLocalhost = false;
 
     protected override void OnInitialized()
     {
+        DevModeService.OnChange += StateHasChanged;
+        
+        // Simple localhost check
+        var uri = NavigationManager.Uri;
+        if (uri.Contains("localhost") || uri.Contains("127.0.0.1"))
+        {
+            IsLocalhost = true;
+        }
+    }
+    
+    private void ToggleDevMode()
+    {
+        DevModeService.Toggle();
     }
 
     public void Dispose()
     {
+        DevModeService.OnChange -= StateHasChanged;
     }
 }

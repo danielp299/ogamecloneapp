@@ -6,12 +6,15 @@ namespace myapp.Services;
 
 public class GalaxyPlanet
 {
+    public int Galaxy { get; set; }
+    public int System { get; set; }
     public int Position { get; set; }
     public string Name { get; set; } = "";
     public string PlayerName { get; set; } = "";
     public string Alliance { get; set; } = "";
     public bool IsOccupied { get; set; }
     public bool IsMyPlanet { get; set; }
+    public bool IsHomeworld { get; set; }
     public bool HasDebris { get; set; }
     public long DebrisMetal { get; set; }
     public long DebrisCrystal { get; set; }
@@ -24,6 +27,9 @@ public class GalaxyService
     private Dictionary<string, List<GalaxyPlanet>> _universe = new();
     private Random _random = new Random();
 
+    // List of planets owned by the player
+    public List<GalaxyPlanet> PlayerPlanets { get; private set; } = new();
+
     // Define the player's home planet for reference (1:1:2 is default in FleetPage, let's assume 1:1:1 is Home)
     public readonly int HomeGalaxy = 1;
     public readonly int HomeSystem = 1;
@@ -32,7 +38,30 @@ public class GalaxyService
     public GalaxyService()
     {
         // Ensure home system exists and has the player
-        GetSystem(HomeGalaxy, HomeSystem);
+        var homeSystem = GetSystem(HomeGalaxy, HomeSystem);
+        
+        // Find and register home planet
+        var homePlanet = homeSystem.FirstOrDefault(p => p.Position == HomePosition);
+        if (homePlanet != null)
+        {
+            PlayerPlanets.Add(homePlanet);
+        }
+    }
+
+    public void RegisterPlanet(GalaxyPlanet planet)
+    {
+        if (!PlayerPlanets.Contains(planet))
+        {
+            PlayerPlanets.Add(planet);
+        }
+    }
+
+    public void UnregisterPlanet(GalaxyPlanet planet)
+    {
+        if (PlayerPlanets.Contains(planet))
+        {
+            PlayerPlanets.Remove(planet);
+        }
     }
 
     public List<GalaxyPlanet> GetSystem(int galaxy, int system)
@@ -55,6 +84,8 @@ public class GalaxyService
         {
             var planet = new GalaxyPlanet
             {
+                Galaxy = galaxy,
+                System = system,
                 Position = i,
                 IsOccupied = false
             };
@@ -64,6 +95,7 @@ public class GalaxyService
             {
                 planet.IsOccupied = true;
                 planet.IsMyPlanet = true;
+                planet.IsHomeworld = true;
                 planet.Name = "Homeworld";
                 planet.PlayerName = "Commander";
                 planet.Image = "planet_home.jpg";
@@ -91,6 +123,25 @@ public class GalaxyService
         }
 
         return planets;
+    }
+
+    public void AbandonPlanet(GalaxyPlanet planet)
+    {
+        if (planet.IsHomeworld) return; // Cannot abandon homeworld
+        
+        // Remove from player list
+        UnregisterPlanet(planet);
+        
+        // Reset planet state
+        planet.IsOccupied = false;
+        planet.IsMyPlanet = false;
+        planet.Name = "";
+        planet.PlayerName = "";
+        planet.Alliance = "";
+        planet.Image = GetRandomPlanetImage(planet.Position); // Reset image to default random type
+        
+        // Note: In a full implementation, we should also cancel active queues 
+        // and handle fleets associated with this planet.
     }
 
     private string GetRandomPlanetImage(int position)

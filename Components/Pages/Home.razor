@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject ResourceService ResourceService
 @inject BuildingService BuildingService
+@inject GalaxyService GalaxyService
 @implements IDisposable
 
 <PageTitle>Home</PageTitle>
@@ -120,6 +121,81 @@
     .management-options button:hover {
         background-color: #555;
     }
+
+    .planet-card-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .btn-abandon {
+        background-color: #800;
+        color: #fff;
+        border: none;
+        padding: 5px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.8em;
+    }
+
+    .btn-abandon:hover {
+        background-color: #a00;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background-color: #222;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #555;
+        max-width: 400px;
+        text-align: center;
+        color: white;
+    }
+
+    .warning-text {
+        color: #ff6666;
+        font-size: 0.9em;
+        margin: 15px 0;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: space-around;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .btn-cancel {
+        background-color: #555;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .btn-confirm {
+        background-color: #d00;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+    }
 </style>
 
 <div class="home-container">
@@ -190,20 +266,41 @@
 
     <!-- Other Planets -->
     <div class="other-planets">
-        <h2>Other Planets</h2>
+        <h2>Your Planets</h2>
         <div class="planets-grid">
-            @for (int i = 1; i <= Planets.Count; i++)
+            @foreach (var planet in GalaxyService.PlayerPlanets)
             {
-                var planet = Planets[i - 1];
-                <div class="planet-card" @onclick="() => NavigateToPlanet(planet)">
-                    <img src="planet.jpg" alt="Planet @i" />
-                    <p>@planet.Name</p>
-                    <p>[@planet.Coordinates]</p>
-                    <p>Temp: @planet.Temperature°C</p>
+                <div class="planet-card-wrapper">
+                    <div class="planet-card" @onclick="() => NavigateToPlanet(planet)">
+                        <img src="@planet.Image" alt="@planet.Name" />
+                        <p>@planet.Name</p>
+                        <p>[@planet.Galaxy:@planet.System:@planet.Position]</p>
+                        <p>Temp: @GetTemperature(planet.Position)°C</p>
+                    </div>
+                    @if (!planet.IsHomeworld)
+                    {
+                        <button class="btn-abandon" @onclick="() => ConfirmAbandon(planet)">Abandon</button>
+                    }
                 </div>
             }
         </div>
     </div>
+
+    <!-- Abandon Confirmation Modal -->
+    @if (ShowAbandonConfirmation)
+    {
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <h3>Abandon Colony</h3>
+                <p>Are you sure you want to abandon <strong>@PlanetToAbandon?.Name</strong>?</p>
+                <p class="warning-text">This action cannot be undone. All buildings and resources on this planet will be lost forever.</p>
+                <div class="modal-actions">
+                    <button class="btn-cancel" @onclick="CancelAbandon">Cancel</button>
+                    <button class="btn-confirm" @onclick="ExecuteAbandon">Confirm Abandon</button>
+                </div>
+            </div>
+        </div>
+    }
 
     <!-- Management Options -->
     <div class="management-options">
@@ -244,26 +341,12 @@
     // Active Events
     private List<EventItem> ActiveEvents = new();
 
-    // Planets
-    private List<Planet> Planets = new();
-
     protected override void OnInitialized()
     {
         ResourceService.OnChange += RefreshState;
         
         // Ensure resources are up to date when page loads
         BuildingService.UpdateProduction();
-
-        // Initialize planets
-        for (int i = 1; i <= 8; i++)
-        {
-            Planets.Add(new Planet
-            {
-                Name = $"Planet {i}",
-                Coordinates = $"1:{i}:1",
-                Temperature = 20 + i
-            });
-        }
 
         // Initialize queue with examples
         if(ConstructionQueue.Count == 0) {
@@ -282,6 +365,12 @@
         await InvokeAsync(StateHasChanged);
     }
 
+    private int GetTemperature(int position)
+    {
+         // Simple approximation based on position
+         return 30 - (position * 2);
+    }
+
     public void Dispose()
     {
         ResourceService.OnChange -= RefreshState;
@@ -292,9 +381,35 @@
         ConstructionQueue.Remove(item);
     }
 
-    private void NavigateToPlanet(Planet planet)
+    private void NavigateToPlanet(GalaxyPlanet planet)
     {
         // Placeholder navigation
+    }
+
+    // Abandon Logic
+    private bool ShowAbandonConfirmation = false;
+    private GalaxyPlanet? PlanetToAbandon;
+
+    private void ConfirmAbandon(GalaxyPlanet planet)
+    {
+        PlanetToAbandon = planet;
+        ShowAbandonConfirmation = true;
+    }
+
+    private void CancelAbandon()
+    {
+        ShowAbandonConfirmation = false;
+        PlanetToAbandon = null;
+    }
+
+    private void ExecuteAbandon()
+    {
+        if (PlanetToAbandon != null)
+        {
+            GalaxyService.AbandonPlanet(PlanetToAbandon);
+        }
+        CancelAbandon();
+        StateHasChanged();
     }
 
     private void NavigateToBuildings()
@@ -337,13 +452,6 @@
     {
         public string Description { get; set; } = "";
         public DateTime ArrivalTime { get; set; }
-    }
-
-    public class Planet
-    {
-        public string Name { get; set; } = "";
-        public string Coordinates { get; set; } = "";
-        public int Temperature { get; set; }
     }
 }
 

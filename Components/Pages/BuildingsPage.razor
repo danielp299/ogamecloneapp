@@ -7,164 +7,78 @@
 @inject RequirementService RequirementService
 @implements IDisposable
 
-<style>
-    .construction-queue {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 10px;
-        margin-bottom: 20px;
-        background-color: #333;
-    }
-</style>
-<style>
-    .buildings-banner {
-        background-image: url('buildings-banner.jpg'); /* Replace with your image path */
-        background-size: cover;
-        background-position: center;
-        color: white;
-        text-align: center;
-        padding: 100px 20px;
-        margin-bottom: 20px;
-    }
-
-    .buildings-banner h2 {
-        font-size: 3em;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .buildings-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 20px;
-    }
-
-    .building-card {
-        background-color: #333;
-        border-radius: 5px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #555;
-        color: white;
-        display: flex; /* Added */
-        flex-direction: column; /* Added */
-        justify-content: space-between; /* Added */               
-        align-items: center;
-        position: relative; /* Add relative position to the building card */
-        width: 100%;
-        height: 100%;
-    }
-
-    .building-card img {
-        width: 177px;
-        height: 177px;        
-
-        object-fit: cover;
-        border: 2px solid #777;
-        display: flex; /* Add this line */
-        justify-content: center; /* Add this line */
-        align-items: center;       
-        border-radius: 5px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .building-card h3 {
-        color: white;
-    }
-   
-    .building-count-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(0,0,0,0.7);
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-weight: bold;
-        border: 1px solid #777;
-        z-index: 2;
-    }
-
-    .building-card button {
-        padding: 10px;
-        background-color: #555;
-        color: white;
-        border: none;
-        cursor: pointer;
-        border-radius: 5px;
-    }
-</style>
-
-<div class="buildings-banner">
+<div class="ogame-banner" style="background-image: url('buildings-banner.jpg');">
     <h2>Buildings</h2>
 </div>
 @if(BuildingService.ConstructionQueue.Count > 0) {
     @* Construction queue *@
-    <h3>Construction Queue</h3>
-    <div class="construction-queue" id="construction-queue">
+    <div class="ogame-queue-container" id="construction-queue">
+        <h3>Construction Queue</h3>
         @foreach (var item in BuildingService.ConstructionQueue)
         {
-            <div class="building-card">
-                <h3>@item.Title</h3>
-                <p>Duration: @item.ConstructionDuration.ToString()</p>
+            <div class="ogame-queue-item">
+                <strong>@item.Title</strong>
+                <span>Duration: @item.ConstructionDuration.ToString(@"hh\:mm\:ss")</span>
                 @if (item.IsBuilding) {
-                   <p>Time remaining: @item.TimeRemaining.ToString()</p>
+                   <span>Time remaining: @item.TimeRemaining.ToString(@"hh\:mm\:ss")</span>
                 }
             </div>
             }
         </div>
 }
-<div class="buildings-grid" id="buildings-grid">
+<div class="ogame-grid" id="buildings-grid">
     @foreach (var building in BuildingService.Buildings)
     {
-        <div class="building-card">
-              <div class="building-count-badge">Level: @building.Level</div>
+        <div class="ogame-card">
+              <div class="ogame-count-badge">Level: @building.Level</div>
 
             <img src="@building.Image" alt="@building.Title" />
             <h3>@building.Title</h3>
             <p>@building.Description</p>            
-            <div class="d-flex justify-content-center">
-                <div class="cost-item d-flex align-items-center">
-                     <img src="metal-icon.png" alt="Metal" style="width:20px;height:20px" /> Metal: @building.MetalCost</div>
-                <div class="cost-item d-flex align-items-center">
-                    <img src="crystal-icon.png" alt="Crystal" style="width:20px;height:20px" /> Crystal: @building.CrystalCost</div>
-                <div class="cost-item d-flex align-items-center">
-                    <img src="deuterium-icon.png" alt="Deuterium" style="width:20px;height:20px" /> Deuterium: @building.DeuteriumCost
-                    </div>
-             </div>
-
-
-            <p>Duration: @building.Duration.ToString()</p>
-            <p>Energy Consumption: @building.EnergyConsumption</p>
             
-            <div class="card-footer">@if (!BuildingService.ConstructionQueue.Contains(building))
+            <div class="ogame-cost-section">
+                <div class="ogame-cost-item d-flex align-items-center">
+                     <img src="metal-icon.png" alt="Metal" style="width:20px;height:20px;margin-right:5px;" /> Metal: @building.MetalCost</div>
+                <div class="ogame-cost-item d-flex align-items-center">
+                    <img src="crystal-icon.png" alt="Crystal" style="width:20px;height:20px;margin-right:5px;" /> Crystal: @building.CrystalCost</div>
+                <div class="ogame-cost-item d-flex align-items-center">
+                    <img src="deuterium-icon.png" alt="Deuterium" style="width:20px;height:20px;margin-right:5px;" /> Deuterium: @building.DeuteriumCost
+                </div>
+
+                <p>Duration: @building.Duration.ToString(@"hh\:mm\:ss")</p>
+                <p>Energy Consumption: @building.EnergyConsumption</p>
+            </div>
+            
+            @if (!BuildingService.ConstructionQueue.Contains(building))
             {
                  // Convert List<string> to Dictionary for compatibility
                  var requirements = new Dictionary<string, int>();
-                 foreach(var dep in building.Dependencies) requirements.Add(dep, 1);
+                 if(building.Dependencies != null) 
+                 {
+                     foreach(var dep in building.Dependencies) requirements.Add(dep, 1);
+                 }
 
                  @if (RequirementService.IsUnlocked(requirements))
                  {
                      @if (building.Level < 1)
                      {
-                         <button id="construct-building-@building.Id" @onclick="() => BuildingService.AddToQueue(building)">Construct</button>
+                         <button class="btn btn-primary" id="construct-building-@building.Id" @onclick="() => BuildingService.AddToQueue(building)">Construct</button>
                      }
                      else
                      {
-                         <button id="upgrade-building-@building.Id" @onclick="() => BuildingService.AddToQueue(building)">Upgrade</button>
+                         <button class="btn btn-primary" id="upgrade-building-@building.Id" @onclick="() => BuildingService.AddToQueue(building)">Upgrade</button>
                      }
                  }
                  else
                  {
                      <div style="color: #ff6666; font-size: 0.8em; margin-bottom: 5px;">Locked</div>
-                     <button disabled style="opacity: 0.5; cursor: not-allowed;">Locked</button>
                  }
             } else {
                  if(building.IsBuilding){
-                    <p>Time remaining: @building.TimeRemaining.ToString()</p>
-                    <button @onclick="() => BuildingService.Cancel(building)">Cancel</button>
+                    <p>Time remaining: @building.TimeRemaining.ToString(@"hh\:mm\:ss")</p>
+                    <button class="btn btn-secondary" @onclick="() => BuildingService.Cancel(building)">Cancel</button>
                 }
             }
-            </div>
         </div>
     }
 </div>  
