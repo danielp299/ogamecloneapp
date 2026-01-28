@@ -76,10 +76,14 @@
 </div>
 
 @code {
+    private System.Threading.Timer? _timer;
+
     protected override void OnInitialized()
     {
         ResourceService.OnChange += RefreshState;
         TechnologyService.OnChange += RefreshState;
+        // Start a local UI timer to refresh the page every second
+        _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 0, 1000);
     }
 
     private async void RefreshState()
@@ -99,6 +103,7 @@
 
     public void Dispose()
     {
+        _timer?.Dispose();
         ResourceService.OnChange -= RefreshState;
         TechnologyService.OnChange -= RefreshState;
     }
