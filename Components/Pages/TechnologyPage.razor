@@ -5,7 +5,125 @@
 @inject RequirementService RequirementService
 @implements IDisposable
 
-<div class="ogame-banner" style="background-image: url('buildings-banner.jpg');">
+<style>
+    .ogame-banner {
+        background-image: url('buildings-banner.jpg');
+        background-size: cover;
+        background-position: center;
+        color: white;
+        text-align: center;
+        padding: 100px 20px;
+        margin-bottom: 20px;
+    }
+
+    .ogame-banner h2 {
+        font-size: 3em;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .ogame-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .ogame-card {
+        background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
+        border-radius: 5px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid #444;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        width: 100%;
+        height: 100%;
+        gap: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .ogame-card img {
+        width: 177px;
+        height: 177px;
+        object-fit: cover;
+        border: 2px solid #777;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .ogame-card h3 {
+        color: white;
+        margin: 10px 0;
+    }
+
+    .ogame-count-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: rgba(0,0,0,0.7);
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        border: 1px solid #777;
+        z-index: 2;
+    }
+
+    .ogame-card button {
+        padding: 10px;
+        background-color: #555;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+        width: 100%;
+        margin-top: auto;
+    }
+
+    .ogame-queue-container {
+        margin-bottom: 30px;
+        background-color: #222;
+        padding: 15px;
+        border-radius: 5px;
+        color: white;
+    }
+
+    .ogame-queue-item {
+        padding: 5px;
+        border-bottom: 1px solid #444;
+    }
+
+    .ogame-cost-section {
+        font-size: 0.9em; 
+        text-align: left; 
+        width: 100%; 
+        padding: 0 10px;
+    }
+
+    .ogame-cost-item {
+         margin: 2px 0;
+    }
+
+    .ogame-requirements-section {
+        margin-top: 10px; 
+        font-size: 0.85em; 
+        border-top: 1px solid #555; 
+        padding-top: 5px;
+    }
+
+    .ogame-card-actions {
+        display:flex;
+        flex-direction: row;
+        width: 100%;
+        justify-content: center;
+        gap: 10px;
+    }
+</style>
+
+<div class="ogame-banner">
     <h2>Technologies</h2>
 </div>
 
