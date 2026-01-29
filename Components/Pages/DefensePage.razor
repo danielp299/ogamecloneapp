@@ -106,9 +106,9 @@
         }
     }
     
-    private void RefreshState()
+    private async void RefreshState()
     {
-        InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
     
     public void Dispose()

@@ -25,6 +25,10 @@ Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         <label>Energy</label>
         <span class="resource-value">@ResourceService.Energy.ToString("N0")</span>
     </div>
+    <div class="resource">
+        <label>Dark Matter</label>
+        <span class="resource-value">@ResourceService.DarkMatter.ToString("N0")</span>
+    </div>
 </div>
 
 @code {

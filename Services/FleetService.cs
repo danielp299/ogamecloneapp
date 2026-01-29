@@ -414,121 +414,192 @@ public class FleetService
     private void HandleExpedition(FleetMission mission)
     {
         var random = new Random();
-        int outcome = random.Next(1, 101); // 1 to 100
+        
+        // Influence outcomes with Astrophysics (small bonus to finding things vs nothing)
+        int astroLevel = _technologyService.GetTechLevel(TechType.Astrophysics);
+        // Base weight modifier (e.g. +1% chance to find something per level)
+        // This is simplified. True OGame logic is very complex.
+        
+        int roll = random.Next(1, 1000); 
 
-        // Determine Fleet Capacity
+        // Weighted Outcomes:
+        // 0-10: Black Hole (1%) - Total Loss
+        // 11-100: Pirates/Aliens (9%) - Combat
+        // 101-400: Nothing (30%) - Delay or Empty
+        // 401-700: Resources (30%) - Metal/Crystal/Deut
+        // 701-900: Ships (20%) - Find fleet
+        // 901-990: Dark Matter (9%)
+        // 991-1000: Item/Merchant (1%) - Not implemented yet, treat as Dark Matter
+
+        // Determine Fleet Capacity & Strength
         long totalCapacity = 0;
+        long totalStructure = 0;
         foreach (var s in mission.Ships)
         {
             var def = ShipDefinitions.FirstOrDefault(x => x.Id == s.Key);
-            if (def != null) totalCapacity += def.Capacity * s.Value;
-        }
-
-        if (outcome <= 30) // 30% Chance: Find Resources
-        {
-            long foundMetal = random.Next(1000, 50000);
-            long foundCrystal = random.Next(500, 25000);
-            long foundDeuterium = random.Next(0, 10000);
-
-            // Cap at 50% capacity or full capacity, whichever is smaller logic could be here, 
-            // but let's just cap at remaining capacity
-            long currentLoad = mission.Cargo.Values.Sum();
-            long available = totalCapacity - currentLoad;
-
-            if (available > 0)
+            if (def != null) 
             {
-                long totalFound = foundMetal + foundCrystal + foundDeuterium;
-                if (totalFound > available)
+                totalCapacity += def.Capacity * s.Value;
+                totalStructure += def.Structure * s.Value;
+            }
+        }
+        
+        // Calculate used cargo
+        long currentLoad = mission.Cargo.Values.Sum();
+        long availableCapacity = Math.Max(0, totalCapacity - currentLoad);
+
+        if (roll <= 10) // 1% Black Hole
+        {
+            mission.Ships.Clear();
+             _messageService.AddMessage("Expedition Result", 
+                "The fleet encountered a singularity and was spaghettified. Total loss.", "Expedition");
+        }
+        else if (roll <= 100) // 9% Combat (Aliens/Pirates)
+        {
+            bool aliens = random.Next(0, 2) == 0;
+            string enemyName = aliens ? "Aliens" : "Pirates";
+            
+            // Simplified Combat: Lose percentage of fleet based on enemy strength
+            // Aliens are stronger.
+            double damagePercent = aliens ? 0.3 : 0.1; // 30% or 10% loss
+            
+            var report = $"Your fleet was ambushed by {enemyName}!<br/>";
+            
+            foreach(var key in mission.Ships.Keys.ToList())
+            {
+                int count = mission.Ships[key];
+                int loss = (int)Math.Ceiling(count * damagePercent);
+                if (loss > 0)
                 {
-                    double ratio = (double)available / totalFound;
-                    foundMetal = (long)(foundMetal * ratio);
-                    foundCrystal = (long)(foundCrystal * ratio);
-                    foundDeuterium = (long)(foundDeuterium * ratio);
+                    mission.Ships[key] -= loss;
+                    if (mission.Ships[key] <= 0) mission.Ships.Remove(key);
+                    var shipName = ShipDefinitions.FirstOrDefault(s => s.Id == key)?.Name ?? key;
+                    report += $"Lost {loss} {shipName}(s)<br/>";
                 }
+            }
+            
+            if (mission.Ships.Count == 0) report += "The entire fleet was wiped out.";
+            else report += "The rest of the fleet managed to escape.";
 
-                if (!mission.Cargo.ContainsKey("Metal")) mission.Cargo["Metal"] = 0;
-                mission.Cargo["Metal"] += foundMetal;
-
-                if (!mission.Cargo.ContainsKey("Crystal")) mission.Cargo["Crystal"] = 0;
-                mission.Cargo["Crystal"] += foundCrystal;
-
-                if (!mission.Cargo.ContainsKey("Deuterium")) mission.Cargo["Deuterium"] = 0;
-                mission.Cargo["Deuterium"] += foundDeuterium;
-
-                _messageService.AddMessage("Expedition Result", 
-                    $"Your expedition found a resource pocket!\n" +
-                    $"Metal: {foundMetal:N0}, Crystal: {foundCrystal:N0}, Deuterium: {foundDeuterium:N0}", "Expedition");
+            _messageService.AddMessage("Expedition Combat", report, "Expedition");
+        }
+        else if (roll <= 400) // 30% Nothing or Delay
+        {
+            bool delay = random.Next(0, 2) == 0;
+            if (delay)
+            {
+                 // Add delay to return time
+                 var delayTime = TimeSpan.FromMinutes(random.Next(30, 120)); // Minutes
+                 // Adjust return time? Since ArrivalTime is passed, we modify ReturnTime logic?
+                 // The mission loop handles ReturnTime after arrival.
+                 // We need to modify mission.ReturnTime effectively.
+                 mission.ReturnTime = mission.ReturnTime.Add(delayTime);
+                 
+                 _messageService.AddMessage("Expedition Result", 
+                    $"The fleet got stuck in a nebula field. Return delayed by {delayTime.TotalMinutes:F0} minutes.", "Expedition");
             }
             else
             {
-                 _messageService.AddMessage("Expedition Result", 
-                    "Your expedition found resources, but your cargo holds were full!", "Expedition");
+                 string[] flavorText = {
+                    "The expedition found nothing but empty space.",
+                    "Strange signals were detected, but they turned out to be background radiation.",
+                    "The crew enjoyed a nice view of a supernova, but found nothing of value.",
+                    "Main sensors malfunctioned for a while. Nothing to report."
+                };
+                _messageService.AddMessage("Expedition Result", flavorText[random.Next(flavorText.Length)], "Expedition");
             }
         }
-        else if (outcome <= 50) // 20% Chance: Find Ships
+        else if (roll <= 700) // 30% Resources
         {
-            // Find a few Light Fighters or Small Cargo
-            int shipType = random.Next(0, 2); 
-            string foundId = shipType == 0 ? "LF" : "SC";
-            string foundName = shipType == 0 ? "Light Fighter" : "Small Cargo";
-            int count = random.Next(2, 10);
+            if (availableCapacity <= 0)
+            {
+                 _messageService.AddMessage("Expedition Result", 
+                    "We found a rich asteroid belt, but our cargo holds are full!", "Expedition");
+                 return;
+            }
 
-            if (!mission.Ships.ContainsKey(foundId)) mission.Ships[foundId] = 0;
-            mission.Ships[foundId] += count;
+            // Size of find: Small, Medium, Large
+            int sizeRoll = random.Next(1, 100);
+            double multiplier = 1.0;
+            string sizeDesc = "Small";
+            
+            if (sizeRoll > 90) { multiplier = 5.0; sizeDesc = "Huge"; }
+            else if (sizeRoll > 50) { multiplier = 2.0; sizeDesc = "Medium"; }
+
+            // Base amount related to fleet structure (heuristic for "fleet points")
+            // Cap base at 10% of fleet structure or similar?
+            long baseAmount = (long)(totalStructure * 0.05 * multiplier); 
+            // Clamp min/max
+            baseAmount = Math.Clamp(baseAmount, 1000, 2000000);
+
+            long m = 0, c = 0, d = 0;
+            int typeRoll = random.Next(0, 3); // 0=Metal, 1=Crystal, 2=Deut (Mixed)
+            
+            if (typeRoll == 0) m = baseAmount;
+            else if (typeRoll == 1) c = (long)(baseAmount * 0.5);
+            else d = (long)(baseAmount * 0.33);
+
+            // Cap by capacity
+            if (m + c + d > availableCapacity)
+            {
+                double ratio = (double)availableCapacity / (m + c + d);
+                m = (long)(m * ratio);
+                c = (long)(c * ratio);
+                d = (long)(d * ratio);
+            }
+
+            if (!mission.Cargo.ContainsKey("Metal")) mission.Cargo["Metal"] = 0;
+            mission.Cargo["Metal"] += m;
+            if (!mission.Cargo.ContainsKey("Crystal")) mission.Cargo["Crystal"] = 0;
+            mission.Cargo["Crystal"] += c;
+            if (!mission.Cargo.ContainsKey("Deuterium")) mission.Cargo["Deuterium"] = 0;
+            mission.Cargo["Deuterium"] += d;
 
             _messageService.AddMessage("Expedition Result", 
-                $"Your expedition encountered abandoned ships.\n" +
-                $"They managed to repair {count} {foundName}(s) and added them to the fleet.", "Expedition");
+                $"We found a {sizeDesc} resource deposit!<br/>Metal: {m:N0}<br/>Crystal: {c:N0}<br/>Deuterium: {d:N0}", "Expedition");
         }
-        else if (outcome <= 60) // 10% Chance: Pirates/Aliens (Combat)
+        else if (roll <= 900) // 20% Ships
         {
-            // Minimal implementation: Just damage/loss message for now to keep it simple
-            // In a full implementation, this would trigger a combat round
-            
-            // Lose 1 random ship
-            var keys = mission.Ships.Keys.ToList();
-            if (keys.Count > 0)
-            {
-                string keyToLose = keys[random.Next(keys.Count)];
-                if (mission.Ships[keyToLose] > 0)
-                {
-                    mission.Ships[keyToLose]--;
-                    if (mission.Ships[keyToLose] <= 0) mission.Ships.Remove(keyToLose);
-                    
-                    var lostShipName = ShipDefinitions.FirstOrDefault(s => s.Id == keyToLose)?.Name ?? keyToLose;
+            // Find ships based on fleet size
+            // Heuristic: Find 5-10% of own fleet points in ships
+            long pointsFound = (long)(totalStructure * random.NextDouble() * 0.1);
+            if (pointsFound < 1000) pointsFound = 1000;
 
-                    _messageService.AddMessage("Expedition Result", 
-                        $"Your expedition was attacked by pirates! You fought them off, but lost 1 {lostShipName}.", "Expedition");
-                }
-            }
-            else
+            // Possible ships to find (limit to smaller than Destroyer usually)
+            var possibleShips = ShipDefinitions.Where(s => s.Id != "RIP" && s.Id != "DST" && s.Id != "CS").ToList();
+            if (!possibleShips.Any()) return;
+
+            string report = "We found abandoned ships drifting in space:<br/>";
+            
+            // Try to spend points
+            int safetyBreak = 0;
+            while (pointsFound > 2000 && safetyBreak < 10)
             {
-                 _messageService.AddMessage("Expedition Result", 
-                    "Your expedition was attacked by pirates! You escaped without losses.", "Expedition");
+                var ship = possibleShips[random.Next(possibleShips.Count)];
+                if (ship.Structure <= pointsFound)
+                {
+                    int count = random.Next(1, (int)(pointsFound / ship.Structure) + 1);
+                    // Cap count reasonably
+                    if (count > 10) count = 10;
+                    
+                    if (!mission.Ships.ContainsKey(ship.Id)) mission.Ships[ship.Id] = 0;
+                    mission.Ships[ship.Id] += count;
+                    
+                    pointsFound -= count * ship.Structure;
+                    report += $"{count} {ship.Name}<br/>";
+                }
+                safetyBreak++;
             }
-        }
-        else if (outcome <= 62) // 2% Chance: Black Hole (Total Loss)
-        {
-            // Clear ships
-            mission.Ships.Clear();
-            // This will likely cause issues if the fleet logic expects ships to return
-            // We need to handle 'fleet destruction' properly.
-            // If ships is empty, the return logic might just credit 0 ships, which is fine.
             
-             _messageService.AddMessage("Expedition Result", 
-                "Your expedition encountered a Black Hole and was never heard from again.", "Expedition");
+            _messageService.AddMessage("Expedition Result", report, "Expedition");
         }
-        else // 38% Chance: Nothing
+        else // 10% Dark Matter
         {
-            string[] flavorText = {
-                "The expedition found nothing but empty space.",
-                "Strange signals were detected, but they turned out to be background radiation.",
-                "The crew enjoyed a nice view of a supernova, but found nothing of value.",
-                "Main sensors malfunctioned for a while. Nothing to report."
-            };
-            string text = flavorText[random.Next(flavorText.Length)];
+            int dm = random.Next(100, 1000) * (1 + astroLevel/5);
+            _resourceService.AddDarkMatter(dm);
             
-            _messageService.AddMessage("Expedition Result", text, "Expedition");
+            _messageService.AddMessage("Expedition Result", 
+                $"We found a pocket of Dark Matter! Obtained {dm} Dark Matter.", "Expedition");
         }
     }
 
@@ -541,33 +612,89 @@ public class FleetService
              return;
         }
 
-        // Generate consistent resources/defense based on planet position/ID
-        var (resources, defenses) = GeneratePlanetState(planet);
-
-        long m = resources["Metal"];
-        long c = resources["Crystal"];
-        long d = resources["Deuterium"];
+        // 1. Get Tech Levels
+        int attackerSpyTech = _technologyService.GetTechLevel(TechType.Espionage);
+        var (resources, defenses, ships, defenderSpyTech) = GeneratePlanetState(planet);
         
-        string defenseRows = "";
-        foreach(var def in defenses)
+        // 2. Counter-Espionage Calculation
+        int probesCount = mission.Ships.ContainsKey("ESP") ? mission.Ships["ESP"] : 0;
+        int defenderFleetCount = ships.Values.Sum(); // Total ships on planet
+        
+        // Chance: (DefenderFleet * 1%) + (Probes * 10%)? 
+        // Heuristic: More ships = higher detection. More probes = higher detection.
+        // Cap at 100%
+        double chance = Math.Min(100.0, (defenderFleetCount * 0.05) + (probesCount * 2.0));
+        
+        bool detected = new Random().NextDouble() * 100.0 < chance;
+        
+        string content = $"<strong>Target:</strong> {planet.Name} ({planet.PlayerName})<br/>" +
+                         $"<strong>Counter-Intel Chance:</strong> {chance:F1}%<br/>";
+
+        if (detected)
         {
-            if(def.Value > 0)
-                defenseRows += $"{def.Key}: {def.Value:N0}<br/>";
+            content += "<br/><span style='color:red; font-weight:bold;'>PROBES DETECTED AND DESTROYED!</span><br/>";
+            content += "The defender's fleet engaged and eliminated your espionage unit.<br/>";
+            
+            // Destroy Probes
+            mission.Ships.Clear(); // Fleet destroyed
+            // Usually this means the fleet doesn't return.
+            // In OGame you usually get the report even if destroyed (transmitted before destruction).
         }
-        if (string.IsNullOrEmpty(defenseRows)) defenseRows = "None";
 
-        string body = $@"
-            <strong>Target:</strong> {planet.Name} ({planet.PlayerName})<br/>
-            <strong>Resources:</strong><br/>
-            Metal: {m:N0}<br/>
-            Crystal: {c:N0}<br/>
-            Deuterium: {d:N0}<br/>
-            <br/>
-            <strong>Defense:</strong><br/>
-            {defenseRows}
-        ";
+        // 3. Report Generation based on Level Difference
+        int levelDiff = attackerSpyTech - defenderSpyTech;
+        content += $"<strong>Tech Difference:</strong> {levelDiff} (Attacker: {attackerSpyTech} vs Defender: {defenderSpyTech})<br/><br/>";
+
+        // Level >= 0: Resources (Base)
+        if (levelDiff >= 0)
+        {
+             content += $"<strong>Resources:</strong><br/>" +
+                       $"Metal: {resources["Metal"]:N0}<br/>" +
+                       $"Crystal: {resources["Crystal"]:N0}<br/>" +
+                       $"Deuterium: {resources["Deuterium"]:N0}<br/><br/>";
+        }
+        else
+        {
+            content += "<em>Signal too weak. Improve Espionage Technology to see resources.</em><br/><br/>";
+        }
+
+        // Level >= 1: Fleet
+        if (levelDiff >= 1)
+        {
+            string fleetRows = "";
+            foreach(var s in ships) if(s.Value > 0) fleetRows += $"{s.Key}: {s.Value:N0}<br/>";
+            if (string.IsNullOrEmpty(fleetRows)) fleetRows = "No ships detected";
+            content += $"<strong>Fleet:</strong><br/>{fleetRows}<br/><br/>";
+        }
+
+        // Level >= 2: Defense
+        if (levelDiff >= 2)
+        {
+            string defRows = "";
+            foreach(var d in defenses) if(d.Value > 0) defRows += $"{d.Key}: {d.Value:N0}<br/>";
+            if (string.IsNullOrEmpty(defRows)) defRows = "No defense structures";
+            content += $"<strong>Defense:</strong><br/>{defRows}<br/><br/>";
+        }
+
+        // Level >= 3: Buildings
+        if (levelDiff >= 3)
+        {
+             var buildings = GeneratePlanetBuildings(planet);
+             string bRows = "";
+             foreach(var b in buildings) if(b.Value > 0) bRows += $"{b.Key}: {b.Value}<br/>";
+             content += $"<strong>Buildings:</strong><br/>{bRows}<br/><br/>";
+        }
+
+        // Level >= 4: Technology
+        if (levelDiff >= 4)
+        {
+             var techs = GeneratePlanetTechs(planet);
+             string tRows = "";
+             foreach(var t in techs) if(t.Value > 0) tRows += $"{t.Key}: {t.Value}<br/>";
+             content += $"<strong>Research:</strong><br/>{tRows}<br/><br/>";
+        }
         
-        _messageService.AddMessage($"Spy Report [{mission.TargetCoordinates}]", body, "Espionage");
+        _messageService.AddMessage($"Spy Report [{mission.TargetCoordinates}]", content, "Espionage");
     }
 
     private void HandleCombat(FleetMission mission, GalaxyPlanet planet)
@@ -601,17 +728,16 @@ public class FleetService
         }
         
         // 2. Defender Power (Generated)
-        var (resources, defenses) = GeneratePlanetState(planet);
+        var (resources, defenses, ships, spyTech) = GeneratePlanetState(planet);
         
         long defenderAttack = 0;
         long defenderStructure = 0;
         long defenderShield = 0;
         
+        // Add Defenses
         foreach(var d in defenses)
         {
-            // Try to match name to Definition for accurate stats
             var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Name == d.Key);
-            
             if (defUnit != null)
             {
                  defenderAttack += defUnit.Attack * d.Value;
@@ -620,13 +746,25 @@ public class FleetService
             }
             else
             {
-                // Fallback if name mismatch (e.g. from simplistic generator vs complex names)
-                // We'll keep the simplistic heuristic as backup
                 if(d.Key.Contains("Rocket")) { defenderAttack += 80 * d.Value; defenderStructure += 2000 * d.Value; defenderShield += 20 * d.Value; }
                 else if(d.Key.Contains("Laser")) { defenderAttack += 100 * d.Value; defenderStructure += 2000 * d.Value; defenderShield += 25 * d.Value; }
                 else if(d.Key.Contains("Heavy") || d.Key.Contains("Cannon")) { defenderAttack += 250 * d.Value; defenderStructure += 8000 * d.Value; defenderShield += 100 * d.Value; }
                 else { defenderAttack += 50 * d.Value; defenderStructure += 1000 * d.Value; defenderShield += 10 * d.Value; }
             }
+        }
+        
+        // Add Ships to Defender
+        foreach(var s in ships)
+        {
+             // We need to match ship names to IDs or vice versa. The generator uses Names ("Light Fighter"), ShipDefinitions uses IDs ("LF") and Names ("Light Fighter").
+             // We'll search by Name.
+             var def = ShipDefinitions.FirstOrDefault(x => x.Name == s.Key);
+             if(def != null) 
+             {
+                 defenderAttack += def.Attack * s.Value;
+                 defenderStructure += def.Structure * s.Value;
+                 defenderShield += def.Shield * s.Value;
+             }
         }
 
         // 3. Battle Resolution (Simplified)
@@ -685,9 +823,6 @@ public class FleetService
             foreach(var d in defenses)
             {
                 var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Name == d.Key);
-                // Fallback for generic names if needed, but defenses dict keys should match names if generated correctly
-                // or we use the fallback stats from earlier. 
-                // For simplified debris, let's try to find the definition or estimate.
                 
                 long unitMetal = 0;
                 long unitCrystal = 0;
@@ -699,7 +834,6 @@ public class FleetService
                 }
                 else
                 {
-                     // Estimation for "Bots" if exact match fails
                      if(d.Key.Contains("Rocket")) { unitMetal = 2000; }
                      else if(d.Key.Contains("Laser")) { unitMetal = 1500; unitCrystal = 500; }
                      else { unitMetal = 1000; }
@@ -707,6 +841,17 @@ public class FleetService
 
                 debrisM += (long)(unitMetal * d.Value * 0.3);
                 debrisC += (long)(unitCrystal * d.Value * 0.3);
+            }
+            
+            // Also debris from destroyed Defender Ships (30%)
+            foreach(var s in ships)
+            {
+                 var def = ShipDefinitions.FirstOrDefault(x => x.Name == s.Key);
+                 if (def != null)
+                 {
+                     debrisM += (long)(def.MetalCost * s.Value * 0.3);
+                     debrisC += (long)(def.CrystalCost * s.Value * 0.3);
+                 }
             }
             
             if (debrisM > 0 || debrisC > 0)
@@ -767,12 +912,10 @@ public class FleetService
     }
 
     // Helper to generate consistent state for a planet based on its coordinate
-    private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses) GeneratePlanetState(GalaxyPlanet planet)
+    private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses, Dictionary<string, int> Ships, int SpyTech) GeneratePlanetState(GalaxyPlanet planet)
     {
         // Seed random with position to get same result for same planet
         int seed = planet.Position * 1000 + planet.Name.Length * 7; 
-        // We really need Galaxy/System info here to be unique, but Planet object might not have it fully populated in this context if passed purely as object.
-        // Assuming unique enough for this demo.
         var r = new Random(seed);
         
         var resources = new Dictionary<string, long>
@@ -788,8 +931,43 @@ public class FleetService
             { "Light Laser", r.Next(0, 30) },
             { "Heavy Cannon", r.Next(0, 10) }
         };
+        
+        var ships = new Dictionary<string, int>
+        {
+            { "Small Cargo", r.Next(0, 15) },
+            { "Light Fighter", r.Next(0, 40) },
+            { "Cruiser", r.Next(0, 5) }
+        };
+        
+        int spyTech = r.Next(0, 10);
 
-        return (resources, defenses);
+        return (resources, defenses, ships, spyTech);
+    }
+    
+    private Dictionary<string, int> GeneratePlanetBuildings(GalaxyPlanet planet)
+    {
+        int seed = planet.Position * 2000; 
+        var r = new Random(seed);
+        return new Dictionary<string, int> {
+            { "Metal Mine", r.Next(1, 20) },
+            { "Crystal Mine", r.Next(1, 15) },
+            { "Deuterium Synthesizer", r.Next(1, 10) },
+            { "Solar Plant", r.Next(1, 20) },
+            { "Shipyard", r.Next(1, 10) }
+        };
+    }
+
+    private Dictionary<string, int> GeneratePlanetTechs(GalaxyPlanet planet)
+    {
+        int seed = planet.Position * 3000; 
+        var r = new Random(seed);
+        return new Dictionary<string, int> {
+            { "Espionage Technology", r.Next(0, 10) },
+            { "Computer Technology", r.Next(0, 10) },
+            { "Weapons Technology", r.Next(0, 10) },
+            { "Shielding Technology", r.Next(0, 10) },
+            { "Armour Technology", r.Next(0, 10) }
+        };
     }
 
     private void HandleColonization(FleetMission mission, GalaxyPlanet planet)

@@ -1,0 +1,224 @@
+@page "/messages"
+@using myapp.Services
+@inject MessageService MessageService
+
+<PageTitle>Messages</PageTitle>
+
+<style>
+    .messages-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        color: #eee;
+    }
+
+    .header-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        background-color: #222;
+        padding: 15px;
+        border-radius: 5px;
+    }
+
+    .btn-delete-all {
+        background-color: #800;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .btn-delete-all:hover {
+        background-color: #a00;
+    }
+
+    .messages-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .message-card {
+        background-color: #222;
+        border: 1px solid #333;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+
+    .message-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 15px;
+        background-color: #2a2a2a;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .message-header:hover {
+        background-color: #333;
+    }
+
+    .message-header.unread {
+        border-left: 3px solid #00f;
+    }
+
+    .message-info {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+    }
+
+    .message-type {
+        font-size: 0.8em;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background-color: #444;
+        min-width: 80px;
+        text-align: center;
+    }
+
+    .type-combat { background-color: #800; }
+    .type-espionage { background-color: #860; }
+    .type-expedition { background-color: #006; }
+    .type-general { background-color: #444; }
+
+    .message-subject {
+        font-weight: bold;
+    }
+
+    .message-time {
+        font-size: 0.8em;
+        color: #aaa;
+    }
+
+    .message-body {
+        padding: 20px;
+        background-color: #1a1a1a;
+        border-top: 1px solid #333;
+        line-height: 1.5;
+    }
+
+    .btn-delete {
+        background-color: transparent;
+        color: #888;
+        border: 1px solid #444;
+        padding: 2px 8px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.8em;
+        margin-left: 10px;
+    }
+
+    .btn-delete:hover {
+        background-color: #800;
+        color: white;
+        border-color: #800;
+    }
+</style>
+
+<div class="messages-container">
+    <div class="header-actions">
+        <h2>Messages (@MessageService.Messages.Count)</h2>
+        @if (MessageService.Messages.Any())
+        {
+            <button class="btn-delete-all" @onclick="DeleteAll">Delete All</button>
+        }
+    </div>
+
+    @if (!MessageService.Messages.Any())
+    {
+        <div style="text-align: center; color: #aaa; margin-top: 50px;">
+            <p>No messages.</p>
+        </div>
+    }
+    else
+    {
+        <div class="messages-list">
+            @foreach (var msg in MessageService.Messages)
+            {
+                var isExpanded = _expandedMessages.Contains(msg.Id);
+                var typeClass = msg.Type switch {
+                    "Combat" => "type-combat",
+                    "Espionage" => "type-espionage",
+                    "Expedition" => "type-expedition",
+                    _ => "type-general"
+                };
+
+                <div class="message-card">
+                    <div class="message-header @(msg.IsRead ? "" : "unread")" @onclick="() => ToggleMessage(msg)">
+                        <div class="message-info">
+                            <span class="message-type @typeClass">@msg.Type</span>
+                            <span class="message-subject">@msg.Subject</span>
+                            @if (!msg.IsRead)
+                            {
+                                <span style="color: #00f; font-size: 0.7em;">(NEW)</span>
+                            }
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span class="message-time">@msg.Timestamp.ToString("yyyy-MM-dd HH:mm")</span>
+                            <button class="btn-delete" @onclick:stopPropagation="true" @onclick="() => DeleteMessage(msg)">✕</button>
+                        </div>
+                    </div>
+                    
+                    @if (isExpanded)
+                    {
+                        <div class="message-body">
+                            @((MarkupString)msg.Body)
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private HashSet<Guid> _expandedMessages = new();
+
+    private async void RefreshState()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override void OnInitialized()
+    {
+        MessageService.OnChange += RefreshState;
+    }
+
+    public void Dispose()
+    {
+        MessageService.OnChange -= RefreshState;
+    }
+
+    private void ToggleMessage(GameMessage msg)
+    {
+        if (_expandedMessages.Contains(msg.Id))
+        {
+            _expandedMessages.Remove(msg.Id);
+        }
+        else
+        {
+            _expandedMessages.Add(msg.Id);
+            if (!msg.IsRead)
+            {
+                MessageService.MarkAsRead(msg.Id);
+            }
+        }
+    }
+
+    private void DeleteMessage(GameMessage msg)
+    {
+        MessageService.DeleteMessage(msg.Id);
+        _expandedMessages.Remove(msg.Id);
+    }
+
+    private void DeleteAll()
+    {
+        MessageService.DeleteAll();
+        _expandedMessages.Clear();
+    }
+}

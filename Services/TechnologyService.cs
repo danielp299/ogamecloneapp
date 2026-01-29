@@ -328,7 +328,7 @@ public class TechnologyService
         {
             Type = TechType.Astrophysics,
             Title = "Astrophysics",
-            Description = "Allows colonization of new planets.",
+            Description = "Allows colonization of new planets and finding more on expeditions.",
             BaseMetalCost = 4000,
             BaseCrystalCost = 8000,
             BaseDeuteriumCost = 4000,

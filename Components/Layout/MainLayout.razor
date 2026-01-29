@@ -43,9 +43,14 @@
     private string BuildDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
     private bool IsLocalhost = false;
 
+    private async void RefreshState()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
     protected override void OnInitialized()
     {
-        DevModeService.OnChange += StateHasChanged;
+        DevModeService.OnChange += RefreshState;
         
         // Simple localhost check
         var uri = NavigationManager.Uri;
@@ -62,6 +67,6 @@
 
     public void Dispose()
     {
-        DevModeService.OnChange -= StateHasChanged;
+        DevModeService.OnChange -= RefreshState;
     }
 }

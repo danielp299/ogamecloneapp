@@ -5,10 +5,12 @@ public class ResourceService
     private double _metal = 50000;
     private double _crystal = 50000;
     private double _deuterium = 50000;
+    private double _darkMatter = 0;
 
     public long Metal => (long)_metal;
     public long Crystal => (long)_crystal;
     public long Deuterium => (long)_deuterium;
+    public long DarkMatter => (long)_darkMatter;
     public long Energy { get; private set; } = 0;
 
     public DateTime LastUpdate { get; private set; } = DateTime.UtcNow;
@@ -57,6 +59,12 @@ public class ResourceService
         _metal += metal;
         _crystal += crystal;
         _deuterium += deuterium;
+        NotifyStateChanged();
+    }
+
+    public void AddDarkMatter(long amount)
+    {
+        _darkMatter += amount;
         NotifyStateChanged();
     }
 
