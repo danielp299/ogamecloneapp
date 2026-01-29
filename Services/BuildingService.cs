@@ -209,7 +209,7 @@ public class BuildingService
             BaseCrystalCost = 15,
             BaseDeuteriumCost = 0,
             ConstructionDuration = TimeSpan.FromSeconds(10),
-            Image = "building1.jpg",
+             Image = "assets/buildings/building1.jpg",
             EnergyConsumption = 10
         });
         Buildings.Add(new Building
@@ -220,7 +220,7 @@ public class BuildingService
             BaseCrystalCost = 24,
             BaseDeuteriumCost = 0,
             ConstructionDuration = TimeSpan.FromSeconds(15),
-            Image = "building2.jpg",
+             Image = "assets/buildings/building2.jpg",
             EnergyConsumption = 8
         });
         Buildings.Add(new Building
@@ -231,7 +231,7 @@ public class BuildingService
             BaseCrystalCost = 75,
             BaseDeuteriumCost = 0,   
             ConstructionDuration = TimeSpan.Parse("00:00:30"),
-            Image = "building3.jpg",
+             Image = "assets/buildings/building3.jpg",
             EnergyConsumption = 15
         });
         Buildings.Add(new Building
@@ -242,7 +242,7 @@ public class BuildingService
             BaseCrystalCost = 30,
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:20"),
-            Image = "building4.jpg",
+             Image = "assets/buildings/building4.jpg",
             EnergyConsumption = -20
         });
         Buildings.Add(new Building
@@ -253,7 +253,7 @@ public class BuildingService
             BaseCrystalCost = 120,
             BaseDeuteriumCost = 200,    
             ConstructionDuration = TimeSpan.Parse("00:01:00"),
-            Image = "building5.jpg",
+             Image = "assets/buildings/building5.jpg",
             EnergyConsumption = 30
         });
 
@@ -265,7 +265,7 @@ public class BuildingService
             BaseCrystalCost = 360,
             BaseDeuteriumCost = 180,    
             ConstructionDuration = TimeSpan.Parse("00:00:45"),
-            Image = "building14.jpg",
+             Image = "assets/buildings/building14.jpg",
             EnergyConsumption = 0 // Special handling: Produces Energy, Consumes Deuterium
         });
 
@@ -277,7 +277,7 @@ public class BuildingService
             BaseCrystalCost = 40000,
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:10:00"),
-            Image = "building15.jpg",
+             Image = "assets/buildings/building15.jpg",
             EnergyConsumption = 0
         });
 
@@ -289,7 +289,7 @@ public class BuildingService
             BaseCrystalCost = 200,
             BaseDeuteriumCost = 100,    
             ConstructionDuration = TimeSpan.Parse("00:01:30"),
-            Image = "building6.jpg",
+             Image = "assets/buildings/building6.jpg",
             EnergyConsumption = 0 // Shipyard does not consume energy continuously in OGame logic usually, unless active? Let's keep 0 for base.
         });
         Buildings.Add(new Building
@@ -300,7 +300,7 @@ public class BuildingService
             BaseCrystalCost = 0,
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:45"),
-            Image = "building7.jpg",
+             Image = "assets/buildings/building7.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -311,7 +311,7 @@ public class BuildingService
             BaseCrystalCost = 500, // Updated
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:50"),
-            Image = "building8.jpg",
+             Image = "assets/buildings/building8.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -322,7 +322,7 @@ public class BuildingService
             BaseCrystalCost = 1000, // Updated
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:55"),
-            Image = "building9.jpg",
+             Image = "assets/buildings/building9.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -333,7 +333,7 @@ public class BuildingService
             BaseCrystalCost = 400, // Updated
             BaseDeuteriumCost = 200,    
             ConstructionDuration = TimeSpan.Parse("00:01:15"),
-            Image = "building10.jpg",
+             Image = "assets/buildings/building10.jpg",
             EnergyConsumption = 0 // Lab doesn't consume energy passively usually
         });
 
@@ -345,7 +345,7 @@ public class BuildingService
             BaseCrystalCost = 50000, // Updated
             BaseDeuteriumCost = 100000, // Updated
             ConstructionDuration = TimeSpan.Parse("01:00:00"),
-            Image = "building11.jpg",
+             Image = "assets/buildings/building11.jpg",
             EnergyConsumption = 0 // Consumes energy only for BUILD cost usually? Or passive? OGame Terraformer cost includes Energy!
             // Note: Building cost logic needs to handle Energy cost if we want to be strict.
         });
@@ -358,7 +358,7 @@ public class BuildingService
             BaseCrystalCost = 20000,
             BaseDeuteriumCost = 1000,    
             ConstructionDuration = TimeSpan.Parse("00:05:00"),
-            Image = "building12.jpg",
+             Image = "assets/buildings/building12.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -369,7 +369,7 @@ public class BuildingService
             BaseCrystalCost = 500000,
             BaseDeuteriumCost = 100000,    
             ConstructionDuration = TimeSpan.Parse("02:00:00"),
-            Image = "building13.jpg",
+             Image = "assets/buildings/building13.jpg",
             EnergyConsumption = 0 // Nanite doesn't consume energy
         });
     }

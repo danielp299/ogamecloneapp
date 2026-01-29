@@ -108,7 +108,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "SC", Name = "Small Cargo", Description = "An agile transporter.",
-            Image = "smallCargo.jpg",
+            Image = "assets/ships/smallCargo.jpg",
             MetalCost = 2000, CrystalCost = 2000, DeuteriumCost = 0,
             Structure = 4000, Shield = 10, Attack = 5, Capacity = 5000, BaseSpeed = 5000, FuelConsumption = 10,
             BaseDuration = TimeSpan.FromSeconds(20),
@@ -118,7 +118,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "LC", Name = "Large Cargo", Description = "A heavy transporter with huge capacity.",
-            Image = "largeCargo.jpg",
+            Image = "assets/ships/largeCargo.jpg",
             MetalCost = 6000, CrystalCost = 6000, DeuteriumCost = 0,
             Structure = 12000, Shield = 25, Attack = 5, Capacity = 25000, BaseSpeed = 7500, FuelConsumption = 50,
             BaseDuration = TimeSpan.FromSeconds(50),
@@ -128,7 +128,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "LF", Name = "Light Fighter", Description = "The backbone of any fleet.",
-            Image = "lightFighter.jpg",
+            Image = "assets/ships/lightFighter.jpg",
             MetalCost = 3000, CrystalCost = 1000, DeuteriumCost = 0,
             Structure = 4000, Shield = 10, Attack = 50, Capacity = 50, BaseSpeed = 12500, FuelConsumption = 20,
             BaseDuration = TimeSpan.FromSeconds(15),
@@ -138,7 +138,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "HF", Name = "Heavy Fighter", Description = "Better armored than the light fighter.",
-            Image = "heavyFighter.jpg",
+            Image = "assets/ships/heavyFighter.jpg",
             MetalCost = 6000, CrystalCost = 4000, DeuteriumCost = 0,
             Structure = 10000, Shield = 25, Attack = 150, Capacity = 100, BaseSpeed = 10000, FuelConsumption = 75,
             BaseDuration = TimeSpan.FromSeconds(40),
@@ -148,7 +148,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "CR", Name = "Cruiser", Description = "Fast and dangerous to fighters.",
-            Image = "cruiser.jpg",
+            Image = "assets/ships/cruiser.jpg",
             MetalCost = 20000, CrystalCost = 7000, DeuteriumCost = 2000,
             Structure = 27000, Shield = 50, Attack = 400, Capacity = 800, BaseSpeed = 15000, FuelConsumption = 300,
             BaseDuration = TimeSpan.FromMinutes(2),
@@ -158,7 +158,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "BS", Name = "Battleship", Description = "The ruler of the battlefield.",
-            Image = "battleship.jpg",
+            Image = "assets/ships/battleship.jpg",
             MetalCost = 45000, CrystalCost = 15000, DeuteriumCost = 0,
             Structure = 60000, Shield = 200, Attack = 1000, Capacity = 1500, BaseSpeed = 10000, FuelConsumption = 500,
             BaseDuration = TimeSpan.FromMinutes(4),
@@ -168,7 +168,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "CS", Name = "Colony Ship", Description = "Used to colonize new planets.",
-            Image = "colonyShip.jpg",
+            Image = "assets/ships/colonyShip.jpg",
             MetalCost = 10000, CrystalCost = 20000, DeuteriumCost = 10000,
             Structure = 30000, Shield = 100, Attack = 50, Capacity = 7500, BaseSpeed = 2500, FuelConsumption = 1000,
             BaseDuration = TimeSpan.FromMinutes(5),
@@ -178,7 +178,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "REC", Name = "Recycler", Description = "Harvests debris fields.",
-            Image = "recycler.jpg",
+            Image = "assets/ships/recycler.jpg",
             MetalCost = 10000, CrystalCost = 6000, DeuteriumCost = 2000,
             Structure = 16000, Shield = 10, Attack = 1, Capacity = 20000, BaseSpeed = 2000, FuelConsumption = 300,
             BaseDuration = TimeSpan.FromMinutes(3),
@@ -188,7 +188,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "ESP", Name = "Espionage Probe", Description = "Fast drone for spying.",
-            Image = "probe.jpg",
+            Image = "assets/ships/probe.jpg",
             MetalCost = 0, CrystalCost = 1000, DeuteriumCost = 0,
             Structure = 1000, Shield = 0, Attack = 0, Capacity = 5, BaseSpeed = 100000000, FuelConsumption = 1,
             BaseDuration = TimeSpan.FromSeconds(5),
@@ -208,7 +208,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "RIP", Name = "Death Star", Description = "The ultimate weapon.",
-            Image = "deathstar.jpg",
+            Image = "assets/ships/deathstar.jpg",
             MetalCost = 5000000, CrystalCost = 4000000, DeuteriumCost = 1000000,
             Structure = 9000000, Shield = 50000, Attack = 200000, Capacity = 1000000, BaseSpeed = 100, FuelConsumption = 1,
             BaseDuration = TimeSpan.FromHours(5),

@@ -18,7 +18,7 @@ public class GalaxyPlanet
     public bool HasDebris { get; set; }
     public long DebrisMetal { get; set; }
     public long DebrisCrystal { get; set; }
-    public string Image { get; set; } = "planet_placeholder.png"; // Default
+    public string Image { get; set; } = "assets/planets/planet_placeholder.png"; // Default
 }
 
 public class GalaxyService
@@ -98,7 +98,7 @@ public class GalaxyService
                 planet.IsHomeworld = true;
                 planet.Name = "Homeworld";
                 planet.PlayerName = "Commander";
-                planet.Image = "planet_home.jpg";
+                planet.Image = "assets/planets/planet_home.jpg";
             }
             // Randomly populate other slots
             else if (_random.NextDouble() < 0.3) // 30% chance of occupation
@@ -147,11 +147,11 @@ public class GalaxyService
     private string GetRandomPlanetImage(int position)
     {
         // Simple logic: hotter planets closer to star (1-3), colder further away (13-15)
-        if (position <= 3) return "planet_hot.jpg";
-        if (position >= 13) return "planet_ice.jpg";
+        if (position <= 3) return "assets/planets/planet_hot.jpg";
+        if (position >= 13) return "assets/planets/planet_ice.jpg";
         
         // Random variation for habitable zone
-        string[] types = { "planet_gas.jpg", "planet_water.jpg", "planet_desert.jpg", "planet_forest.jpg" };
+        string[] types = { "assets/planets/planet_gas.jpg", "assets/planets/planet_water.jpg", "assets/planets/planet_desert.jpg", "assets/planets/planet_forest.jpg" };
         return types[_random.Next(types.Length)];
     }
 }

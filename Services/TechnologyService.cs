@@ -95,7 +95,7 @@ public class TechnologyService
             BaseCrystalCost = 1000,
             BaseDeuteriumCost = 200,
             BaseDuration = TimeSpan.FromMinutes(2),
-            Image = "tech_espionage.jpg",
+            Image = "assets/technologies/tech_espionage.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 3, IsBuilding = true }
             }
@@ -111,7 +111,7 @@ public class TechnologyService
             BaseCrystalCost = 400,
             BaseDeuteriumCost = 600,
             BaseDuration = TimeSpan.FromMinutes(5),
-            Image = "tech_computer.jpg",
+            Image = "assets/technologies/tech_computer.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 1, IsBuilding = true }
             }
@@ -127,7 +127,7 @@ public class TechnologyService
             BaseCrystalCost = 200,
             BaseDeuteriumCost = 0,
             BaseDuration = TimeSpan.FromMinutes(10),
-            Image = "tech_weapons.jpg",
+            Image = "assets/technologies/tech_weapons.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 4, IsBuilding = true }
             }
@@ -143,7 +143,7 @@ public class TechnologyService
             BaseCrystalCost = 600,
             BaseDeuteriumCost = 0,
             BaseDuration = TimeSpan.FromMinutes(10),
-            Image = "tech_shielding.jpg",
+            Image = "assets/technologies/tech_shielding.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 6, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 3, IsBuilding = false }
@@ -160,7 +160,7 @@ public class TechnologyService
             BaseCrystalCost = 0,
             BaseDeuteriumCost = 0,
             BaseDuration = TimeSpan.FromMinutes(10),
-            Image = "tech_armour.jpg",
+            Image = "assets/technologies/tech_armour.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 2, IsBuilding = true }
             }
@@ -176,7 +176,7 @@ public class TechnologyService
             BaseCrystalCost = 800,
             BaseDeuteriumCost = 400,
             BaseDuration = TimeSpan.FromMinutes(8),
-            Image = "tech_energy.jpg",
+            Image = "assets/technologies/tech_energy.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 1, IsBuilding = true }
             }
@@ -192,7 +192,7 @@ public class TechnologyService
             BaseCrystalCost = 4000,
             BaseDeuteriumCost = 2000,
             BaseDuration = TimeSpan.FromMinutes(20),
-            Image = "tech_hyperspace.jpg",
+            Image = "assets/technologies/tech_hyperspace.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 7, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 5, IsBuilding = false },
@@ -210,7 +210,7 @@ public class TechnologyService
             BaseCrystalCost = 0,
             BaseDeuteriumCost = 600,
             BaseDuration = TimeSpan.FromMinutes(4),
-            Image = "tech_combustion.jpg",
+            Image = "assets/technologies/tech_combustion.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 1, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 1, IsBuilding = false }
@@ -227,7 +227,7 @@ public class TechnologyService
             BaseCrystalCost = 4000,
             BaseDeuteriumCost = 600,
             BaseDuration = TimeSpan.FromMinutes(12),
-            Image = "tech_impulse.jpg",
+            Image = "assets/technologies/tech_impulse.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 2, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 1, IsBuilding = false }
@@ -244,7 +244,7 @@ public class TechnologyService
             BaseCrystalCost = 20000,
             BaseDeuteriumCost = 6000,
             BaseDuration = TimeSpan.FromMinutes(45),
-            Image = "tech_hyperspacedrive.jpg",
+            Image = "assets/technologies/tech_hyperspacedrive.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 7, IsBuilding = true },
                 new Requirement { Name = "Hyperspace Technology", Level = 3, IsBuilding = false }
@@ -261,7 +261,7 @@ public class TechnologyService
             BaseCrystalCost = 100,
             BaseDeuteriumCost = 0,
             BaseDuration = TimeSpan.FromMinutes(3),
-            Image = "tech_laser.jpg",
+            Image = "assets/technologies/tech_laser.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 1, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 2, IsBuilding = false }
@@ -278,7 +278,7 @@ public class TechnologyService
             BaseCrystalCost = 300,
             BaseDeuteriumCost = 100,
             BaseDuration = TimeSpan.FromMinutes(15),
-            Image = "tech_ion.jpg",
+            Image = "assets/technologies/tech_ion.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 4, IsBuilding = true },
                 new Requirement { Name = "Laser Technology", Level = 5, IsBuilding = false },
@@ -296,7 +296,7 @@ public class TechnologyService
             BaseCrystalCost = 4000,
             BaseDeuteriumCost = 1000,
             BaseDuration = TimeSpan.FromMinutes(30),
-            Image = "tech_plasma.jpg",
+            Image = "assets/technologies/tech_plasma.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 4, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 8, IsBuilding = false },
@@ -315,7 +315,7 @@ public class TechnologyService
             BaseCrystalCost = 400000,
             BaseDeuteriumCost = 160000,
             BaseDuration = TimeSpan.FromHours(2),
-            Image = "tech_network.jpg",
+            Image = "assets/technologies/tech_network.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 10, IsBuilding = true },
                 new Requirement { Name = "Computer Technology", Level = 8, IsBuilding = false },
@@ -334,7 +334,7 @@ public class TechnologyService
             BaseDeuteriumCost = 4000,
             BaseDuration = TimeSpan.FromMinutes(40),
             Scaling = 1.75, // Special scaling
-            Image = "tech_astrophysics.jpg",
+            Image = "assets/technologies/tech_astrophysics.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 3, IsBuilding = true },
                 new Requirement { Name = "Espionage Technology", Level = 4, IsBuilding = false },
@@ -354,7 +354,7 @@ public class TechnologyService
             BaseEnergyCost = 300000,
             BaseDuration = TimeSpan.Zero, // Instant
             Scaling = 3.0, // Special scaling
-            Image = "tech_graviton.jpg",
+            Image = "assets/technologies/tech_graviton.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 12, IsBuilding = true }
             }

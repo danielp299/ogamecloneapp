@@ -71,7 +71,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "RL", Name = "Rocket Launcher", Description = "A simple but cost-effective defense.",
-            Image = "rocketLauncher.jpg",
+            Image = "assets/defense/rocketLauncher.jpg",
             MetalCost = 2000, CrystalCost = 0, DeuteriumCost = 0,
             Structure = 2000, Shield = 20, Attack = 80,
             BaseDuration = TimeSpan.FromSeconds(20),
@@ -81,7 +81,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "LL", Name = "Light Laser", Description = "Uses concentrated light to damage enemies.",
-            Image = "laserCannon.jpg", // Using existing image name
+            Image = "assets/defense/laserCannon.jpg", // Using existing image name
             MetalCost = 1500, CrystalCost = 500, DeuteriumCost = 0,
             Structure = 2000, Shield = 25, Attack = 100,
             BaseDuration = TimeSpan.FromSeconds(30),
@@ -91,7 +91,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "HL", Name = "Heavy Laser", Description = "Stronger version of the light laser.",
-            Image = "heavyLaser.jpg",
+            Image = "assets/defense/heavyLaser.jpg",
             MetalCost = 6000, CrystalCost = 2000, DeuteriumCost = 0,
             Structure = 8000, Shield = 100, Attack = 250,
             BaseDuration = TimeSpan.FromSeconds(60),
@@ -101,7 +101,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "GC", Name = "Gauss Cannon", Description = "Fires high-velocity projectiles.",
-            Image = "gaussCannon.jpg",
+            Image = "assets/defense/gaussCannon.jpg",
             MetalCost = 20000, CrystalCost = 15000, DeuteriumCost = 2000,
             Structure = 35000, Shield = 200, Attack = 1100,
             BaseDuration = TimeSpan.FromMinutes(2.5),
@@ -111,7 +111,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "IC", Name = "Ion Cannon", Description = "Fires ion beams to disrupt shields.",
-            Image = "ionCannon.jpg",
+            Image = "assets/defense/ionCannon.jpg",
             MetalCost = 2000, CrystalCost = 6000, DeuteriumCost = 0,
             Structure = 8000, Shield = 500, Attack = 150,
             BaseDuration = TimeSpan.FromMinutes(1.5),
@@ -121,7 +121,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "PT", Name = "Plasma Turret", Description = "The most powerful defensive structure.",
-            Image = "plasmaTurret.jpg",
+            Image = "assets/defense/plasmaTurret.jpg",
             MetalCost = 50000, CrystalCost = 50000, DeuteriumCost = 30000,
             Structure = 100000, Shield = 300, Attack = 3000,
             BaseDuration = TimeSpan.FromMinutes(10),
@@ -131,7 +131,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "SSD", Name = "Small Shield Dome", Description = "Protects the planet with a shield.",
-            Image = "smallShield.jpg",
+            Image = "assets/defense/smallShield.jpg",
             MetalCost = 10000, CrystalCost = 10000, DeuteriumCost = 0,
             Structure = 20000, Shield = 2000, Attack = 0,
             BaseDuration = TimeSpan.FromMinutes(5),
@@ -141,7 +141,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "LSD", Name = "Large Shield Dome", Description = "A massive planetary shield.",
-            Image = "largeShield.jpg",
+            Image = "assets/defense/largeShield.jpg",
             MetalCost = 50000, CrystalCost = 50000, DeuteriumCost = 0,
             Structure = 100000, Shield = 10000, Attack = 0,
             BaseDuration = TimeSpan.FromMinutes(20),
@@ -151,7 +151,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "ABM", Name = "Anti-Ballistic Missile", Description = "Intercepts interplanetary missiles.",
-            Image = "abm.jpg",
+            Image = "assets/defense/abm.jpg",
             MetalCost = 8000, CrystalCost = 0, DeuteriumCost = 2000,
             Structure = 8000, Shield = 1, Attack = 1,
             BaseDuration = TimeSpan.FromMinutes(2),
@@ -161,7 +161,7 @@ public class DefenseService
         DefenseDefinitions.Add(new DefenseUnit
         {
             Id = "IPM", Name = "Interplanetary Missile", Description = "Destroys enemy defenses remotely.",
-            Image = "ipm.jpg",
+            Image = "assets/defense/ipm.jpg",
             MetalCost = 12500, CrystalCost = 2500, DeuteriumCost = 10000,
             Structure = 15000, Shield = 1, Attack = 12000,
             BaseDuration = TimeSpan.FromMinutes(5),

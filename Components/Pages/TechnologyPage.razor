@@ -7,7 +7,7 @@
 
 <style>
     .ogame-banner {
-        background-image: url('buildings-banner.jpg');
+        background-image: url('assets/banners/tech-banner.jpg');
         background-size: cover;
         background-position: center;
         color: white;
@@ -152,10 +152,10 @@
             <p>@tech.Description</p>
             
             <div class="ogame-cost-section">
-                @if(tech.MetalCost > 0) { <div class="ogame-cost-item">Metal: @tech.MetalCost.ToString("N0")</div> }
-                @if(tech.CrystalCost > 0) { <div class="ogame-cost-item">Crystal: @tech.CrystalCost.ToString("N0")</div> }
-                @if(tech.DeuteriumCost > 0) { <div class="ogame-cost-item">Deuterium: @tech.DeuteriumCost.ToString("N0")</div> }
-                @if(tech.EnergyCost > 0) { <div class="ogame-cost-item">Energy: @tech.EnergyCost.ToString("N0")</div> }
+                @if(tech.MetalCost > 0) { <div class="ogame-cost-item"><img src="assets/common/metal-icon.png" alt="Metal" style="width:16px;height:16px;margin-right:4px;" /> Metal: @tech.MetalCost.ToString("N0")</div> }
+                @if(tech.CrystalCost > 0) { <div class="ogame-cost-item"><img src="assets/common/crystal-icon.png" alt="Crystal" style="width:16px;height:16px;margin-right:4px;" /> Crystal: @tech.CrystalCost.ToString("N0")</div> }
+                @if(tech.DeuteriumCost > 0) { <div class="ogame-cost-item"><img src="assets/common/deuterium-icon.png" alt="Deuterium" style="width:16px;height:16px;margin-right:4px;" /> Deuterium: @tech.DeuteriumCost.ToString("N0")</div> }
+                @if(tech.EnergyCost > 0) { <div class="ogame-cost-item"><img src="assets/common/energy-icon.png" alt="Energy" style="width:16px;height:16px;margin-right:4px;" /> Energy: @tech.EnergyCost.ToString("N0")</div> }
                 
                 <div class="ogame-cost-item">Duration: @tech.Duration.ToString(@"hh\:mm\:ss")</div>
 

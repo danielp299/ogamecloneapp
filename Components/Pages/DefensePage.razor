@@ -9,7 +9,7 @@
 
 <style>
     .ogame-banner {
-        background-image: url('buildings-banner.jpg');
+        background-image: url('assets/banners/buildings-banner.jpg');
         background-size: cover;
         background-position: center;
         color: white;
@@ -173,9 +173,9 @@
             <p>@unit.Description</p>   
             
             <div class="ogame-cost-section">
-                <div class="ogame-cost-item">Metal: @unit.MetalCost.ToString("N0")</div>            
-                <div class="ogame-cost-item">Crystal: @unit.CrystalCost.ToString("N0")</div>            
-                @if(unit.DeuteriumCost > 0) { <div class="ogame-cost-item">Deuterium: @unit.DeuteriumCost.ToString("N0")</div> }
+                <div class="ogame-cost-item"><img src="assets/common/metal-icon.png" alt="Metal" style="width:16px;height:16px;margin-right:4px;" /> Metal: @unit.MetalCost.ToString("N0")</div>
+                <div class="ogame-cost-item"><img src="assets/common/crystal-icon.png" alt="Crystal" style="width:16px;height:16px;margin-right:4px;" /> Crystal: @unit.CrystalCost.ToString("N0")</div>
+                @if(unit.DeuteriumCost > 0) { <div class="ogame-cost-item"><img src="assets/common/deuterium-icon.png" alt="Deuterium" style="width:16px;height:16px;margin-right:4px;" /> Deuterium: @unit.DeuteriumCost.ToString("N0")</div> }
                 <div class="ogame-cost-item">Structure: @unit.Structure.ToString("N0") | Attack: @unit.Attack.ToString("N0")</div>
                 <div class="ogame-cost-item">Base Time: @unit.BaseDuration.ToString()</div> 
 
