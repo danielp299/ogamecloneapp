@@ -6,6 +6,11 @@
 
 main {
     flex: 1;
+    background-color: #000000;
+}
+
+article.content {
+    padding-top: 1.1rem;
 }
 
 .sidebar {
