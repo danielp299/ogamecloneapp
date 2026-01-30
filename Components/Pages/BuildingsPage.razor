@@ -114,6 +114,13 @@
          margin: 2px 0;
     }
 </style>
+<div class="ogame-banner" style="background-image: url('assets/banners/buildings-banner.jpg'); position: relative;">
+    <img src="assets/banners/buildings-banner.jpg" alt="Buildings Banner" style="width:100%; max-height:200px; object-fit:cover; opacity:0.1; position:absolute; top:0; left:0; z-index:0;" />
+    <div style="position:relative; z-index:1;">
+        <h2>Buildings</h2>
+    </div>
+</div>
+
 @if(BuildingService.ConstructionQueue.Count > 0) {
     @* Construction queue *@
     <div class="ogame-queue-container" id="construction-queue">
