@@ -148,52 +148,8 @@
                     <tr class="planet-row">
                         <td>@planet.Position</td>
                         <td>
-                            @if (planet.IsOccupied)
-                            {
-                             <img src="@planet.Image" class="planet-img" />
-                         </td>
-                         <td>
-                             @if (planet.IsOccupied)
-                             {
-                                 <span class="@(planet.IsMyPlanet ? "status-occupied" : "status-enemy")">@planet.Name</span>
-                             }
-                             else
-                             {
-                                 <span class="status-vacant">Empty Space</span>
-                             }
-                         </td>
-                         <td>
-                             @if (planet.IsOccupied)
-                             {
-                                 <span>@planet.PlayerName</span>
-                             }
-                         </td>
-                         <td>@planet.Alliance</td>
-                         <td>
-                             @if (planet.HasDebris)
-                             {
-                                 <div class="debris-info">
-                                     M: @planet.DebrisMetal<br/>
-                                     C: @planet.DebrisCrystal
-                                 </div>
-                             }
-                         </td>
-                         <td>
-                             @if (planet.IsOccupied && !planet.IsMyPlanet)
-                             {
-                                 <button class="action-btn" @onclick="() => SendFleet(planet.Position, 1)">Attack</button>
-                                 <button class="action-btn" @onclick="() => SendFleet(planet.Position, 2)">Espionage</button>
-                             }
-                             else if (!planet.IsOccupied)
-                             {
-                                 <button class="action-btn" style="background-color: #FF9800" @onclick="() => SendFleet(planet.Position, 3)">Colonize</button>
-                             }
-                             
-                             @if (planet.HasDebris)
-                             {
-                                 <button class="action-btn" style="background-color: #9C27B0" @onclick="() => SendFleet(planet.Position, 4)">Recycle</button>
-                             }
-                         </td>
+                            <img src="@planet.Image" class="planet-img" />
+                        </td>
                         <td>
                             @if (planet.IsOccupied)
                             {
