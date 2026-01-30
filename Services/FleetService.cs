@@ -198,7 +198,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "DST", Name = "Destroyer", Description = "Anti-Deathstar specialized ship.",
-            Image = "destroyer.jpg",
+             Image = "assets/ships/destroyer.jpg",
             MetalCost = 60000, CrystalCost = 50000, DeuteriumCost = 15000,
             Structure = 110000, Shield = 500, Attack = 2000, Capacity = 2000, BaseSpeed = 5000, FuelConsumption = 1000,
             BaseDuration = TimeSpan.FromMinutes(10),
