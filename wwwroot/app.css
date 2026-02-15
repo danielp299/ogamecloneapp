@@ -112,6 +112,30 @@ h1:focus {
     gap: 20px;
 }
 
+.ogame-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+@media (max-width: 1200px) {
+    .ogame-grid-4 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .ogame-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .ogame-grid-4 {
+        grid-template-columns: 1fr;
+    }
+}
+
 .ogame-card {
     background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
     border-radius: 5px;

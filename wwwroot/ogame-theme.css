@@ -186,11 +186,30 @@ body {
     gap: var(--spacing-xl);
 }
 
+.ogame-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-lg);
+}
+
 /* Responsive Grid */
+@media (max-width: 1200px) {
+    .ogame-grid-4 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .ogame-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 640px) {
     .ogame-grid,
     .ogame-grid-sm,
-    .ogame-grid-lg {
+    .ogame-grid-lg,
+    .ogame-grid-4 {
         grid-template-columns: 1fr;
         gap: var(--spacing-md);
     }

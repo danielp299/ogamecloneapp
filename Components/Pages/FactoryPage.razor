@@ -37,7 +37,7 @@
     }
 
     <!-- Ships Grid -->
-    <div class="ogame-grid">
+    <div class="ogame-grid-4">
         @foreach (var ship in FleetService.ShipDefinitions)
         {
             var vm = GetViewModel(ship.Id);
@@ -75,7 +75,7 @@
                     <div class="text-muted" style="margin-top: 8px; font-size: 0.85em;">
                         <div>Structure: @ship.Structure.ToString("N0")</div>
                         <div>Speed: @ship.BaseSpeed</div>
-                        <div>Cargo: @ship.Cargo.ToString("N0")</div>
+                        <div>Cargo: @ship.Capacity.ToString("N0")</div>
                         <div>Build Time: @ship.BaseDuration.ToString(@"hh\:mm\:ss")</div>
                     </div>
 
