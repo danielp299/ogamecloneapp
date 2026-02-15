@@ -1,0 +1,517 @@
+/* ===================================
+   OGame Clone - Unified Design System
+   =================================== */
+
+:root {
+    /* Color Palette - Dark Space Theme */
+    --color-bg-primary: #0a0a0a;
+    --color-bg-secondary: #1a1a1a;
+    --color-bg-tertiary: #2a2a2a;
+    --color-bg-card: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+
+    /* UI Elements */
+    --color-border-subtle: #333;
+    --color-border-medium: #444;
+    --color-border-strong: #555;
+
+    /* Text Colors */
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #cccccc;
+    --color-text-muted: #888888;
+    --color-text-dim: #666666;
+
+    /* Accent Colors */
+    --color-accent-blue: #4a90e2;
+    --color-accent-cyan: #66ccff;
+    --color-accent-gold: #ffd700;
+    --color-accent-green: #00ff00;
+
+    /* Resource Colors */
+    --color-metal: #b0b0b0;
+    --color-crystal: #6ab7ff;
+    --color-deuterium: #51d151;
+    --color-energy: #ffc107;
+
+    /* Status Colors */
+    --color-success: #4caf50;
+    --color-warning: #ff9800;
+    --color-danger: #f44336;
+    --color-info: #2196f3;
+
+    /* Button Colors */
+    --color-btn-primary: #4a90e2;
+    --color-btn-primary-hover: #5aa0f2;
+    --color-btn-secondary: #3a3a3a;
+    --color-btn-secondary-hover: #4a4a4a;
+    --color-btn-success: #4caf50;
+    --color-btn-success-hover: #66bb6a;
+    --color-btn-danger: #d32f2f;
+    --color-btn-danger-hover: #e53935;
+    --color-btn-disabled: #222222;
+
+    /* Spacing */
+    --spacing-xs: 5px;
+    --spacing-sm: 10px;
+    --spacing-md: 15px;
+    --spacing-lg: 20px;
+    --spacing-xl: 30px;
+
+    /* Border Radius */
+    --radius-sm: 3px;
+    --radius-md: 5px;
+    --radius-lg: 10px;
+    --radius-xl: 15px;
+
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.4);
+
+    /* Container Widths */
+    --container-sm: 800px;
+    --container-md: 1000px;
+    --container-lg: 1200px;
+    --container-xl: 1400px;
+}
+
+/* ===================================
+   Global Styles
+   =================================== */
+
+body {
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+/* ===================================
+   Layout Components
+   =================================== */
+
+.ogame-container {
+    max-width: var(--container-lg);
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+}
+
+.ogame-container-sm {
+    max-width: var(--container-sm);
+}
+
+.ogame-container-md {
+    max-width: var(--container-md);
+}
+
+.ogame-container-xl {
+    max-width: var(--container-xl);
+}
+
+/* Banner */
+.ogame-banner {
+    background-size: cover;
+    background-position: center;
+    color: var(--color-text-primary);
+    text-align: center;
+    padding: 80px var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    position: relative;
+    overflow: hidden;
+}
+
+.ogame-banner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1;
+}
+
+.ogame-banner > * {
+    position: relative;
+    z-index: 2;
+}
+
+.ogame-banner h1,
+.ogame-banner h2 {
+    font-size: 3em;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+    margin: 0;
+}
+
+.ogame-banner p {
+    font-size: 1.2em;
+    text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+    margin-top: var(--spacing-sm);
+}
+
+/* Responsive Banner */
+@media (max-width: 768px) {
+    .ogame-banner {
+        padding: 60px var(--spacing-md);
+    }
+
+    .ogame-banner h1,
+    .ogame-banner h2 {
+        font-size: 2em;
+    }
+
+    .ogame-banner p {
+        font-size: 1em;
+    }
+}
+
+/* ===================================
+   Grid System
+   =================================== */
+
+.ogame-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.ogame-grid-sm {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.ogame-grid-lg {
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: var(--spacing-xl);
+}
+
+/* Responsive Grid */
+@media (max-width: 640px) {
+    .ogame-grid,
+    .ogame-grid-sm,
+    .ogame-grid-lg {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+}
+
+/* ===================================
+   Card Components
+   =================================== */
+
+.ogame-card {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    text-align: center;
+    border: 1px solid var(--color-border-medium);
+    color: var(--color-text-primary);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    gap: var(--spacing-sm);
+    box-shadow: var(--shadow-md);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.ogame-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.ogame-card img {
+    width: 177px;
+    height: 177px;
+    object-fit: cover;
+    border: 2px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-sm);
+    box-shadow: var(--shadow-sm);
+}
+
+.ogame-card h3 {
+    color: var(--color-text-primary);
+    margin: var(--spacing-sm) 0;
+    font-size: 1.2em;
+}
+
+.ogame-card p {
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+    margin: var(--spacing-xs) 0;
+}
+
+/* Badge */
+.ogame-badge {
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    background-color: rgba(0, 0, 0, 0.8);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-xl);
+    font-weight: bold;
+    border: 1px solid var(--color-border-strong);
+    z-index: 2;
+    font-size: 0.9em;
+}
+
+.ogame-badge-success {
+    background-color: var(--color-success);
+    color: white;
+}
+
+.ogame-badge-warning {
+    background-color: var(--color-warning);
+    color: white;
+}
+
+.ogame-badge-danger {
+    background-color: var(--color-danger);
+    color: white;
+}
+
+/* Panel */
+.ogame-panel {
+    background-color: var(--color-bg-secondary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--color-text-primary);
+}
+
+.ogame-panel h2,
+.ogame-panel h3 {
+    margin-top: 0;
+    border-bottom: 1px solid var(--color-border-medium);
+    padding-bottom: var(--spacing-sm);
+    font-size: 1.2rem;
+    color: var(--color-text-secondary);
+}
+
+/* ===================================
+   Button System
+   =================================== */
+
+.ogame-btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    transition: all 0.2s;
+    text-align: center;
+    display: inline-block;
+    text-decoration: none;
+}
+
+.ogame-btn:disabled {
+    background-color: var(--color-btn-disabled) !important;
+    color: var(--color-text-dim) !important;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Primary Button */
+.ogame-btn-primary {
+    background-color: var(--color-btn-primary);
+    color: white;
+}
+
+.ogame-btn-primary:hover:not(:disabled) {
+    background-color: var(--color-btn-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Secondary Button */
+.ogame-btn-secondary {
+    background-color: var(--color-btn-secondary);
+    color: var(--color-text-primary);
+}
+
+.ogame-btn-secondary:hover:not(:disabled) {
+    background-color: var(--color-btn-secondary-hover);
+}
+
+/* Success Button */
+.ogame-btn-success {
+    background-color: var(--color-btn-success);
+    color: white;
+}
+
+.ogame-btn-success:hover:not(:disabled) {
+    background-color: var(--color-btn-success-hover);
+}
+
+/* Danger Button */
+.ogame-btn-danger {
+    background-color: var(--color-btn-danger);
+    color: white;
+}
+
+.ogame-btn-danger:hover:not(:disabled) {
+    background-color: var(--color-btn-danger-hover);
+}
+
+/* Button Sizes */
+.ogame-btn-sm {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: 0.9em;
+}
+
+.ogame-btn-lg {
+    padding: var(--spacing-md) var(--spacing-xl);
+    font-size: 1.1em;
+}
+
+.ogame-btn-block {
+    width: 100%;
+    display: block;
+}
+
+/* ===================================
+   Queue Components
+   =================================== */
+
+.ogame-queue-container {
+    margin-bottom: var(--spacing-xl);
+    background-color: var(--color-bg-secondary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+}
+
+.ogame-queue-item {
+    padding: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border-medium);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ogame-queue-item:last-child {
+    border-bottom: none;
+}
+
+.ogame-queue-timer {
+    color: var(--color-accent-green);
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+}
+
+/* ===================================
+   Cost Display
+   =================================== */
+
+.ogame-cost-section {
+    font-size: 0.9em;
+    text-align: left;
+    width: 100%;
+    padding: 0 var(--spacing-sm);
+    margin: var(--spacing-sm) 0;
+}
+
+.ogame-cost-item {
+    margin: var(--spacing-xs) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.ogame-cost-item img {
+    width: 16px;
+    height: 16px;
+    margin-right: var(--spacing-xs);
+}
+
+/* ===================================
+   Utility Classes
+   =================================== */
+
+.text-center {
+    text-align: center;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-muted {
+    color: var(--color-text-muted);
+}
+
+.text-success {
+    color: var(--color-success);
+}
+
+.text-warning {
+    color: var(--color-warning);
+}
+
+.text-danger {
+    color: var(--color-danger);
+}
+
+.mb-sm {
+    margin-bottom: var(--spacing-sm);
+}
+
+.mb-md {
+    margin-bottom: var(--spacing-md);
+}
+
+.mb-lg {
+    margin-bottom: var(--spacing-lg);
+}
+
+.mt-sm {
+    margin-top: var(--spacing-sm);
+}
+
+.mt-md {
+    margin-top: var(--spacing-md);
+}
+
+.mt-lg {
+    margin-top: var(--spacing-lg);
+}
+
+/* ===================================
+   Responsive Utilities
+   =================================== */
+
+@media (max-width: 640px) {
+    .ogame-container {
+        padding: var(--spacing-md);
+    }
+
+    .ogame-card img {
+        width: 120px;
+        height: 120px;
+    }
+
+    .ogame-btn {
+        padding: var(--spacing-sm);
+        font-size: 0.9em;
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --spacing-lg: 15px;
+        --spacing-xl: 20px;
+    }
+
+    .ogame-banner h1,
+    .ogame-banner h2 {
+        font-size: 1.5em;
+    }
+}

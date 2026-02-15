@@ -1007,7 +1007,7 @@ public class FleetService
         planet.IsMyPlanet = true;
         planet.Name = "Colony";
         planet.PlayerName = "Commander";
-        planet.Image = "planet_colony.jpg";
+        planet.Image = "assets/planets/planet_colony.jpg";
         
         _galaxyService.RegisterPlanet(planet);
 

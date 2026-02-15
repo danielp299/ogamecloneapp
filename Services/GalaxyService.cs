@@ -149,9 +149,9 @@ public class GalaxyService
         // Simple logic: hotter planets closer to star (1-3), colder further away (13-15)
         if (position <= 3) return "assets/planets/planet_hot.jpg";
         if (position >= 13) return "assets/planets/planet_ice.jpg";
-        
+
         // Random variation for habitable zone
-        string[] types = { "assets/planets/planet_gas.jpg", "assets/planets/planet_water.jpg", "assets/planets/planet_desert.jpg", "assets/planets/planet_forest.jpg" };
+        string[] types = { "assets/planets/planet_gas.jpg", "assets/planets/planet_water.png", "assets/planets/planet_desert.png", "assets/planets/planet_forest.png" };
         return types[_random.Next(types.Length)];
     }
 }

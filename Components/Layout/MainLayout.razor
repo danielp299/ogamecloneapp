@@ -4,6 +4,27 @@
 @inject DevModeService DevModeService
 @inject NavigationManager NavigationManager
 
+<style>
+    .page {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+
+    @@media (min-width: 641px) {
+        .page {
+            flex-direction: row !important;
+        }
+
+        .sidebar {
+            width: 250px !important;
+            height: 100vh !important;
+            position: sticky !important;
+            top: 0 !important;
+        }
+    }
+</style>
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />
