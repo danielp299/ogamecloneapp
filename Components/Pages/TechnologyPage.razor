@@ -5,197 +5,134 @@
 @inject RequirementService RequirementService
 @implements IDisposable
 
-<style>
-    .ogame-banner {
-        background-image: url('assets/banners/tech-banner.jpg');
-        background-size: cover;
-        background-position: center;
-        color: white;
-        text-align: center;
-        padding: 100px 20px;
-        margin-bottom: 20px;
-    }
+<PageTitle>Technologies</PageTitle>
 
-    .ogame-banner h2 {
-        font-size: 3em;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    article {
-        background-color: #000000;
-        padding-top: 1.1rem;
-    }
-
-    .ogame-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 20px;
-    }
-
-    .ogame-card {
-        background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
-        border-radius: 5px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #444;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        align-items: center;
-        position: relative;
-        width: 100%;
-        height: 100%;
-        gap: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }
-
-    .ogame-card img {
-        width: 177px;
-        height: 177px;
-        object-fit: cover;
-        border: 2px solid #777;
-        border-radius: 5px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .ogame-card h3 {
-        color: white;
-        margin: 10px 0;
-    }
-
-    .ogame-count-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(0,0,0,0.7);
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-weight: bold;
-        border: 1px solid #777;
-        z-index: 2;
-    }
-
-    .ogame-card button {
-        padding: 10px;
-        background-color: #555;
-        color: white;
-        border: none;
-        cursor: pointer;
-        border-radius: 5px;
-        width: 100%;
-        margin-top: auto;
-    }
-
-    .ogame-queue-container {
-        margin-bottom: 30px;
-        background-color: #222;
-        padding: 15px;
-        border-radius: 5px;
-        color: white;
-    }
-
-    .ogame-queue-item {
-        padding: 5px;
-        border-bottom: 1px solid #444;
-    }
-
-    .ogame-cost-section {
-        font-size: 0.9em; 
-        text-align: left; 
-        width: 100%; 
-        padding: 0 10px;
-    }
-
-    .ogame-cost-item {
-         margin: 2px 0;
-    }
-
-    .ogame-requirements-section {
-        margin-top: 10px; 
-        font-size: 0.85em; 
-        border-top: 1px solid #555; 
-        padding-top: 5px;
-    }
-
-    .ogame-card-actions {
-        display:flex;
-        flex-direction: row;
-        width: 100%;
-        justify-content: center;
-        gap: 10px;
-    }
-</style>
-
-<div class="ogame-banner">
-    <h2>Technologies</h2>
-</div>
-
-@if(TechnologyService.CurrentResearch != null)
-{
-    <div class="ogame-queue-container">
-        <h3>Researching: @TechnologyService.CurrentResearch.Title</h3>
-        <p>Level: @(TechnologyService.CurrentResearch.Level + 1)</p>
-        <p>Time Remaining: @TechnologyService.CurrentResearch.TimeRemaining.ToString(@"hh\:mm\:ss")</p>
-        <button class="btn btn-secondary" @onclick="CancelResearch">Cancel</button>
+<div class="ogame-container">
+    <!-- Banner -->
+    <div class="ogame-banner" style="background-image: url('assets/banners/tech-banner.jpg');">
+        <h2>Technologies</h2>
+        <p>Research to unlock new capabilities</p>
     </div>
-}
 
-<div class="ogame-grid">
-    @foreach (var tech in TechnologyService.Technologies)
+    <!-- Research Queue -->
+    @if(TechnologyService.CurrentResearch != null)
     {
-        <div class="ogame-card">
-            <div class="ogame-count-badge">Level: @tech.Level</div>
-            <img src="@tech.Image" alt="@tech.Title" />
-            <h3>@tech.Title</h3>
-            <p>@tech.Description</p>
-            
-            <div class="ogame-cost-section">
-                @if(tech.MetalCost > 0) { <div class="ogame-cost-item"><img src="assets/common/metal-icon.png" alt="Metal" style="width:16px;height:16px;margin-right:4px;" /> Metal: @tech.MetalCost.ToString("N0")</div> }
-                @if(tech.CrystalCost > 0) { <div class="ogame-cost-item"><img src="assets/common/crystal-icon.png" alt="Crystal" style="width:16px;height:16px;margin-right:4px;" /> Crystal: @tech.CrystalCost.ToString("N0")</div> }
-                @if(tech.DeuteriumCost > 0) { <div class="ogame-cost-item"><img src="assets/common/deuterium-icon.png" alt="Deuterium" style="width:16px;height:16px;margin-right:4px;" /> Deuterium: @tech.DeuteriumCost.ToString("N0")</div> }
-                @if(tech.EnergyCost > 0) { <div class="ogame-cost-item"><img src="assets/common/energy-icon.png" alt="Energy" style="width:16px;height:16px;margin-right:4px;" /> Energy: @tech.EnergyCost.ToString("N0")</div> }
-                
-                <div class="ogame-cost-item">Duration: @tech.Duration.ToString(@"hh\:mm\:ss")</div>
-
-                @if (tech.Requirements != null && tech.Requirements.Any())
-                {
-                     <div class="ogame-requirements-section">
-                        <strong>Requirements:</strong>
-                        <ul style="list-style-type: none; padding-left: 0; margin: 5px 0;">
-                            @foreach (var req in tech.Requirements)
-                            {
-                                 <li>@req.Name (Lvl @req.Level)</li>
-                            }
-                        </ul>
+        <div class="ogame-queue-container mb-lg">
+            <h3>Researching: @TechnologyService.CurrentResearch.Title</h3>
+            <div class="ogame-queue-item">
+                <div>
+                    <div><strong>Level @(TechnologyService.CurrentResearch.Level + 1)</strong></div>
+                    <div class="text-muted" style="font-size: 0.9em;">
+                        Duration: @TechnologyService.CurrentResearch.Duration.ToString(@"hh\:mm\:ss")
                     </div>
-                }
+                </div>
+                <span class="ogame-queue-timer">
+                    @TechnologyService.CurrentResearch.TimeRemaining.ToString(@"hh\:mm\:ss")
+                </span>
             </div>
+            <button class="ogame-btn ogame-btn-danger ogame-btn-sm mt-sm" @onclick="CancelResearch">
+                Cancel Research
+            </button>
+        </div>
+    }
 
-            <div class="ogame-card-actions">
-            @if (TechnologyService.CurrentResearch == null)
-            {
-                if (TechnologyService.RequirementsMet(tech))
+    <!-- Technologies Grid -->
+    <div class="ogame-grid">
+        @foreach (var tech in TechnologyService.Technologies)
+        {
+            <div class="ogame-card">
+                <!-- Level Badge -->
+                <div class="ogame-badge">Level @tech.Level</div>
+
+                <!-- Technology Image -->
+                <img src="@tech.Image" alt="@tech.Title" />
+
+                <!-- Technology Info -->
+                <h3>@tech.Title</h3>
+                <p class="text-muted">@tech.Description</p>
+
+                <!-- Costs -->
+                <div class="ogame-cost-section">
+                    @if(tech.MetalCost > 0)
+                    {
+                        <div class="ogame-cost-item">
+                            <img src="assets/common/metal-icon.png" alt="Metal" />
+                            Metal: @tech.MetalCost.ToString("N0")
+                        </div>
+                    }
+                    @if(tech.CrystalCost > 0)
+                    {
+                        <div class="ogame-cost-item">
+                            <img src="assets/common/crystal-icon.png" alt="Crystal" />
+                            Crystal: @tech.CrystalCost.ToString("N0")
+                        </div>
+                    }
+                    @if(tech.DeuteriumCost > 0)
+                    {
+                        <div class="ogame-cost-item">
+                            <img src="assets/common/deuterium-icon.png" alt="Deuterium" />
+                            Deuterium: @tech.DeuteriumCost.ToString("N0")
+                        </div>
+                    }
+                    @if(tech.EnergyCost > 0)
+                    {
+                        <div class="ogame-cost-item">
+                            <img src="assets/common/energy-icon.png" alt="Energy" />
+                            Energy: @tech.EnergyCost.ToString("N0")
+                        </div>
+                    }
+
+                    <div class="text-muted" style="margin-top: 8px; font-size: 0.85em;">
+                        Duration: @tech.Duration.ToString(@"hh\:mm\:ss")
+                    </div>
+
+                    <!-- Requirements -->
+                    @if (tech.Requirements != null && tech.Requirements.Any())
+                    {
+                        <div style="margin-top: 10px; font-size: 0.85em; border-top: 1px solid var(--color-border-medium); padding-top: 8px;">
+                            <strong class="text-muted">Requirements:</strong>
+                            <ul style="list-style-type: none; padding-left: 0; margin: 5px 0;">
+                                @foreach (var req in tech.Requirements)
+                                {
+                                    <li class="text-muted">@req.Name (Lvl @req.Level)</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+
+                <!-- Action Buttons -->
+                @if (TechnologyService.CurrentResearch == null)
                 {
-                     <button class="btn btn-primary" @onclick="() => StartResearch(tech)">Research</button>
+                    @if (TechnologyService.RequirementsMet(tech))
+                    {
+                        <button class="ogame-btn ogame-btn-primary ogame-btn-block"
+                                @onclick="() => StartResearch(tech)">
+                            Research Level @(tech.Level + 1)
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="ogame-btn ogame-btn-block" disabled>
+                            Requirements Not Met
+                        </button>
+                    }
+                }
+                else if (TechnologyService.CurrentResearch == tech)
+                {
+                    <button class="ogame-btn ogame-btn-secondary ogame-btn-block" disabled>
+                        Researching...
+                    </button>
                 }
                 else
                 {
-                    
+                    <button class="ogame-btn ogame-btn-block" disabled>
+                        Lab Busy
+                    </button>
                 }
-            }
-            else if (TechnologyService.CurrentResearch == tech)
-            {
-                <button class="btn btn-secondary" disabled>Researching...</button>
-            }
-            else
-            {
-                 <button class="btn btn-secondary" disabled>Queue Busy</button>
-            }
             </div>
-        </div>
-    }
+        }
+    </div>
 </div>
 
 @code {
