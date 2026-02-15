@@ -1,227 +1,176 @@
 @page "/fleet"
 @using myapp.Services
+@inject NavigationManager Navigation
 @inject ResourceService ResourceService
 @inject FleetService FleetService
 @implements IDisposable
 
-<style>
-    .fleet-banner {
-        background-image: url('assets/banners/fleet-banner.jpg'); /* Replace with your image path */
-        background-size: cover;
-        background-position: center;
-        color: white;
-        text-align: center;
-        padding: 100px 20px;
-        margin-bottom: 20px;
-    }
+<PageTitle>Fleet</PageTitle>
 
-    .fleet-banner h2 {
-        font-size: 3em;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .fleet-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 20px;
-    }
-
-    .ship-card {
-        background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
-        border-radius: 5px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #444;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        position: relative;
-        align-items: center;
-        width: 100%;
-        height: 100%;
-        gap: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }
-    
-    .building-count-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(0,0,0,0.7);
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-weight: bold;
-        border: 1px solid #777;
-        z-index: 2;
-    }
-
-    .ship-card img {
-        width: 128px;
-        height: 128px;
-        object-fit: cover;
-        border: 2px solid #777;
-        border-radius: 5px;
-        margin-bottom: 10px;
-    }
-
-    .ship-card h3 {
-        color: white;
-    }
-
-    .send-fleet, .fleet-activity {
-        background-color: #222;
-        padding: 20px;
-        margin: 20px 0;
-        border-radius: 10px;
-        color:white;
-    }
-
-    .send-ships {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 10px;
-        margin: 10px 0;
-    }
-
-    .activity-list {
-        display: grid;
-        gap: 10px;
-    }
-
-    .activity-item {
-        background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
-        padding: 10px;
-        border-radius: 5px;
-        border: 1px solid #444;
-        color: white;
-    }
-
-    .ship-card .ship-counter{
-        font-size: 1.2em;
-        font-weight: bold;
-    }
-</style>
-
-<div class="fleet-banner">
-    <h2>Fleet Command</h2>
-</div>
-
-<!-- Fleet Activity -->
-<div class="fleet-activity">
-    <h3>Fleet Movements</h3>
-    @if (FleetService.ActiveFleets.Any())
-    {
-        <div class="activity-list">
-            @foreach (var mission in FleetService.ActiveFleets)
-            {
-                <div class="activity-item">
-                    <p><strong>@mission.MissionType</strong> to [@mission.TargetCoordinates]</p>
-                    <p>Status: @mission.Status</p>
-                    <p>Arrival: @mission.ArrivalTime.ToString("HH:mm:ss") (Return: @mission.ReturnTime.ToString("HH:mm:ss"))</p>
-                    <p>Ships: 
-                        @foreach(var s in mission.Ships)
-                        {
-                            <span>@s.Key: @s.Value | </span>
-                        }
-                    </p>
-                    @if(mission.Cargo.Count > 0)
-                    {
-                        <p>Cargo: 
-                           @if(mission.Cargo.ContainsKey("Metal")) { <span>M: @mission.Cargo["Metal"].ToString("N0") | </span> }
-                           @if(mission.Cargo.ContainsKey("Crystal")) { <span>C: @mission.Cargo["Crystal"].ToString("N0") | </span> }
-                           @if(mission.Cargo.ContainsKey("Deuterium")) { <span>D: @mission.Cargo["Deuterium"].ToString("N0")</span> }
-                        </p>
-                    }
-                </div>
-            }
-        </div>
-    }
-    else
-    {
-        <p>No active fleet movements.</p>
-    }
-</div>
-
-<!-- Send Fleet Section -->
-<div class="send-fleet">
-    <h3>Send Fleet</h3>
-    
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div style="color: red; margin-bottom: 10px; font-weight: bold;">
-            @errorMessage
-        </div>
-    }
-    
-    <div style="margin-bottom: 15px;">
-        <label>Target:</label>
-        G:<input type="number" @bind="TargetGalaxy" style="width:50px" />
-        S:<input type="number" @bind="TargetSystem" style="width:50px" />
-        P:<input type="number" @bind="TargetPosition" style="width:50px" />
-        
-        <label style="margin-left: 20px;">Mission:</label>
-        <select @bind="SelectedMission">
-            <option value="Attack">Attack</option>
-            <option value="Transport">Transport</option>
-            <option value="Espionage">Espionage</option>
-            <option value="Deploy">Deploy</option>
-            <option value="Colonize">Colonize</option>
-            <option value="Recycle">Recycle</option>
-            <option value="Expedition">Expedition</option>
-        </select>
+<div class="ogame-container">
+    <!-- Banner -->
+    <div class="ogame-banner" style="background-image: url('assets/banners/fleet-banner.jpg');">
+        <h2>Fleet Command</h2>
+        <p>Manage your ships and launch missions</p>
     </div>
 
-    <div class="fleet-grid">
-        @foreach (var ship in FleetService.ShipDefinitions)
+    <!-- Fleet Activity -->
+    <div class="ogame-panel mb-lg">
+        <h3>Fleet Movements</h3>
+        @if (FleetService.ActiveFleets.Any())
         {
-            var count = FleetService.GetShipCount(ship.Id);
-            if(count > 0)
-            {
-                // Find or create input model
-                var input = GetInputModel(ship.Id);
-                
-                <div class="ship-card">
-                    <img src="@ship.Image" alt="@ship.Name" />
-                    <h3>@ship.Name</h3>
-                    <p class="ship-counter">Available: @count</p>
-                    <p>Speed: @ship.BaseSpeed</p>
-                    <input type="number" @bind="input.QuantityToSend" min="0" max="@count" />
-                    <button style="margin-top:5px;" @onclick="() => input.QuantityToSend = count">Max</button>
-                </div>
-            }
+            <div style="display: grid; gap: 10px; margin-top: 15px;">
+                @foreach (var mission in FleetService.ActiveFleets)
+                {
+                    <div class="ogame-card" style="padding: 15px;">
+                        <div style="width: 100%; text-align: left;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <strong style="color: var(--color-accent-gold);">@mission.MissionType</strong>
+                                <span class="ogame-badge ogame-badge-@(mission.Status == FleetStatus.Return ? "warning" : "success")">
+                                    @mission.Status
+                                </span>
+                            </div>
+                            <div class="text-muted" style="font-size: 0.9em;">
+                                <div>Target: [@mission.TargetCoordinates]</div>
+                                <div>
+                                    Arrival: @mission.ArrivalTime.ToString("HH:mm:ss") |
+                                    Return: @mission.ReturnTime.ToString("HH:mm:ss")
+                                </div>
+                                <div style="margin-top: 5px;">
+                                    Ships:
+                                    @foreach(var s in mission.Ships)
+                                    {
+                                        <span style="margin-right: 10px;">@s.Key: @s.Value</span>
+                                    }
+                                </div>
+                                @if(mission.Cargo.Count > 0)
+                                {
+                                    <div style="margin-top: 5px;">
+                                        Cargo:
+                                        @if(mission.Cargo.ContainsKey("Metal"))
+                                        {
+                                            <span style="margin-right: 10px;">Metal: @mission.Cargo["Metal"].ToString("N0")</span>
+                                        }
+                                        @if(mission.Cargo.ContainsKey("Crystal"))
+                                        {
+                                            <span style="margin-right: 10px;">Crystal: @mission.Cargo["Crystal"].ToString("N0")</span>
+                                        }
+                                        @if(mission.Cargo.ContainsKey("Deuterium"))
+                                        {
+                                            <span>Deuterium: @mission.Cargo["Deuterium"].ToString("N0")</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
         }
-    </div>
-    
-    <div style="margin-top: 20px; text-align: center;">
-        <button @onclick="CalculateFlight" style="padding: 10px 20px;">Calculate Flight</button>
-        
-        @if(calculatedFlightTime > TimeSpan.Zero)
+        else
         {
-             <div style="margin-top: 10px;">
-                <p>Duration: @calculatedFlightTime.ToString(@"hh\:mm\:ss")</p>
-                <p>Fuel Consumption: @calculatedFuel.ToString("N0") Deuterium</p>
-                <button @onclick="LaunchFleet" style="padding: 10px 20px; background-color: green; color: white; font-weight: bold;">Launch Fleet</button>
-             </div>
+            <p class="text-muted">No active fleet movements.</p>
         }
     </div>
 
+    <!-- Send Fleet Section -->
+    <div class="ogame-panel">
+        <h3>Send Fleet</h3>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div style="color: var(--color-danger); margin: 10px 0; padding: 10px; background-color: rgba(244, 67, 54, 0.1); border-radius: 5px; font-weight: bold;">
+                @errorMessage
+            </div>
+        }
+
+        <!-- Target & Mission Selection -->
+        <div style="margin: 15px 0; padding: 15px; background-color: var(--color-bg-tertiary); border-radius: 5px;">
+            <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <label style="margin-right: 10px; font-weight: bold;">Target:</label>
+                    <label>G:</label>
+                    <input type="number" @bind="TargetGalaxy" style="width:50px; margin-right: 5px; padding: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
+                    <label>S:</label>
+                    <input type="number" @bind="TargetSystem" style="width:50px; margin-right: 5px; padding: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
+                    <label>P:</label>
+                    <input type="number" @bind="TargetPosition" style="width:50px; padding: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
+                </div>
+
+                <div>
+                    <label style="margin-right: 10px; font-weight: bold;">Mission:</label>
+                    <select @bind="SelectedMission" style="padding: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;">
+                        <option value="Attack">Attack</option>
+                        <option value="Transport">Transport</option>
+                        <option value="Espionage">Espionage</option>
+                        <option value="Deploy">Deploy</option>
+                        <option value="Colonize">Colonize</option>
+                        <option value="Recycle">Recycle</option>
+                        <option value="Expedition">Expedition</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ships Selection Grid -->
+        <div class="ogame-grid-sm mt-md">
+            @foreach (var ship in FleetService.ShipDefinitions)
+            {
+                var count = FleetService.GetShipCount(ship.Id);
+                if(count > 0)
+                {
+                    var input = GetInputModel(ship.Id);
+
+                    <div class="ogame-card">
+                        <img src="@ship.Image" alt="@ship.Name" style="width: 96px; height: 96px;" />
+                        <h3 style="font-size: 1em;">@ship.Name</h3>
+                        <div class="ogame-badge">@count</div>
+                        <p class="text-muted" style="font-size: 0.85em;">Speed: @ship.BaseSpeed</p>
+                        <input type="number" @bind="input.QuantityToSend" min="0" max="@count"
+                               style="width: 100%; padding: 8px; margin-top: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px; text-align: center;" />
+                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm ogame-btn-block mt-sm"
+                                @onclick="() => input.QuantityToSend = count">
+                            All (@count)
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Flight Calculation -->
+        <div style="margin-top: 20px; text-align: center;">
+            <button class="ogame-btn ogame-btn-primary ogame-btn-lg" @onclick="CalculateFlight">
+                Calculate Flight
+            </button>
+
+            @if(calculatedFlightTime > TimeSpan.Zero)
+            {
+                <div style="margin-top: 15px; padding: 15px; background-color: var(--color-bg-tertiary); border-radius: 5px;">
+                    <div style="font-size: 1.1em; margin-bottom: 10px;">
+                        <div><strong>Duration:</strong> @calculatedFlightTime.ToString(@"hh\:mm\:ss")</div>
+                        <div><strong>Fuel Cost:</strong> @calculatedFuel.ToString("N0") Deuterium</div>
+                    </div>
+                    <button class="ogame-btn ogame-btn-success ogame-btn-lg" @onclick="LaunchFleet">
+                        🚀 Launch Fleet
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
 </div>
 
 @code {
-    @inject NavigationManager Navigation
-    
     private System.Threading.Timer? _timer;
 
     [SupplyParameterFromQuery]
     public int? Galaxy { get; set; }
-    
+
     [SupplyParameterFromQuery]
     public int? System { get; set; }
-    
+
     [SupplyParameterFromQuery]
     public int? Position { get; set; }
-    
+
     [SupplyParameterFromQuery]
     public string? Mission { get; set; }
 
@@ -230,45 +179,43 @@
     private int TargetPosition = 2;
     private string SelectedMission = "Attack";
     private string errorMessage = "";
-    
+
     private TimeSpan calculatedFlightTime;
     private long calculatedFuel;
 
-    // View Model for inputs
     public class FleetInputModel
     {
         public string ShipId { get; set; }
         public int QuantityToSend { get; set; }
     }
-    
+
     private List<FleetInputModel> inputs = new();
 
     protected override void OnInitialized()
     {
         FleetService.OnChange += RefreshState;
         ResourceService.OnChange += RefreshState;
-        
-        // Timer for UI updates (Fleet movements)
+
         _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 0, 1000);
 
         foreach(var s in FleetService.ShipDefinitions)
         {
             inputs.Add(new FleetInputModel { ShipId = s.Id });
         }
-        
+
         if (Galaxy.HasValue) TargetGalaxy = Galaxy.Value;
         if (System.HasValue) TargetSystem = System.Value;
         if (Position.HasValue) TargetPosition = Position.Value;
         if (!string.IsNullOrEmpty(Mission)) SelectedMission = Mission;
     }
-    
+
     private FleetInputModel GetInputModel(string id) => inputs.First(i => i.ShipId == id);
-    
+
     private async void RefreshState()
     {
         await InvokeAsync(StateHasChanged);
     }
-    
+
     private Dictionary<string, int> GetSelectedShips()
     {
         var dict = new Dictionary<string, int>();
@@ -285,33 +232,31 @@
     private void CalculateFlight()
     {
         var ships = GetSelectedShips();
-        if (!ships.Any()) 
+        if (!ships.Any())
         {
             errorMessage = "No ships selected.";
             calculatedFlightTime = TimeSpan.Zero;
             return;
         }
-        
+
         errorMessage = "";
         calculatedFlightTime = FleetService.CalculateFlightTime(ships, TargetGalaxy, TargetSystem, TargetPosition);
         calculatedFuel = FleetService.CalculateFuelConsumption(ships, TargetGalaxy, TargetSystem, TargetPosition);
     }
-    
+
     private void LaunchFleet()
     {
         var ships = GetSelectedShips();
         var error = FleetService.SendFleet(ships, TargetGalaxy, TargetSystem, TargetPosition, SelectedMission);
-        
+
         if (error != null)
         {
             errorMessage = error;
         }
         else
         {
-            // Success
             errorMessage = "";
             calculatedFlightTime = TimeSpan.Zero;
-            // Reset inputs
             foreach(var i in inputs) i.QuantityToSend = 0;
         }
     }
