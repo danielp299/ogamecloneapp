@@ -7,251 +7,152 @@
 @inject TechnologyService TechnologyService
 @implements IDisposable
 
-<style>
-    .ogame-banner {
-        background-image: url('assets/banners/buildings-banner.jpg');
-        background-size: cover;
-        background-position: center;
-        color: white;
-        text-align: center;
-        padding: 100px 20px;
-        margin-bottom: 20px;
-    }
+<PageTitle>Shipyard</PageTitle>
 
-    .ogame-banner h2 {
-        font-size: 3em;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    article {
-        background-color: #000000;
-        padding-top: 1.1rem;
-    }
-
-    article {
-        background-color: #000000;
-        padding-top: 1.1rem;
-    }
-
-    .ogame-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 20px;
-    }
-
-    .ogame-card {
-        background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
-        border-radius: 5px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #444;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        align-items: center;
-        position: relative;
-        width: 100%;
-        height: 100%;
-        gap: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }
-
-    .ogame-card img {
-        width: 177px;
-        height: 177px;
-        object-fit: cover;
-        border: 2px solid #777;
-        border-radius: 5px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .ogame-card h3 {
-        color: white;
-        margin: 10px 0;
-    }
-
-    .ogame-count-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(0,0,0,0.7);
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-weight: bold;
-        border: 1px solid #777;
-        z-index: 2;
-    }
-
-    .ogame-queue-container {
-        margin-bottom: 30px;
-        background-color: #222;
-        padding: 15px;
-        border-radius: 5px;
-        color: white;
-    }
-
-    .ogame-queue-item {
-        padding: 5px;
-        border-bottom: 1px solid #444;
-    }
-
-    .ogame-cost-section {
-        font-size: 0.9em; 
-        text-align: left; 
-        width: 100%; 
-        padding: 0 10px;
-    }
-
-    .ogame-cost-item {
-         margin: 2px 0;
-    }
-
-    .ogame-requirements-section {
-        margin-top: 10px; 
-        font-size: 0.85em; 
-        border-top: 1px solid #555; 
-        padding-top: 5px;
-    }
-
-    .ogame-quantity-selector {
-        display: flex;
-        justify-content: space-around;
-        width: 100%;
-        margin-bottom: 10px;
-    }
-
-    .ogame-quantity-button {
-        width: 30px;
-        height: 30px;
-        background-color: #555;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 5px;
-        cursor: pointer;
-    }
-
-    .ogame-input-quantity {
-         width: 80px;
-         text-align: center;
-    }
-
-    .ogame-card-actions {
-        display:flex;
-        flex-direction: row;
-        width: 100%;
-        justify-content: center;
-        gap: 10px;
-    }
-</style>
-
-<div class="ogame-banner" style="background-image: url('assets/banners/buildings-banner.jpg'); position: relative;">
-    <img src="assets/banners/buildings-banner.jpg" alt="Factory Banner" style="width:100%; max-height:200px; object-fit:cover; opacity:0.1; position:absolute; top:0; left:0; z-index:0;" />
-    <div style="position:relative; z-index:1;">
+<div class="ogame-container">
+    <!-- Banner -->
+    <div class="ogame-banner" style="background-image: url('assets/banners/fleet-banner.jpg');">
         <h2>Shipyard</h2>
+        <p>Construct powerful spaceships</p>
     </div>
-</div>
 
-<!-- Shipyard Queue Display -->
-@if (FleetService.ConstructionQueue.Any())
-{
-    <div class="ogame-queue-container">
-        <h3>Current Production</h3>
-        @foreach (var item in FleetService.ConstructionQueue)
+    <!-- Production Queue -->
+    @if (FleetService.ConstructionQueue.Any())
+    {
+        <div class="ogame-queue-container mb-lg">
+            <h3>Current Production</h3>
+            @foreach (var item in FleetService.ConstructionQueue)
+            {
+                <div class="ogame-queue-item">
+                    <div>
+                        <strong>@item.Ship.Name</strong> - @item.Quantity units remaining
+                        <div class="text-muted" style="font-size: 0.9em;">
+                            Next unit: @item.Ship.BaseDuration.ToString(@"hh\:mm\:ss")
+                        </div>
+                    </div>
+                    <span class="ogame-queue-timer">@item.TimeRemaining.ToString(@"hh\:mm\:ss")</span>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Ships Grid -->
+    <div class="ogame-grid">
+        @foreach (var ship in FleetService.ShipDefinitions)
         {
-            <div class="ogame-queue-item">
-                <strong>@item.Ship.Name</strong>: @item.Quantity remaining. 
-                Next unit in: @item.TimeRemaining.ToString(@"hh\:mm\:ss")
+            var vm = GetViewModel(ship.Id);
+            var currentCount = FleetService.GetShipCount(ship.Id);
+
+            <div class="ogame-card">
+                <!-- Count Badge -->
+                <div class="ogame-badge">Hangar: @currentCount</div>
+
+                <!-- Ship Image -->
+                <img src="@ship.Image" alt="@ship.Name" />
+
+                <!-- Ship Info -->
+                <h3>@ship.Name</h3>
+                <p class="text-muted">@ship.Description</p>
+
+                <!-- Stats & Costs -->
+                <div class="ogame-cost-section">
+                    <div class="ogame-cost-item">
+                        <img src="assets/common/metal-icon.png" alt="Metal" />
+                        Metal: @ship.MetalCost.ToString("N0")
+                    </div>
+                    <div class="ogame-cost-item">
+                        <img src="assets/common/crystal-icon.png" alt="Crystal" />
+                        Crystal: @ship.CrystalCost.ToString("N0")
+                    </div>
+                    @if(ship.DeuteriumCost > 0)
+                    {
+                        <div class="ogame-cost-item">
+                            <img src="assets/common/deuterium-icon.png" alt="Deuterium" />
+                            Deuterium: @ship.DeuteriumCost.ToString("N0")
+                        </div>
+                    }
+
+                    <div class="text-muted" style="margin-top: 8px; font-size: 0.85em;">
+                        <div>Structure: @ship.Structure.ToString("N0")</div>
+                        <div>Speed: @ship.BaseSpeed</div>
+                        <div>Cargo: @ship.Cargo.ToString("N0")</div>
+                        <div>Build Time: @ship.BaseDuration.ToString(@"hh\:mm\:ss")</div>
+                    </div>
+
+                    <!-- Requirements -->
+                    @if (ship.Requirements != null && ship.Requirements.Any())
+                    {
+                        <div style="margin-top: 10px; font-size: 0.85em; border-top: 1px solid var(--color-border-medium); padding-top: 8px;">
+                            <strong class="text-muted">Requirements:</strong>
+                            <ul style="list-style-type: none; padding-left: 0; margin: 5px 0;">
+                                @foreach (var req in ship.Requirements)
+                                {
+                                    var building = BuildingService.Buildings.FirstOrDefault(b => b.Title == req.Key);
+                                    var tech = TechnologyService.Technologies.FirstOrDefault(t => t.Title == req.Key);
+                                    int currentLevel = building?.Level ?? tech?.Level ?? 0;
+                                    bool met = currentLevel >= req.Value;
+
+                                    <li style="color: @(met ? "var(--color-success)" : "var(--color-danger)")">
+                                        @req.Key (Lvl @req.Value)
+                                        <span class="text-muted" style="font-size: 0.9em;"> - Current: @currentLevel</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+
+                <!-- Quantity Selector -->
+                <div style="display: flex; justify-content: space-around; width: 100%; margin: 10px 0; gap: 5px;">
+                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantityToBuild(vm, 1)">+1</button>
+                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantityToBuild(vm, 10)">+10</button>
+                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantityToBuild(vm, 50)">+50</button>
+                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantityToBuild(vm, 100)">+100</button>
+                </div>
+
+                <!-- Input & Build Button -->
+                <div style="display: flex; width: 100%; gap: 10px; align-items: center;">
+                    <input type="number" @bind="vm.QuantityInput" min="0" max="9999"
+                           style="flex: 1; padding: 8px; text-align: center; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 5px;" />
+
+                    @if(CanBuild(ship))
+                    {
+                        <button class="ogame-btn ogame-btn-primary" style="flex: 1;" @onclick="() => BuildShip(ship, vm)">
+                            Build (@vm.QuantityInput)
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="ogame-btn" style="flex: 1;" disabled>
+                            Locked
+                        </button>
+                    }
+                </div>
             </div>
         }
     </div>
-}
-
-<div class="ogame-grid">
-    @foreach (var ship in FleetService.ShipDefinitions)
-    {
-        // Local view model to track input
-        var vm = GetViewModel(ship.Id);
-        
-        <div class="ogame-card">
-            <div class="ogame-count-badge">Hangar: @FleetService.GetShipCount(ship.Id)</div>
-            <img src="@ship.Image" alt="@ship.Name" />
-            <h3>@ship.Name</h3>
-            <p>@ship.Description</p>
-            
-            <div class="ogame-cost-section">
-                <div class="ogame-cost-item"><img src="assets/common/metal-icon.png" alt="Metal" style="width:16px;height:16px;margin-right:4px;" /> Metal: @ship.MetalCost.ToString("N0")</div>
-                <div class="ogame-cost-item"><img src="assets/common/crystal-icon.png" alt="Crystal" style="width:16px;height:16px;margin-right:4px;" /> Crystal: @ship.CrystalCost.ToString("N0")</div>
-                @if(ship.DeuteriumCost > 0) { <div class="ogame-cost-item"><img src="assets/common/deuterium-icon.png" alt="Deuterium" style="width:16px;height:16px;margin-right:4px;" /> Deuterium: @ship.DeuteriumCost.ToString("N0")</div> }
-                <div class="ogame-cost-item">Structure: @ship.Structure.ToString("N0")</div>
-                <div class="ogame-cost-item">Base Time: @ship.BaseDuration.ToString()</div>
-
-                @if (ship.Requirements != null && ship.Requirements.Any())
-                {
-                    <div class="ogame-requirements-section">
-                        <strong>Requirements:</strong>
-                        <ul style="list-style-type: none; padding-left: 0; margin: 5px 0;">
-                            @foreach (var req in ship.Requirements)
-                            {
-                                var building = BuildingService.Buildings.FirstOrDefault(b => b.Title == req.Key);
-                                var tech = TechnologyService.Technologies.FirstOrDefault(t => t.Title == req.Key);
-                                int currentLevel = building?.Level ?? tech?.Level ?? 0;
-                                bool met = currentLevel >= req.Value;
-                                
-                                <li style="color: @(met ? "#00ff00" : "#ff6666")">
-                                    @req.Key (Lvl @req.Value) - <span style="font-size:0.8em">Current: @currentLevel</span>
-                                </li>
-                            }
-                        </ul>
-                    </div>
-                }
-            </div>
-
-            <div class="ogame-quantity-selector">
-                <button class="ogame-quantity-button" @onclick="() => AddToQuantityToBuild(vm, 10)">10</button>
-                <button class="ogame-quantity-button" @onclick="() => AddToQuantityToBuild(vm, 50)">50</button>
-                <button class="ogame-quantity-button" @onclick="() => AddToQuantityToBuild(vm, 100)">100</button>
-            </div>
-            
-            <div class="ogame-card-actions">
-                <input type="number" class="ogame-input-quantity" @bind="vm.QuantityInput" min="0" max="9999"/>
-                
-                @if(CanBuild(ship))
-                {
-                     <button class="btn btn-primary" @onclick="() => BuildShip(ship, vm)">Build</button>
-                }
-                else
-                {
-                     
-                }
-            </div>
-         </div>
-    }
 </div>
 
 @code {
-    // Simple ViewModel to hold input state for each ship
     public class ShipViewModel
     {
         public string ShipId { get; set; }
         public int QuantityInput { get; set; } = 0;
     }
-    
+
     private List<ShipViewModel> viewModels = new();
 
     protected override void OnInitialized()
     {
         FleetService.OnChange += RefreshState;
         ResourceService.OnChange += RefreshState;
-        
+
         foreach(var ship in FleetService.ShipDefinitions)
         {
             viewModels.Add(new ShipViewModel { ShipId = ship.Id });
         }
     }
-    
+
     private async void RefreshState()
     {
         await InvokeAsync(StateHasChanged);
@@ -262,7 +163,7 @@
         FleetService.OnChange -= RefreshState;
         ResourceService.OnChange -= RefreshState;
     }
-    
+
     private ShipViewModel GetViewModel(string shipId) => viewModels.First(v => v.ShipId == shipId);
 
     private void AddToQuantityToBuild(ShipViewModel vm, int amount)
@@ -273,9 +174,9 @@
     private void BuildShip(Ship ship, ShipViewModel vm)
     {
         FleetService.AddToQueue(ship, vm.QuantityInput);
-        vm.QuantityInput = 0; // Reset after adding
+        vm.QuantityInput = 0;
     }
-    
+
     private bool CanBuild(Ship ship)
     {
         return RequirementService.IsUnlocked(ship.Requirements);
