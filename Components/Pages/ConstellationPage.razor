@@ -3,200 +3,137 @@
 @inject GalaxyService GalaxyService
 @inject NavigationManager Navigation
 
-<style>
-    .galaxy-container {
-        color: white;
-        padding: 20px;
-        max-width: 1200px;
-        margin: 0 auto;
-        background-color: #000000;
-        border-radius: 10px;
-    }
+<PageTitle>Galaxy</PageTitle>
 
-    article {
-        background-color: #000000;
-    }
-
-    .nav-panel {
-        background-color: #222;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 20px;
-        border: 1px solid #444;
-    }
-
-    .nav-panel input {
-        width: 60px;
-        padding: 5px;
-        background-color: #333;
-        color: white;
-        border: 1px solid #555;
-        text-align: center;
-    }
-
-    .nav-button {
-        background-color: #444;
-        border: none;
-        color: white;
-        padding: 5px 15px;
-        border-radius: 3px;
-        cursor: pointer;
-    }
-
-    .nav-button:hover {
-        background-color: #666;
-    }
-
-    .galaxy-table {
-        width: 100%;
-        border-collapse: collapse;
-        background-color: #1a1a1a;
-        border-radius: 10px;
-        overflow: hidden;
-    }
-
-    .galaxy-table th {
-        background-color: #333;
-        padding: 15px;
-        text-align: left;
-    }
-
-    .galaxy-table td {
-        padding: 10px 15px;
-        border-bottom: 1px solid #333;
-        vertical-align: middle;
-    }
-
-    .planet-row:hover {
-        background-color: #2a2a2a;
-    }
-
-    .planet-img {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 1px solid #555;
-    }
-
-    .status-vacant {
-        color: #666;
-        font-style: italic;
-    }
-
-    .status-occupied {
-        color: #4CAF50;
-        font-weight: bold;
-    }
-    
-    .status-enemy {
-        color: #FF5252;
-        font-weight: bold;
-    }
-
-    .action-btn {
-        background-color: #2196F3;
-        color: white;
-        border: none;
-        padding: 5px 10px;
-        border-radius: 3px;
-        cursor: pointer;
-        font-size: 0.8em;
-        margin-right: 5px;
-    }
-    
-    .debris-info {
-        font-size: 0.8em;
-        color: #aaa;
-    }
-</style>
-
-<div class="galaxy-container">
-    <div class="nav-panel">
-        <button class="nav-button" @onclick="PrevSystem">&lt;</button>
-        <div>
-            <label>Galaxy</label>
-            <input type="number" min="1" max="9" @bind="CurrentGalaxy" />
-            <label>System</label>
-            <input type="number" min="1" max="499" @bind="CurrentSystem" />
-            <button class="nav-button" @onclick="LoadSystem">Go</button>
-        </div>
-        <button class="nav-button" @onclick="NextSystem">&gt;</button>
+<div class="ogame-container">
+    <!-- Banner -->
+    <div class="ogame-banner" style="background-image: url('assets/banners/tech-banner.jpg');">
+        <h2>Galaxy View</h2>
+        <p>Explore the universe and launch missions</p>
     </div>
 
-    <table class="galaxy-table">
-        <thead>
-            <tr>
-                <th>Pos</th>
-                <th>Image</th>
-                <th>Planet Name</th>
-                <th>Player (Status)</th>
-                <th>Alliance</th>
-                <th>Debris</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @if (CurrentPlanets != null)
-            {
-                @foreach (var planet in CurrentPlanets)
+    <!-- Navigation Panel -->
+    <div class="ogame-panel mb-lg">
+        <div style="display: flex; justify-content: center; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <button class="ogame-btn ogame-btn-secondary" @onclick="PrevSystem">&lt; Previous</button>
+
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div>
+                    <label style="font-weight: bold; margin-right: 5px;">Galaxy</label>
+                    <input type="number" min="1" max="9" @bind="CurrentGalaxy"
+                           style="width: 60px; padding: 5px; text-align: center; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
+                </div>
+                <div>
+                    <label style="font-weight: bold; margin-right: 5px;">System</label>
+                    <input type="number" min="1" max="499" @bind="CurrentSystem"
+                           style="width: 60px; padding: 5px; text-align: center; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
+                </div>
+                <button class="ogame-btn ogame-btn-primary" @onclick="LoadSystem">Go</button>
+            </div>
+
+            <button class="ogame-btn ogame-btn-secondary" @onclick="NextSystem">Next &gt;</button>
+        </div>
+    </div>
+
+    <!-- Galaxy Table -->
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; background-color: var(--color-bg-secondary); border-radius: 10px; overflow: hidden;">
+            <thead>
+                <tr style="background-color: var(--color-bg-tertiary);">
+                    <th style="padding: 15px; text-align: left; border-bottom: 2px solid var(--color-border-medium);">Pos</th>
+                    <th style="padding: 15px; text-align: left; border-bottom: 2px solid var(--color-border-medium);">Image</th>
+                    <th style="padding: 15px; text-align: left; border-bottom: 2px solid var(--color-border-medium);">Planet Name</th>
+                    <th style="padding: 15px; text-align: left; border-bottom: 2px solid var(--color-border-medium);">Player</th>
+                    <th style="padding: 15px; text-align: left; border-bottom: 2px solid var(--color-border-medium);">Alliance</th>
+                    <th style="padding: 15px; text-align: left; border-bottom: 2px solid var(--color-border-medium);">Debris</th>
+                    <th style="padding: 15px; text-align: left; border-bottom: 2px solid var(--color-border-medium);">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (CurrentPlanets != null)
                 {
-                    <tr class="planet-row">
-                        <td>@planet.Position</td>
-                        <td>
-                            <img src="@planet.Image" class="planet-img" />
-                        </td>
-                        <td>
-                            @if (planet.IsOccupied)
-                            {
-                                <span class="@(planet.IsMyPlanet ? "status-occupied" : "status-enemy")">@planet.Name</span>
-                            }
-                            else
-                            {
-                                <span class="status-vacant">Empty Space</span>
-                            }
-                        </td>
-                        <td>
-                            @if (planet.IsOccupied)
-                            {
-                                <span>@planet.PlayerName</span>
-                            }
-                        </td>
-                        <td>@planet.Alliance</td>
-                        <td>
-                            @if (planet.HasDebris)
-                            {
-                                <div class="debris-info">
-                                    M: @planet.DebrisMetal<br/>
-                                    C: @planet.DebrisCrystal
+                    @foreach (var planet in CurrentPlanets)
+                    {
+                        <tr style="border-bottom: 1px solid var(--color-border-subtle); transition: background-color 0.2s;"
+                            @onmouseover="@(() => {})"
+                            onmouseenter="this.style.backgroundColor='var(--color-bg-tertiary)'"
+                            onmouseleave="this.style.backgroundColor='transparent'">
+                            <td style="padding: 10px 15px; vertical-align: middle;">
+                                <strong>@planet.Position</strong>
+                            </td>
+                            <td style="padding: 10px 15px; vertical-align: middle;">
+                                <img src="@planet.Image" alt="Planet"
+                                     style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid var(--color-border-medium);" />
+                            </td>
+                            <td style="padding: 10px 15px; vertical-align: middle;">
+                                @if (planet.IsOccupied)
+                                {
+                                    <span style="color: @(planet.IsMyPlanet ? "var(--color-success)" : "var(--color-danger)"); font-weight: bold;">
+                                        @planet.Name
+                                    </span>
+                                    @if (planet.IsHomeworld)
+                                    {
+                                        <span class="ogame-badge ogame-badge-success" style="margin-left: 5px; font-size: 0.7em;">Home</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted" style="font-style: italic;">Empty Space</span>
+                                }
+                            </td>
+                            <td style="padding: 10px 15px; vertical-align: middle;">
+                                @if (planet.IsOccupied)
+                                {
+                                    <span>@planet.PlayerName</span>
+                                }
+                            </td>
+                            <td style="padding: 10px 15px; vertical-align: middle;">
+                                @if (!string.IsNullOrEmpty(planet.Alliance))
+                                {
+                                    <span style="color: var(--color-accent-cyan);">@planet.Alliance</span>
+                                }
+                            </td>
+                            <td style="padding: 10px 15px; vertical-align: middle;">
+                                @if (planet.HasDebris)
+                                {
+                                    <div style="font-size: 0.85em;">
+                                        <div style="color: var(--color-metal);">M: @planet.DebrisMetal.ToString("N0")</div>
+                                        <div style="color: var(--color-crystal);">C: @planet.DebrisCrystal.ToString("N0")</div>
+                                    </div>
+                                }
+                            </td>
+                            <td style="padding: 10px 15px; vertical-align: middle;">
+                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                    @if (planet.IsOccupied && !planet.IsMyPlanet)
+                                    {
+                                        <button class="ogame-btn ogame-btn-danger ogame-btn-sm" @onclick="() => SendFleet(planet.Position, 1)">
+                                            Attack
+                                        </button>
+                                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => SendFleet(planet.Position, 2)">
+                                            Spy
+                                        </button>
+                                    }
+                                    else if (!planet.IsOccupied)
+                                    {
+                                        <button class="ogame-btn ogame-btn-sm" style="background-color: var(--color-warning);" @onclick="() => SendFleet(planet.Position, 3)">
+                                            Colonize
+                                        </button>
+                                    }
+
+                                    @if (planet.HasDebris)
+                                    {
+                                        <button class="ogame-btn ogame-btn-sm" style="background-color: var(--color-info);" @onclick="() => SendFleet(planet.Position, 4)">
+                                            Recycle
+                                        </button>
+                                    }
                                 </div>
-                            }
-                        </td>
-                        <td>
-                            @if (planet.IsOccupied && !planet.IsMyPlanet)
-                            {
-                                <button class="action-btn" @onclick="() => SendFleet(planet.Position, 1)">Attack</button>
-                                <button class="action-btn" @onclick="() => SendFleet(planet.Position, 2)">Espionage</button>
-                            }
-                            else if (!planet.IsOccupied)
-                            {
-                                <button class="action-btn" style="background-color: #FF9800" @onclick="() => SendFleet(planet.Position, 3)">Colonize</button>
-                            }
-                            
-                            @if (planet.HasDebris)
-                            {
-                                <button class="action-btn" style="background-color: #9C27B0" @onclick="() => SendFleet(planet.Position, 4)">Recycle</button>
-                            }
-                        </td>
-                    </tr>
+                            </td>
+                        </tr>
+                    }
                 }
-            }
-        </tbody>
-    </table>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 @code {
@@ -234,9 +171,7 @@
 
     private void SendFleet(int position, int missionCode)
     {
-        // 1=Attack, 2=Espionage, 3=Colonize, 4=Recycle
-        // We will pass parameters via Query String to Fleet Page
-        string mission = missionCode switch 
+        string mission = missionCode switch
         {
             1 => "Attack",
             2 => "Espionage",
@@ -244,7 +179,7 @@
             4 => "Recycle",
             _ => "Attack"
         };
-        
+
         Navigation.NavigateTo($"/fleet?galaxy={CurrentGalaxy}&system={CurrentSystem}&position={position}&mission={mission}");
     }
 }
