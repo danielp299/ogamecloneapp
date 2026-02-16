@@ -3,6 +3,7 @@
 @inject ResourceService ResourceService
 @inject TechnologyService TechnologyService
 @inject RequirementService RequirementService
+@inject DevModeService DevModeService
 @implements IDisposable
 
 <PageTitle>Technologies</PageTitle>
@@ -23,7 +24,7 @@
                 <div>
                     <div><strong>Level @(TechnologyService.CurrentResearch.Level + 1)</strong></div>
                     <div class="text-muted" style="font-size: 0.9em;">
-                        Duration: @TechnologyService.CurrentResearch.Duration.ToString(@"hh\:mm\:ss")
+                        Duration: @TechnologyService.CurrentResearch.ConstructionDuration.ToString(@"hh\:mm\:ss")
                     </div>
                 </div>
                 <span class="ogame-queue-timer">
@@ -83,7 +84,7 @@
                     }
 
                     <div class="text-muted" style="margin-top: 8px; font-size: 0.85em;">
-                        Duration: @tech.Duration.ToString(@"hh\:mm\:ss")
+                        Duration: @DevModeService.GetDuration(tech.Duration, 10).ToString(@"hh\:mm\:ss")
                     </div>
 
                     <!-- Requirements -->
@@ -142,6 +143,7 @@
     {
         ResourceService.OnChange += RefreshState;
         TechnologyService.OnChange += RefreshState;
+        DevModeService.OnChange += RefreshState;
         // Start a local UI timer to refresh the page every second
         _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 0, 1000);
     }
@@ -166,5 +168,6 @@
         _timer?.Dispose();
         ResourceService.OnChange -= RefreshState;
         TechnologyService.OnChange -= RefreshState;
+        DevModeService.OnChange -= RefreshState;
     }
 }

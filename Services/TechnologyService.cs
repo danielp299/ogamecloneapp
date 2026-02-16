@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace myapp.Services;
 
@@ -68,6 +69,7 @@ public class TechnologyService
     private readonly ResourceService _resourceService;
     private readonly BuildingService _buildingService;
     private readonly DevModeService _devModeService;
+    private readonly ILogger<TechnologyService> _logger;
 
     public List<Technology> Technologies { get; private set; } = new();
     public Technology? CurrentResearch { get; private set; }
@@ -75,11 +77,12 @@ public class TechnologyService
     public event Action OnChange;
     private bool _isProcessingResearch = false;
 
-    public TechnologyService(ResourceService resourceService, BuildingService buildingService, DevModeService devModeService)
+    public TechnologyService(ResourceService resourceService, BuildingService buildingService, DevModeService devModeService, ILogger<TechnologyService> logger)
     {
         _resourceService = resourceService;
         _buildingService = buildingService;
         _devModeService = devModeService;
+        _logger = logger;
         InitializeTechnologies();
     }
 
@@ -414,6 +417,9 @@ public class TechnologyService
             tech.ConstructionDuration = duration;
             tech.TimeRemaining = duration;
             
+            _logger.LogInformation("StartResearch: {Tech}, DevMode={DevMode}, Duration={Duration}s", 
+                tech.Title, _devModeService.IsEnabled, duration.TotalSeconds);
+            
             NotifyStateChanged();
             
             if (!_isProcessingResearch)
@@ -427,9 +433,14 @@ public class TechnologyService
     {
         if (CurrentResearch != null)
         {
+            // Refund resources based on CancelRefundPercentage setting
+            _resourceService.RefundResources(
+                CurrentResearch.MetalCost, 
+                CurrentResearch.CrystalCost, 
+                CurrentResearch.DeuteriumCost);
+            
             CurrentResearch.IsResearching = false;
             CurrentResearch.TimeRemaining = TimeSpan.Zero;
-            // Refund logic could go here
             CurrentResearch = null;
             NotifyStateChanged();
         }
@@ -438,32 +449,54 @@ public class TechnologyService
     private async Task ProcessResearchQueue()
     {
         _isProcessingResearch = true;
+        _logger.LogInformation("ProcessResearchQueue started");
 
-        while (CurrentResearch != null)
+        try
         {
-            NotifyStateChanged();
-
-            while (CurrentResearch.TimeRemaining > TimeSpan.Zero)
+            while (CurrentResearch != null)
             {
-                // Check cancellation
-                if (CurrentResearch == null || !CurrentResearch.IsResearching) break;
+                var tech = CurrentResearch;
+                tech.IsResearching = true;
+                NotifyStateChanged();
 
-                await Task.Delay(1000);
-                CurrentResearch.TimeRemaining = CurrentResearch.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
+                _logger.LogInformation("Processing research: {Tech}, TimeRemaining={Time}s", 
+                    tech.Title, tech.TimeRemaining.TotalSeconds);
+
+                while (tech.TimeRemaining > TimeSpan.Zero)
+                {
+                    // Check if this research was cancelled
+                    if (CurrentResearch != tech) break;
+
+                    await Task.Delay(1000);
+
+                    // Re-check after delay
+                    if (CurrentResearch != tech) break;
+
+                    tech.TimeRemaining = tech.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
+                    NotifyStateChanged();
+                }
+
+                // Check if cancelled (CurrentResearch changed or was nulled)
+                if (CurrentResearch != tech) continue;
+
+                // Complete
+                _logger.LogInformation("Research completed: {Tech} -> Level {Level}", tech.Title, tech.Level + 1);
+                tech.IsResearching = false;
+                tech.Level++;
+                CurrentResearch = null;
+
                 NotifyStateChanged();
             }
-
-            if (CurrentResearch == null || !CurrentResearch.IsResearching) continue;
-
-            // Complete
-            CurrentResearch.IsResearching = false;
-            CurrentResearch.Level++;
-            CurrentResearch = null; // Queue clear
-            
-            NotifyStateChanged();
         }
-
-        _isProcessingResearch = false;
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in ProcessResearchQueue: {Message}", ex.Message);
+        }
+        finally
+        {
+            _isProcessingResearch = false;
+            _logger.LogInformation("ProcessResearchQueue ended");
+        }
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();

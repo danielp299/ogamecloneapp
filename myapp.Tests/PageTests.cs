@@ -2,6 +2,7 @@ using Bunit;
 using Xunit;
 using myapp.Components.Pages;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using myapp.Services;
 
 namespace myapp.Tests
@@ -10,6 +11,9 @@ namespace myapp.Tests
     {
         public PageTests()
         {
+            // Register logging
+            Services.AddLogging(builder => builder.AddConsole());
+            
             // Register services
             Services.AddSingleton<ResourceService>();
             Services.AddSingleton<BuildingService>();

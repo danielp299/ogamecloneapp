@@ -13,6 +13,9 @@ public class ResourceService
     public long DarkMatter => (long)_darkMatter;
     public long Energy { get; private set; } = 0;
 
+    // Refund percentage for cancelled buildings/research (1-100)
+    public double CancelRefundPercentage { get; set; } = 100.0;
+
     public DateTime LastUpdate { get; private set; } = DateTime.UtcNow;
 
     public event Action OnChange;
@@ -65,6 +68,15 @@ public class ResourceService
     public void AddDarkMatter(long amount)
     {
         _darkMatter += amount;
+        NotifyStateChanged();
+    }
+
+    public void RefundResources(long metal, long crystal, long deuterium)
+    {
+        var percentage = Math.Clamp(CancelRefundPercentage, 0.0, 100.0) / 100.0;
+        _metal += metal * percentage;
+        _crystal += crystal * percentage;
+        _deuterium += deuterium * percentage;
         NotifyStateChanged();
     }
 

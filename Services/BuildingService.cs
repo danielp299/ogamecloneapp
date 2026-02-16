@@ -404,10 +404,12 @@ public class BuildingService
     {
         if (ConstructionQueue.Contains(building))
         {
+            // Refund resources based on CancelRefundPercentage setting
+            _resourceService.RefundResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
+            
             ConstructionQueue.Remove(building);
             building.IsBuilding = false;
             building.TimeRemaining = TimeSpan.Zero;
-            // Optionally refund resources here
             NotifyStateChanged();
         }
     }

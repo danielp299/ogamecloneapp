@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using myapp.Services;
 using Xunit;
 
@@ -15,7 +16,8 @@ namespace myapp.Tests.Services
             var messageService = new MessageService();
             var resourceService = new ResourceService(); 
             var buildingService = new BuildingService(resourceService, devModeService);
-            var techService = new TechnologyService(resourceService, buildingService, devModeService);
+            var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<TechnologyService>();
+            var techService = new TechnologyService(resourceService, buildingService, devModeService, logger);
             var galaxyService = new GalaxyService();
             var defenseService = new DefenseService(resourceService, buildingService, techService, devModeService);
             
