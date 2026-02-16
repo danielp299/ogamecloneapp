@@ -47,7 +47,7 @@ wwwroot/assets/               # Static images (buildings, ships, technologies, d
 
 ## Workflow Rules
 
-- **Git commands are ALLOWED.** You can run `git add`, `git commit`, `git diff`, `git status`, etc. when explicitly requested by the user.
+- **Git operations MUST be delegated to the `@git-commit` subagent.** Whenever you detect that a commit is needed, the user mentions committing, or any git operation is required (status, diff, log, add, commit), automatically invoke `@git-commit` via the Task tool to handle it. Do NOT run git commands directly — always delegate to the subagent.
 - Always use absolute paths when referencing files.
 - Verify file existence before reading or editing.
 
