@@ -685,7 +685,8 @@ public class FleetService
 
         // 1. Get Tech Levels
         int attackerSpyTech = _technologyService.GetTechLevel(TechType.Espionage);
-        var (resources, defenses, ships, defenderSpyTech) = GeneratePlanetState(planet);
+        
+        var (resources, defenses, ships, defenderSpyTech, buildings, techs) = GetPlanetActualState(planet);
         
         // 2. Counter-Espionage Calculation
         int probesCount = mission.Ships.ContainsKey("ESP") ? mission.Ships["ESP"] : 0;
@@ -745,18 +746,18 @@ public class FleetService
         // Level >= 3: Buildings
         if (levelDiff >= 3)
         {
-             var buildings = GeneratePlanetBuildings(planet);
              string bRows = "";
              foreach(var b in buildings) if(b.Value > 0) bRows += $"{b.Key}: {b.Value}<br/>";
+             if (string.IsNullOrEmpty(bRows)) bRows = "No buildings detected";
              content += $"<strong>Buildings:</strong><br/>{bRows}<br/><br/>";
         }
 
         // Level >= 4: Technology
         if (levelDiff >= 4)
         {
-             var techs = GeneratePlanetTechs(planet);
              string tRows = "";
              foreach(var t in techs) if(t.Value > 0) tRows += $"{t.Key}: {t.Value}<br/>";
+             if (string.IsNullOrEmpty(tRows)) tRows = "No research detected";
              content += $"<strong>Research:</strong><br/>{tRows}<br/><br/>";
         }
         
@@ -793,8 +794,8 @@ public class FleetService
              }
         }
         
-        // 2. Defender Power (Generated)
-        var (resources, defenses, ships, spyTech) = GeneratePlanetState(planet);
+        // 2. Defender Power (Actual data from EnemyService)
+        var (resources, defenses, ships, spyTech, buildings, techs) = GetPlanetActualState(planet);
         
         long defenderAttack = 0;
         long defenderStructure = 0;
@@ -810,19 +811,12 @@ public class FleetService
                  defenderStructure += defUnit.Structure * d.Value;
                  defenderShield += defUnit.Shield * d.Value;
             }
-            else
-            {
-                if(d.Key.Contains("Rocket")) { defenderAttack += 80 * d.Value; defenderStructure += 2000 * d.Value; defenderShield += 20 * d.Value; }
-                else if(d.Key.Contains("Laser")) { defenderAttack += 100 * d.Value; defenderStructure += 2000 * d.Value; defenderShield += 25 * d.Value; }
-                else if(d.Key.Contains("Heavy") || d.Key.Contains("Cannon")) { defenderAttack += 250 * d.Value; defenderStructure += 8000 * d.Value; defenderShield += 100 * d.Value; }
-                else { defenderAttack += 50 * d.Value; defenderStructure += 1000 * d.Value; defenderShield += 10 * d.Value; }
-            }
         }
         
         // Add Ships to Defender
         foreach(var shipEntry in ships)
         {
-             var def = ShipDefinitions.FirstOrDefault(x => x.Name == shipEntry.Key);
+             var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key || x.Name == shipEntry.Key);
              if(def != null) 
              {
                  defenderAttack += def.Attack * shipEntry.Value;
@@ -981,63 +975,25 @@ public class FleetService
         }
     }
 
-    // Helper to generate consistent state for a planet based on its coordinate
-    private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses, Dictionary<string, int> Ships, int SpyTech) GeneratePlanetState(GalaxyPlanet planet)
+    // Helper to get real state for a planet
+    private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses, Dictionary<string, int> Ships, int SpyTech, Dictionary<string, int> Buildings, Dictionary<string, int> Techs) GetPlanetActualState(GalaxyPlanet planet)
     {
-        // Seed random with position to get same result for same planet
-        int seed = planet.Position * 1000 + planet.Name.Length * 7; 
-        var r = new Random(seed);
+        var enemy = _enemyService.GetEnemy(planet.Galaxy, planet.System, planet.Position);
         
-        var resources = new Dictionary<string, long>
+        if (enemy != null)
         {
-            { "Metal", r.Next(5000, 100000) },
-            { "Crystal", r.Next(2000, 50000) },
-            { "Deuterium", r.Next(0, 20000) }
-        };
+            return (
+                new Dictionary<string, long> { { "Metal", enemy.Metal }, { "Crystal", enemy.Crystal }, { "Deuterium", enemy.Deuterium } },
+                enemy.Defenses,
+                enemy.Ships,
+                enemy.Technologies.GetValueOrDefault("Espionage Technology", 0),
+                enemy.Buildings,
+                enemy.Technologies
+            );
+        }
 
-        var defenses = new Dictionary<string, int>
-        {
-            { "Rocket Launcher", r.Next(0, 50) },
-            { "Light Laser", r.Next(0, 30) },
-            { "Heavy Cannon", r.Next(0, 10) }
-        };
-        
-        var ships = new Dictionary<string, int>
-        {
-            { "Small Cargo", r.Next(0, 15) },
-            { "Light Fighter", r.Next(0, 40) },
-            { "Cruiser", r.Next(0, 5) }
-        };
-        
-        int spyTech = r.Next(0, 10);
-
-        return (resources, defenses, ships, spyTech);
-    }
-    
-    private Dictionary<string, int> GeneratePlanetBuildings(GalaxyPlanet planet)
-    {
-        int seed = planet.Position * 2000; 
-        var r = new Random(seed);
-        return new Dictionary<string, int> {
-            { "Metal Mine", r.Next(1, 20) },
-            { "Crystal Mine", r.Next(1, 15) },
-            { "Deuterium Synthesizer", r.Next(1, 10) },
-            { "Solar Plant", r.Next(1, 20) },
-            { "Shipyard", r.Next(1, 10) }
-        };
-    }
-
-    private Dictionary<string, int> GeneratePlanetTechs(GalaxyPlanet planet)
-    {
-        int seed = planet.Position * 3000; 
-        var r = new Random(seed);
-        return new Dictionary<string, int> {
-            { "Espionage Technology", r.Next(0, 10) },
-            { "Computer Technology", r.Next(0, 10) },
-            { "Weapons Technology", r.Next(0, 10) },
-            { "Shielding Technology", r.Next(0, 10) },
-            { "Armour Technology", r.Next(0, 10) }
-        };
+        // Fallback for non-enemy (or if not found), e.g. player planets handled elsewhere or empty
+        return (new(), new(), new(), 0, new(), new());
     }
 
     private void HandleColonization(FleetMission mission, GalaxyPlanet? planet)

@@ -165,6 +165,11 @@ public class GalaxyService
     {
         var planets = new List<GalaxyPlanet>();
 
+        // Fetch enemies for this system from DB to ensure persistence
+        var systemEnemies = _dbContext.Enemies
+            .Where(e => e.Galaxy == galaxy && e.System == system)
+            .ToList();
+
         for (int i = 1; i <= 15; i++)
         {
             var planet = new GalaxyPlanet
@@ -175,7 +180,7 @@ public class GalaxyService
                 IsOccupied = false
             };
 
-            // Hardcode Player Home
+            // 1. Check if it's the Player's Home
             if (galaxy == HomeGalaxy && system == HomeSystem && i == HomePosition)
             {
                 planet.IsOccupied = true;
@@ -185,22 +190,28 @@ public class GalaxyService
                 planet.PlayerName = "Commander";
                 planet.Image = "assets/planets/planet_home.jpg";
             }
-            // Randomly populate other slots
-            else if (_random.NextDouble() < 0.3) // 30% chance of occupation
+            // 2. Check if it's a Player's Colony
+            else if (PlayerPlanets.Any(p => p.Galaxy == galaxy && p.System == system && p.Position == i))
             {
+                var existingColony = PlayerPlanets.First(p => p.Galaxy == galaxy && p.System == system && p.Position == i);
                 planet.IsOccupied = true;
-                planet.IsMyPlanet = false;
-                planet.Name = $"Planet {galaxy}:{system}:{i}";
-                planet.PlayerName = $"Player_{_random.Next(1000, 9999)}";
-                planet.Alliance = _random.NextDouble() < 0.2 ? "[BOTS]" : "";
-                planet.Image = GetRandomPlanetImage(i);
-                
-                // Random debris
-                if (_random.NextDouble() < 0.2)
+                planet.IsMyPlanet = true;
+                planet.Name = existingColony.Name;
+                planet.PlayerName = "Commander";
+                planet.Image = existingColony.Image;
+            }
+            // 3. Check if it's an Enemy
+            else
+            {
+                var enemy = systemEnemies.FirstOrDefault(e => e.Position == i);
+                if (enemy != null)
                 {
-                    planet.HasDebris = true;
-                    planet.DebrisMetal = _random.Next(1000, 50000);
-                    planet.DebrisCrystal = _random.Next(1000, 50000);
+                    planet.IsOccupied = true;
+                    planet.IsMyPlanet = false;
+                    planet.Name = enemy.Name;
+                    planet.PlayerName = enemy.Name;
+                    planet.Alliance = enemy.IsBot ? "[BOTS]" : "";
+                    planet.Image = GetRandomPlanetImage(i);
                 }
             }
 
