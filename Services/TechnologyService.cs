@@ -1,7 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using myapp.Data;
+using myapp.Data.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace myapp.Services;
@@ -28,7 +27,7 @@ public enum TechType
 
 public class Requirement
 {
-    public string Name { get; set; } // Can be Building Title or Tech Title
+    public string Name { get; set; } = ""; // Can be Building Title or Tech Title
     public int Level { get; set; }
     public bool IsBuilding { get; set; }
 }
@@ -66,6 +65,7 @@ public class Technology
 
 public class TechnologyService
 {
+    private readonly GameDbContext _dbContext;
     private readonly ResourceService _resourceService;
     private readonly BuildingService _buildingService;
     private readonly DevModeService _devModeService;
@@ -74,16 +74,44 @@ public class TechnologyService
     public List<Technology> Technologies { get; private set; } = new();
     public Technology? CurrentResearch { get; private set; }
 
-    public event Action OnChange;
+    public event Action? OnChange;
     private bool _isProcessingResearch = false;
 
-    public TechnologyService(ResourceService resourceService, BuildingService buildingService, DevModeService devModeService, ILogger<TechnologyService> logger)
+    public TechnologyService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, DevModeService devModeService, ILogger<TechnologyService> logger)
     {
+        _dbContext = dbContext;
         _resourceService = resourceService;
         _buildingService = buildingService;
         _devModeService = devModeService;
         _logger = logger;
         InitializeTechnologies();
+        LoadFromDatabaseAsync().Wait();
+    }
+
+    private async Task LoadFromDatabaseAsync()
+    {
+        var dbTechs = await _dbContext.Technologies.ToListAsync();
+        foreach (var dbTech in dbTechs)
+        {
+            var tech = Technologies.FirstOrDefault(t => t.Title == dbTech.TechnologyType);
+            if (tech != null)
+            {
+                tech.Level = dbTech.Level;
+            }
+        }
+    }
+
+    private async Task SaveToDatabaseAsync()
+    {
+        foreach (var tech in Technologies)
+        {
+            var dbTech = await _dbContext.Technologies.FirstOrDefaultAsync(t => t.TechnologyType == tech.Title);
+            if (dbTech != null)
+            {
+                dbTech.Level = tech.Level;
+            }
+        }
+        await _dbContext.SaveChangesAsync();
     }
 
     private void InitializeTechnologies()
@@ -401,6 +429,7 @@ public class TechnologyService
              {
                  // Instant complete
                  tech.Level++;
+                 SaveToDatabaseAsync().Wait();
                  NotifyStateChanged();
              }
              return;
@@ -483,6 +512,7 @@ public class TechnologyService
                 _logger.LogInformation("Research completed: {Tech} -> Level {Level}", tech.Title, tech.Level + 1);
                 tech.IsResearching = false;
                 tech.Level++;
+                await SaveToDatabaseAsync();
                 CurrentResearch = null;
 
                 NotifyStateChanged();

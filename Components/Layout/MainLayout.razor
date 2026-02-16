@@ -81,9 +81,9 @@
         }
     }
     
-    private void ToggleDevMode()
+    private async Task ToggleDevMode()
     {
-        DevModeService.Toggle();
+        await DevModeService.ToggleAsync();
     }
 
     public void Dispose()

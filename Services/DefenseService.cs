@@ -1,7 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using myapp.Data;
+using myapp.Data.Entities;
 
 namespace myapp.Services;
 
@@ -30,7 +29,7 @@ public class DefenseUnit
 
 public class DefenseQueueItem
 {
-    public DefenseUnit Unit { get; set; }
+    public DefenseUnit Unit { get; set; } = null!;
     public int Quantity { get; set; }
     public TimeSpan DurationPerUnit { get; set; }
     public TimeSpan TimeRemaining { get; set; }
@@ -38,6 +37,7 @@ public class DefenseQueueItem
 
 public class DefenseService
 {
+    private readonly GameDbContext _dbContext;
     private readonly ResourceService _resourceService;
     private readonly BuildingService _buildingService;
     private readonly TechnologyService _technologyService;
@@ -51,19 +51,43 @@ public class DefenseService
     // Queue
     public List<DefenseQueueItem> ConstructionQueue { get; private set; } = new();
 
-    public event Action OnChange;
+    public event Action? OnChange;
 
-    public DefenseService(ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService)
+    public DefenseService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService)
     {
+        _dbContext = dbContext;
         _resourceService = resourceService;
         _buildingService = buildingService;
         _technologyService = technologyService;
         _devModeService = devModeService;
         
         InitializeDefenses();
+        LoadFromDatabaseAsync().Wait();
         
         // Start queue processor
         _ = ProcessQueueLoop();
+    }
+
+    private async Task LoadFromDatabaseAsync()
+    {
+        var dbDefenses = await _dbContext.Defenses.ToListAsync();
+        foreach (var dbDefense in dbDefenses)
+        {
+            BuiltDefenses[dbDefense.DefenseType] = dbDefense.Quantity;
+        }
+    }
+
+    private async Task SaveToDatabaseAsync()
+    {
+        foreach (var kvp in BuiltDefenses)
+        {
+            var dbDefense = await _dbContext.Defenses.FirstOrDefaultAsync(d => d.DefenseType == kvp.Key);
+            if (dbDefense != null)
+            {
+                dbDefense.Quantity = kvp.Value;
+            }
+        }
+        await _dbContext.SaveChangesAsync();
     }
 
     private void InitializeDefenses()
@@ -252,6 +276,8 @@ public class DefenseService
                     {
                         ConstructionQueue.RemoveAt(0);
                     }
+                    
+                    await SaveToDatabaseAsync();
                     NotifyStateChanged();
                 }
                 NotifyStateChanged();

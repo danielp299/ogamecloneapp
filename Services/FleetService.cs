@@ -1,7 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using myapp.Data;
+using myapp.Data.Entities;
 
 namespace myapp.Services;
 
@@ -15,8 +14,8 @@ public enum FleetStatus
 public class FleetMission
 {
     public Guid Id { get; set; }
-    public string MissionType { get; set; }
-    public string TargetCoordinates { get; set; }
+    public string MissionType { get; set; } = "";
+    public string TargetCoordinates { get; set; } = "";
     public Dictionary<string, int> Ships { get; set; } = new();
     public DateTime StartTime { get; set; }
     public DateTime ArrivalTime { get; set; }
@@ -24,6 +23,15 @@ public class FleetMission
     public FleetStatus Status { get; set; }
     public long FuelConsumed { get; set; }
     public Dictionary<string, long> Cargo { get; set; } = new();
+    
+    // Calculated properties for countdown
+    public TimeSpan TimeToArrival => Status == FleetStatus.Flight && ArrivalTime > DateTime.Now 
+        ? ArrivalTime - DateTime.Now 
+        : TimeSpan.Zero;
+    
+    public TimeSpan TimeToReturn => Status == FleetStatus.Return && ReturnTime > DateTime.Now 
+        ? ReturnTime - DateTime.Now 
+        : TimeSpan.Zero;
 }
 
 public class Ship
@@ -55,7 +63,7 @@ public class Ship
 
 public class ShipyardItem
 {
-    public Ship Ship { get; set; }
+    public Ship Ship { get; set; } = null!;
     public int Quantity { get; set; }
     public TimeSpan DurationPerUnit { get; set; }
     public TimeSpan TimeRemaining { get; set; } // For the current unit being built
@@ -63,6 +71,7 @@ public class ShipyardItem
 
 public class FleetService
 {
+    private readonly GameDbContext _dbContext;
     private readonly ResourceService _resourceService;
     private readonly BuildingService _buildingService;
     private readonly TechnologyService _technologyService;
@@ -82,12 +91,13 @@ public class FleetService
     // Active Fleets (Missions)
     public List<FleetMission> ActiveFleets { get; private set; } = new();
 
-    public event Action OnChange;
+    public event Action? OnChange;
 
     private bool _isProcessingQueue = false;
 
-    public FleetService(ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, MessageService messageService, DefenseService defenseService, DevModeService devModeService)
+    public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, MessageService messageService, DefenseService defenseService, DevModeService devModeService)
     {
+        _dbContext = dbContext;
         _resourceService = resourceService;
         _buildingService = buildingService;
         _technologyService = technologyService;
@@ -97,6 +107,7 @@ public class FleetService
         _devModeService = devModeService;
         
         InitializeShips();
+        LoadFromDatabaseAsync().Wait();
         
         // DevMode: Add 10 ships of each type
         if (_devModeService.IsEnabled)
@@ -107,6 +118,28 @@ public class FleetService
         // Start loops
         _ = ProcessQueueLoop();
         _ = ProcessFleetLoop();
+    }
+
+    private async Task LoadFromDatabaseAsync()
+    {
+        var dbShips = await _dbContext.Ships.ToListAsync();
+        foreach (var dbShip in dbShips)
+        {
+            DockedShips[dbShip.ShipType] = dbShip.Quantity;
+        }
+    }
+
+    private async Task SaveToDatabaseAsync()
+    {
+        foreach (var kvp in DockedShips)
+        {
+            var dbShip = await _dbContext.Ships.FirstOrDefaultAsync(s => s.ShipType == kvp.Key);
+            if (dbShip != null)
+            {
+                dbShip.Quantity = kvp.Value;
+            }
+        }
+        await _dbContext.SaveChangesAsync();
     }
 
     private void InitializeShips()
@@ -290,27 +323,32 @@ public class FleetService
         return TimeSpan.FromSeconds(seconds);
     }
 
-    public string SendFleet(Dictionary<string, int> shipsToSend, int g, int s, int p, string missionType)
+    public string? SendFleet(Dictionary<string, int> shipsToSend, int g, int s, int p, string missionType)
     {
         if (!shipsToSend.Any()) return "No ships selected.";
-        
+
+        // Validate mission requirements
+        var validationError = ValidateMission(missionType, g, s, p);
+        if (validationError != null) return validationError;
+
         // 1. Check Ship Availability
         foreach(var kvp in shipsToSend)
         {
             if (GetShipCount(kvp.Key) < kvp.Value) return $"Not enough {kvp.Key}.";
         }
-        
+
         // 2. Calculate Fuel & Check Deuterium
         long fuel = CalculateFuelConsumption(shipsToSend, g, s, p);
         if (!_resourceService.HasResources(0,0, fuel)) return "Not enough Deuterium for fuel.";
-        
+
         // 3. Deduct Resources and Ships
         _resourceService.ConsumeResources(0,0, fuel);
         foreach(var kvp in shipsToSend)
         {
             DockedShips[kvp.Key] -= kvp.Value;
         }
-        
+        SaveToDatabaseAsync().Wait();
+
         // 4. Create Mission
         var flightTime = CalculateFlightTime(shipsToSend, g, s, p);
         flightTime = _devModeService.GetDuration(flightTime, 10); // Dev mode override
@@ -327,11 +365,31 @@ public class FleetService
             Status = FleetStatus.Flight,
             FuelConsumed = fuel
         };
-        
+
         ActiveFleets.Add(mission);
         NotifyStateChanged();
-        
+
         return null; // Success
+    }
+
+    private string? ValidateMission(string missionType, int g, int s, int p)
+    {
+        var planet = _galaxyService.GetPlanet(g, s, p);
+
+        return missionType switch
+        {
+            "Attack" or "Transport" or "Espionage" or "Deploy" => planet?.IsOccupied == true 
+                ? null 
+                : $"Target [{g}:{s}:{p}] does not exist. Cannot perform {missionType.ToLower()} mission.",
+            "Recycle" => planet?.HasDebris == true 
+                ? null 
+                : $"No debris field at [{g}:{s}:{p}]. Cannot perform recycle mission.",
+            "Colonize" => planet?.IsOccupied == false 
+                ? null 
+                : $"Planet [{g}:{s}:{p}] is already occupied. Cannot colonize.",
+            "Expedition" => null, // Expedition doesn't require planet validation
+            _ => null
+        };
     }
 
     private async Task ProcessFleetLoop()
@@ -375,6 +433,8 @@ public class FleetService
                             long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
                             _resourceService.AddResources(m, c, d);
                         }
+                        
+                        await SaveToDatabaseAsync();
                         
                         _messageService.AddMessage("Fleet Return", 
                             $"Your fleet from {mission.TargetCoordinates} has returned to base.", 
@@ -439,19 +499,8 @@ public class FleetService
         
         // Influence outcomes with Astrophysics (small bonus to finding things vs nothing)
         int astroLevel = _technologyService.GetTechLevel(TechType.Astrophysics);
-        // Base weight modifier (e.g. +1% chance to find something per level)
-        // This is simplified. True OGame logic is very complex.
         
         int roll = random.Next(1, 1000); 
-
-        // Weighted Outcomes:
-        // 0-10: Black Hole (1%) - Total Loss
-        // 11-100: Pirates/Aliens (9%) - Combat
-        // 101-400: Nothing (30%) - Delay or Empty
-        // 401-700: Resources (30%) - Metal/Crystal/Deut
-        // 701-900: Ships (20%) - Find fleet
-        // 901-990: Dark Matter (9%)
-        // 991-1000: Item/Merchant (1%) - Not implemented yet, treat as Dark Matter
 
         // Determine Fleet Capacity & Strength
         long totalCapacity = 0;
@@ -481,8 +530,6 @@ public class FleetService
             bool aliens = random.Next(0, 2) == 0;
             string enemyName = aliens ? "Aliens" : "Pirates";
             
-            // Simplified Combat: Lose percentage of fleet based on enemy strength
-            // Aliens are stronger.
             double damagePercent = aliens ? 0.3 : 0.1; // 30% or 10% loss
             
             var report = $"Your fleet was ambushed by {enemyName}!<br/>";
@@ -510,11 +557,7 @@ public class FleetService
             bool delay = random.Next(0, 2) == 0;
             if (delay)
             {
-                 // Add delay to return time
                  var delayTime = TimeSpan.FromMinutes(random.Next(30, 120)); // Minutes
-                 // Adjust return time? Since ArrivalTime is passed, we modify ReturnTime logic?
-                 // The mission loop handles ReturnTime after arrival.
-                 // We need to modify mission.ReturnTime effectively.
                  mission.ReturnTime = mission.ReturnTime.Add(delayTime);
                  
                  _messageService.AddMessage("Expedition Result", 
@@ -548,10 +591,7 @@ public class FleetService
             if (sizeRoll > 90) { multiplier = 5.0; sizeDesc = "Huge"; }
             else if (sizeRoll > 50) { multiplier = 2.0; sizeDesc = "Medium"; }
 
-            // Base amount related to fleet structure (heuristic for "fleet points")
-            // Cap base at 10% of fleet structure or similar?
             long baseAmount = (long)(totalStructure * 0.05 * multiplier); 
-            // Clamp min/max
             baseAmount = Math.Clamp(baseAmount, 1000, 2000000);
 
             long m = 0, c = 0, d = 0;
@@ -582,18 +622,14 @@ public class FleetService
         }
         else if (roll <= 900) // 20% Ships
         {
-            // Find ships based on fleet size
-            // Heuristic: Find 5-10% of own fleet points in ships
             long pointsFound = (long)(totalStructure * random.NextDouble() * 0.1);
             if (pointsFound < 1000) pointsFound = 1000;
 
-            // Possible ships to find (limit to smaller than Destroyer usually)
             var possibleShips = ShipDefinitions.Where(s => s.Id != "RIP" && s.Id != "DST" && s.Id != "CS").ToList();
             if (!possibleShips.Any()) return;
 
             string report = "We found abandoned ships drifting in space:<br/>";
             
-            // Try to spend points
             int safetyBreak = 0;
             while (pointsFound > 2000 && safetyBreak < 10)
             {
@@ -601,7 +637,6 @@ public class FleetService
                 if (ship.Structure <= pointsFound)
                 {
                     int count = random.Next(1, (int)(pointsFound / ship.Structure) + 1);
-                    // Cap count reasonably
                     if (count > 10) count = 10;
                     
                     if (!mission.Ships.ContainsKey(ship.Id)) mission.Ships[ship.Id] = 0;
@@ -625,7 +660,7 @@ public class FleetService
         }
     }
 
-    private void HandleEspionage(FleetMission mission, GalaxyPlanet planet)
+    private void HandleEspionage(FleetMission mission, GalaxyPlanet? planet)
     {
         if (planet == null || !planet.IsOccupied)
         {
@@ -642,9 +677,6 @@ public class FleetService
         int probesCount = mission.Ships.ContainsKey("ESP") ? mission.Ships["ESP"] : 0;
         int defenderFleetCount = ships.Values.Sum(); // Total ships on planet
         
-        // Chance: (DefenderFleet * 1%) + (Probes * 10%)? 
-        // Heuristic: More ships = higher detection. More probes = higher detection.
-        // Cap at 100%
         double chance = Math.Min(100.0, (defenderFleetCount * 0.05) + (probesCount * 2.0));
         
         bool detected = new Random().NextDouble() * 100.0 < chance;
@@ -659,8 +691,6 @@ public class FleetService
             
             // Destroy Probes
             mission.Ships.Clear(); // Fleet destroyed
-            // Usually this means the fleet doesn't return.
-            // In OGame you usually get the report even if destroyed (transmitted before destruction).
         }
 
         // 3. Report Generation based on Level Difference
@@ -719,9 +749,9 @@ public class FleetService
         _messageService.AddMessage($"Spy Report [{mission.TargetCoordinates}]", content, "Espionage");
     }
 
-    private void HandleCombat(FleetMission mission, GalaxyPlanet planet)
+    private void HandleCombat(FleetMission mission, GalaxyPlanet? planet)
     {
-        if (!planet.IsOccupied)
+        if (planet == null || !planet.IsOccupied)
         {
             _messageService.AddMessage("Combat Report", "Planet is uninhabited. No combat occurred.", "Combat");
             return;
@@ -778,8 +808,6 @@ public class FleetService
         // Add Ships to Defender
         foreach(var s in ships)
         {
-             // We need to match ship names to IDs or vice versa. The generator uses Names ("Light Fighter"), ShipDefinitions uses IDs ("LF") and Names ("Light Fighter").
-             // We'll search by Name.
              var def = ShipDefinitions.FirstOrDefault(x => x.Name == s.Key);
              if(def != null) 
              {
@@ -790,17 +818,12 @@ public class FleetService
         }
 
         // 3. Battle Resolution (Simplified)
-        // Total Health = Structure + Shield
         long attackerHealth = attackerStructure + attackerShield;
         long defenderHealth = defenderStructure + defenderShield;
         
-        // Avoid div by zero
         if(attackerHealth <= 0) attackerHealth = 1;
         if(defenderHealth <= 0) defenderHealth = 1;
 
-        // Rounds? Or simple comparison?
-        // Simple: Higher damage output relative to enemy health wins.
-        // Score = Attack / EnemyHealth
         double attackerScore = (double)attackerAttack / defenderHealth;
         double defenderScore = (double)defenderAttack / attackerHealth;
         
@@ -992,9 +1015,9 @@ public class FleetService
         };
     }
 
-    private void HandleColonization(FleetMission mission, GalaxyPlanet planet)
+    private void HandleColonization(FleetMission mission, GalaxyPlanet? planet)
     {
-        if (planet.IsOccupied)
+        if (planet == null || planet.IsOccupied)
         {
             _messageService.AddMessage("Colonization Failed", 
                  $"Planet {mission.TargetCoordinates} is already occupied!", "General");
@@ -1037,9 +1060,9 @@ public class FleetService
             $"You have successfully colonized position {mission.TargetCoordinates}!", "General");
     }
 
-    private void HandleRecycle(FleetMission mission, GalaxyPlanet planet)
+    private void HandleRecycle(FleetMission mission, GalaxyPlanet? planet)
     {
-        if (!planet.HasDebris)
+        if (planet == null || !planet.HasDebris)
         {
             _messageService.AddMessage("Recycle Report", 
                  $"No debris found at {mission.TargetCoordinates}.", "General");
@@ -1154,6 +1177,7 @@ public class FleetService
                         ConstructionQueue.RemoveAt(0);
                     }
                     
+                    await SaveToDatabaseAsync();
                     NotifyStateChanged();
                 }
                 NotifyStateChanged(); // Update timer UI

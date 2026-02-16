@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using myapp.Data;
 using myapp.Services;
 using myapp.Components;
 
@@ -7,6 +9,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
+// Add SQLite database
+var dbPath = Path.Combine(builder.Environment.ContentRootPath, "game.db");
+builder.Services.AddDbContext<GameDbContext>(options =>
+    options.UseSqlite($"Data Source={dbPath}"));
+
+// Register persistence service
+builder.Services.AddSingleton<GamePersistenceService>();
+
+// Register game services
 builder.Services.AddSingleton<ResourceService>();
 builder.Services.AddSingleton<BuildingService>();
 builder.Services.AddSingleton<TechnologyService>();
@@ -30,25 +41,25 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Initialize database on startup
+using (var scope = app.Services.CreateScope())
+{
+    var persistenceService = scope.ServiceProvider.GetRequiredService<GamePersistenceService>();
+    await persistenceService.EnsureDatabaseCreatedAsync();
+    await persistenceService.InitializeGameStateAsync();
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    // app.UseHsts(); // Disable HSTS for now to avoid strict HTTPS requirements locally
 }
 
-// app.UseHttpsRedirection(); // Disable HTTPS redirection to allow plain HTTP on localhost
-
-
 app.UseStaticFiles();
-
 app.UseCors("AllowAll");
-
 app.UseRouting();
 
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
 app.Run();
-

@@ -1,7 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using myapp.Data;
+using myapp.Data.Entities;
 
 namespace myapp.Services;
 
@@ -35,12 +34,13 @@ public class Building
 
 public class BuildingService
 {
+    private readonly GameDbContext _dbContext;
     private readonly ResourceService _resourceService;
     private readonly DevModeService _devModeService;
     public List<Building> Buildings { get; private set; } = new();
     public List<Building> ConstructionQueue { get; private set; } = new();
     
-    public event Action OnChange;
+    public event Action? OnChange;
 
     private bool _isProcessingQueue = false;
 
@@ -55,13 +55,41 @@ public class BuildingService
     
     public double ProductionFactor { get; private set; } = 1.0;
 
-    public BuildingService(ResourceService resourceService, DevModeService devModeService)
+    public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService)
     {
+        _dbContext = dbContext;
         _resourceService = resourceService;
         _devModeService = devModeService;
         InitializeBuildings();
+        LoadFromDatabaseAsync().Wait();
         // Initial production calculation
         UpdateProduction();
+    }
+
+    private async Task LoadFromDatabaseAsync()
+    {
+        var dbBuildings = await _dbContext.Buildings.ToListAsync();
+        foreach (var dbBuilding in dbBuildings)
+        {
+            var building = Buildings.FirstOrDefault(b => b.Title == dbBuilding.BuildingType);
+            if (building != null)
+            {
+                building.Level = dbBuilding.Level;
+            }
+        }
+    }
+
+    private async Task SaveToDatabaseAsync()
+    {
+        foreach (var building in Buildings)
+        {
+            var dbBuilding = await _dbContext.Buildings.FirstOrDefaultAsync(b => b.BuildingType == building.Title);
+            if (dbBuilding != null)
+            {
+                dbBuilding.Level = building.Level;
+            }
+        }
+        await _dbContext.SaveChangesAsync();
     }
 
     // Call this method whenever we need to ensure resources are up to date
@@ -448,6 +476,9 @@ public class BuildingService
             // Just increment level and recalculate.
 
             currentBuilding.Level++;
+            
+            // Save to database
+            await SaveToDatabaseAsync();
             
             ConstructionQueue.RemoveAt(0);
             

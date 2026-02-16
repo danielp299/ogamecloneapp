@@ -154,4 +154,10 @@ public class GalaxyService
         string[] types = { "assets/planets/planet_gas.jpg", "assets/planets/planet_water.png", "assets/planets/planet_desert.png", "assets/planets/planet_forest.png" };
         return types[_random.Next(types.Length)];
     }
+
+    public GalaxyPlanet? GetPlanet(int galaxy, int system, int position)
+    {
+        var systemPlanets = GetSystem(galaxy, system);
+        return systemPlanets.FirstOrDefault(p => p.Position == position);
+    }
 }

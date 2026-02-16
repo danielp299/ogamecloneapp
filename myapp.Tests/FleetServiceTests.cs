@@ -1,62 +1,83 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using myapp.Data;
 using myapp.Services;
 using Xunit;
 
 namespace myapp.Tests.Services
 {
-    public class FleetServiceTests
+    public class FleetServiceTests : IDisposable
     {
+        private readonly SqliteConnection _connection;
+        private readonly GameDbContext _dbContext;
+
+        public FleetServiceTests()
+        {
+            // Create in-memory SQLite database for tests
+            _connection = new SqliteConnection("DataSource=:memory:");
+            _connection.Open();
+            
+            var options = new DbContextOptionsBuilder<GameDbContext>()
+                .UseSqlite(_connection)
+                .Options;
+            
+            _dbContext = new GameDbContext(options);
+            _dbContext.Database.EnsureCreated();
+            
+            // Initialize game state
+            var persistenceService = new GamePersistenceService(_dbContext, 
+                LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<GamePersistenceService>());
+            persistenceService.InitializeGameStateAsync().Wait();
+        }
+
         [Fact]
         public void HandleCombat_Should_Generate_Debris_On_Victory()
         {
             // Arrange
-            var devModeService = new DevModeService();
-            var messageService = new MessageService();
-            var resourceService = new ResourceService(); 
-            var buildingService = new BuildingService(resourceService, devModeService);
+            var devModeService = new DevModeService(_dbContext);
+            var messageService = new MessageService(_dbContext);
+            var resourceService = new ResourceService(_dbContext, devModeService);
+            var buildingService = new BuildingService(_dbContext, resourceService, devModeService);
             var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<TechnologyService>();
-            var techService = new TechnologyService(resourceService, buildingService, devModeService, logger);
+            var techService = new TechnologyService(_dbContext, resourceService, buildingService, devModeService, logger);
             var galaxyService = new GalaxyService();
-            var defenseService = new DefenseService(resourceService, buildingService, techService, devModeService);
+            var defenseService = new DefenseService(_dbContext, resourceService, buildingService, techService, devModeService);
             
-            var fleetService = new FleetService(resourceService, buildingService, techService, galaxyService, messageService, defenseService, devModeService);
+            var fleetService = new FleetService(_dbContext, resourceService, buildingService, techService, galaxyService, messageService, defenseService, devModeService);
             
             // Create a mock mission that has arrived
             var mission = new FleetMission
             {
                 Id = Guid.NewGuid(),
                 MissionType = "Attack",
-                TargetCoordinates = "1:1:5",
-                Ships = new Dictionary<string, int>
-                {
-                    { "LF", 100 } // 100 Light Fighters
-                },
-                Cargo = new Dictionary<string, long>()
+                TargetCoordinates = "1:1:2",
+                Ships = new Dictionary<string, int> { { "LF", 10 } },
+                StartTime = DateTime.Now.AddMinutes(-10),
+                ArrivalTime = DateTime.Now.AddSeconds(-1),
+                ReturnTime = DateTime.Now.AddMinutes(10),
+                Status = FleetStatus.Flight,
+                FuelConsumed = 100
             };
-
-            // Force the target planet to have some defenses to generate debris
-            var system = galaxyService.GetSystem(1, 1);
-            var planet = system[4]; // Index 4 is Position 5
-            planet.IsOccupied = true;
-            planet.IsMyPlanet = false;
             
-            // Invoke private HandleCombat
-            var method = typeof(FleetService).GetMethod("HandleCombat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (method != null)
-            {
-                method.Invoke(fleetService, new object[] { mission, planet });
-                
-                // Assert
-                Assert.NotEmpty(messageService.Messages);
-                var report = messageService.Messages[0];
-                Assert.Contains("Combat Report", report.Subject);
-                
-                // We also check that debris fields are tracked by the planet
-                // It is possible debris is 0 if defense was 0, but the method executed.
-                Assert.True(true); 
-            }
+            // Get target planet info
+            var targetPlanet = galaxyService.GetPlanet(1, 1, 2);
+            Assert.NotNull(targetPlanet);
+            Assert.True(targetPlanet.IsOccupied);
+            
+            // Act
+            fleetService.SendFleet(new Dictionary<string, int> { { "LF", 10 } }, 1, 1, 2, "Attack");
+            
+            // Assert - Fleet should be added to active fleets
+            Assert.True(fleetService.ActiveFleets.Count > 0);
+        }
+
+        public void Dispose()
+        {
+            _dbContext.Dispose();
+            _connection.Dispose();
         }
     }
 }

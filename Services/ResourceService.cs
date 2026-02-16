@@ -1,46 +1,87 @@
+using Microsoft.EntityFrameworkCore;
+using myapp.Data;
+using myapp.Data.Entities;
+
 namespace myapp.Services;
 
 public class ResourceService
 {
-    private double _metal = 50000;
-    private double _crystal = 50000;
-    private double _deuterium = 50000;
-    private double _darkMatter = 0;
-
-    public long Metal => (long)_metal;
-    public long Crystal => (long)_crystal;
-    public long Deuterium => (long)_deuterium;
-    public long DarkMatter => (long)_darkMatter;
-    public long Energy { get; private set; } = 0;
+    private readonly GameDbContext _dbContext;
+    private readonly DevModeService _devModeService;
+    private GameState? _cachedState;
 
     // Refund percentage for cancelled buildings/research (1-100)
     public double CancelRefundPercentage { get; set; } = 100.0;
 
-    public DateTime LastUpdate { get; private set; } = DateTime.UtcNow;
+    public event Action? OnChange;
 
-    public event Action OnChange;
+    public ResourceService(GameDbContext dbContext, DevModeService devModeService)
+    {
+        _dbContext = dbContext;
+        _devModeService = devModeService;
+    }
 
+    public async Task LoadStateAsync()
+    {
+        _cachedState = await _dbContext.GameState.FirstOrDefaultAsync();
+    }
+
+    private async Task<GameState> GetStateAsync()
+    {
+        if (_cachedState == null)
+        {
+            _cachedState = await _dbContext.GameState.FirstOrDefaultAsync();
+        }
+        return _cachedState ?? throw new InvalidOperationException("Game state not initialized");
+    }
+
+    public long Metal => (long)(GetStateAsync().Result.Metal);
+    public long Crystal => (long)(GetStateAsync().Result.Crystal);
+    public long Deuterium => (long)(GetStateAsync().Result.Deuterium);
+    public long DarkMatter => (long)(GetStateAsync().Result.DarkMatter);
+    public long Energy => GetStateAsync().Result.Energy;
+
+    // Synchronous version for backward compatibility during migration
     public void UpdateResources(double metalRate, double crystalRate, double deuteriumRate)
     {
+        var state = GetStateAsync().Result;
         var now = DateTime.UtcNow;
-        var elapsedSeconds = (now - LastUpdate).TotalSeconds;
+        var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
 
         if (elapsedSeconds > 0)
         {
-            _metal += metalRate * elapsedSeconds;
-            _crystal += crystalRate * elapsedSeconds;
-            _deuterium += deuteriumRate * elapsedSeconds;
-            LastUpdate = now;
+            state.Metal += metalRate * elapsedSeconds;
+            state.Crystal += crystalRate * elapsedSeconds;
+            state.Deuterium += deuteriumRate * elapsedSeconds;
+            state.LastResourceUpdate = now;
+
+            _dbContext.SaveChanges();
+            NotifyStateChanged();
+        }
+    }
+
+    public async Task UpdateResourcesAsync(double metalRate, double crystalRate, double deuteriumRate)
+    {
+        var state = await GetStateAsync();
+        var now = DateTime.UtcNow;
+        var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
+
+        if (elapsedSeconds > 0)
+        {
+            state.Metal += metalRate * elapsedSeconds;
+            state.Crystal += crystalRate * elapsedSeconds;
+            state.Deuterium += deuteriumRate * elapsedSeconds;
+            state.LastResourceUpdate = now;
+
+            await _dbContext.SaveChangesAsync();
             NotifyStateChanged();
         }
     }
 
     public bool HasResources(long metal, long crystal, long deuterium)
     {
-        // Force update before checking (requires rates, but this method is passive check)
-        // Ideally we update resources before any check/consume action. 
-        // For now, checks are against CURRENT state.
-        return Metal >= metal && Crystal >= crystal && Deuterium >= deuterium;
+        var state = GetStateAsync().Result;
+        return state.Metal >= metal && state.Crystal >= crystal && state.Deuterium >= deuterium;
     }
 
     public bool ConsumeResources(long metal, long crystal, long deuterium)
@@ -50,47 +91,57 @@ public class ResourceService
             return false;
         }
 
-        _metal -= metal;
-        _crystal -= crystal;
-        _deuterium -= deuterium;
+        var state = GetStateAsync().Result;
+        state.Metal -= metal;
+        state.Crystal -= crystal;
+        state.Deuterium -= deuterium;
+
+        _dbContext.SaveChanges();
         NotifyStateChanged();
         return true;
     }
 
     public void AddResources(double metal, double crystal, double deuterium)
     {
-        _metal += metal;
-        _crystal += crystal;
-        _deuterium += deuterium;
+        var state = GetStateAsync().Result;
+        state.Metal += metal;
+        state.Crystal += crystal;
+        state.Deuterium += deuterium;
+
+        _dbContext.SaveChanges();
         NotifyStateChanged();
     }
 
     public void AddDarkMatter(long amount)
     {
-        _darkMatter += amount;
+        var state = GetStateAsync().Result;
+        state.DarkMatter += amount;
+
+        _dbContext.SaveChanges();
         NotifyStateChanged();
     }
 
     public void RefundResources(long metal, long crystal, long deuterium)
     {
         var percentage = Math.Clamp(CancelRefundPercentage, 0.0, 100.0) / 100.0;
-        _metal += metal * percentage;
-        _crystal += crystal * percentage;
-        _deuterium += deuterium * percentage;
+        AddResources(metal * percentage, crystal * percentage, deuterium * percentage);
+    }
+
+    public void SetEnergy(long energy)
+    {
+        var state = GetStateAsync().Result;
+        state.Energy = energy;
+
+        _dbContext.SaveChanges();
         NotifyStateChanged();
     }
 
-    // Energy is usually a calculated state (Production - Consumption), 
-    // but for now we allow direct modification or setting it.
-    public void SetEnergy(long energy)
-    {
-        Energy = energy;
-        NotifyStateChanged();
-    }
-    
     public void UpdateEnergy(long deltaEnergy)
     {
-        Energy += deltaEnergy;
+        var state = GetStateAsync().Result;
+        state.Energy += deltaEnergy;
+
+        _dbContext.SaveChanges();
         NotifyStateChanged();
     }
 
