@@ -92,22 +92,15 @@ public class BuildingService
         await _dbContext.SaveChangesAsync();
     }
 
-    // Call this method whenever we need to ensure resources are up to date
-    // e.g., when loading a page or before performing an action
     public void UpdateProduction()
     {
-        // Simple formula: BaseProduction * Level * (SpeedFactor)
-        // OGame formula is more complex: 30 * Level * 1.1^Level
-        // We'll use a simplified linear scaling for now: 30 * Level per hour
-        // Per second: (30 * Level) / 3600
-
         // Configuration Multiplier (x1000 speed for testing/fast servers)
         double speedMultiplier = 1000.0;
 
         double metalProduction = 0;
         double crystalProduction = 0;
         double deuteriumProduction = 0;
-        
+
         long energyProduction = 0;
         long energyConsumption = 0;
 
@@ -221,10 +214,12 @@ public class BuildingService
         MetalHourlyProduction += baseMetalProd;
         CrystalHourlyProduction += baseCrystalProd;
         
-        metalProduction += baseMetalProd / 3600.0; 
+        metalProduction += baseMetalProd / 3600.0;
         crystalProduction += baseCrystalProd / 3600.0;
 
-        _resourceService.UpdateResources(metalProduction, crystalProduction, deuteriumProduction);
+        _resourceService.MetalProductionRate = metalProduction;
+        _resourceService.CrystalProductionRate = crystalProduction;
+        _resourceService.DeuteriumProductionRate = deuteriumProduction;
     }
 
     private void InitializeBuildings()

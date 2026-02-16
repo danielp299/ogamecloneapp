@@ -35,52 +35,66 @@ public class ResourceService
         return _cachedState ?? throw new InvalidOperationException("Game state not initialized");
     }
 
-    public long Metal => (long)(GetStateAsync().Result.Metal);
-    public long Crystal => (long)(GetStateAsync().Result.Crystal);
-    public long Deuterium => (long)(GetStateAsync().Result.Deuterium);
+    public long Metal
+    {
+        get
+        {
+            var state = GetStateAsync().Result;
+            var now = DateTime.UtcNow;
+            var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
+            return (long)(state.Metal + (MetalProductionRate * elapsedSeconds));
+        }
+    }
+    public long Crystal
+    {
+        get
+        {
+            var state = GetStateAsync().Result;
+            var now = DateTime.UtcNow;
+            var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
+            return (long)(state.Crystal + (CrystalProductionRate * elapsedSeconds));
+        }
+    }
+    public long Deuterium
+    {
+        get
+        {
+            var state = GetStateAsync().Result;
+            var now = DateTime.UtcNow;
+            var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
+            return (long)(state.Deuterium + (DeuteriumProductionRate * elapsedSeconds));
+        }
+    }
     public long DarkMatter => (long)(GetStateAsync().Result.DarkMatter);
     public long Energy => GetStateAsync().Result.Energy;
 
-    // Synchronous version for backward compatibility during migration
-    public void UpdateResources(double metalRate, double crystalRate, double deuteriumRate)
+    public double MetalProductionRate { get; set; }
+    public double CrystalProductionRate { get; set; }
+    public double DeuteriumProductionRate { get; set; }
+
+private async Task SaveStateAsync()
     {
-        var state = GetStateAsync().Result;
-        var now = DateTime.UtcNow;
-        var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
-
-        if (elapsedSeconds > 0)
-        {
-            state.Metal += metalRate * elapsedSeconds;
-            state.Crystal += crystalRate * elapsedSeconds;
-            state.Deuterium += deuteriumRate * elapsedSeconds;
-            state.LastResourceUpdate = now;
-
-            _dbContext.SaveChanges();
-            NotifyStateChanged();
-        }
+        await _dbContext.SaveChangesAsync();
     }
 
-    public async Task UpdateResourcesAsync(double metalRate, double crystalRate, double deuteriumRate)
+    private void EnsureCurrentResourcesCalculated(GameState state)
     {
-        var state = await GetStateAsync();
         var now = DateTime.UtcNow;
         var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
 
         if (elapsedSeconds > 0)
         {
-            state.Metal += metalRate * elapsedSeconds;
-            state.Crystal += crystalRate * elapsedSeconds;
-            state.Deuterium += deuteriumRate * elapsedSeconds;
+            state.Metal += MetalProductionRate * elapsedSeconds;
+            state.Crystal += CrystalProductionRate * elapsedSeconds;
+            state.Deuterium += DeuteriumProductionRate * elapsedSeconds;
             state.LastResourceUpdate = now;
-
-            await _dbContext.SaveChangesAsync();
-            NotifyStateChanged();
         }
     }
 
     public bool HasResources(long metal, long crystal, long deuterium)
     {
         var state = GetStateAsync().Result;
+        EnsureCurrentResourcesCalculated(state);
         return state.Metal >= metal && state.Crystal >= crystal && state.Deuterium >= deuterium;
     }
 
@@ -92,6 +106,7 @@ public class ResourceService
         }
 
         var state = GetStateAsync().Result;
+        EnsureCurrentResourcesCalculated(state);
         state.Metal -= metal;
         state.Crystal -= crystal;
         state.Deuterium -= deuterium;
@@ -104,6 +119,7 @@ public class ResourceService
     public void AddResources(double metal, double crystal, double deuterium)
     {
         var state = GetStateAsync().Result;
+        EnsureCurrentResourcesCalculated(state);
         state.Metal += metal;
         state.Crystal += crystal;
         state.Deuterium += deuterium;

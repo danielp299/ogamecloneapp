@@ -9,10 +9,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
-// Add SQLite database
+// Add SQLite database as Singleton (required for singleton services)
 var dbPath = Path.Combine(builder.Environment.ContentRootPath, "game.db");
 builder.Services.AddDbContext<GameDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+    options.UseSqlite($"Data Source={dbPath}"), ServiceLifetime.Singleton);
 
 // Register persistence service
 builder.Services.AddSingleton<GamePersistenceService>();

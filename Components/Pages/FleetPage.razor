@@ -22,6 +22,7 @@
             <div style="display: grid; gap: 10px; margin-top: 15px;">
                 @foreach (var mission in FleetService.ActiveFleets)
                 {
+                    var timeRemaining = GetTimeRemaining(mission);
                     <div class="ogame-card" style="padding: 15px;">
                         <div style="width: 100%; text-align: left;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -30,12 +31,25 @@
                                     @mission.Status
                                 </span>
                             </div>
-                            <div class="text-muted" style="font-size: 0.9em;">
-                                <div>Target: [@mission.TargetCoordinates]</div>
-                                <div>
-                                    Arrival: @mission.ArrivalTime.ToString("HH:mm:ss") |
+                            <!-- Countdown Timer -->
+                            <div style="background-color: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 5px; margin: 10px 0; text-align: center;">
+                                <div style="font-size: 1.2em; font-weight: bold; color: var(--color-accent-gold);">
+                                    @if (mission.Status == FleetStatus.Flight)
+                                    {
+                                        <span>⏱️ Time to Arrival: @FormatTimeSpan(timeRemaining)</span>
+                                    }
+                                    else
+                                    {
+                                        <span>⏱️ Time to Return: @FormatTimeSpan(timeRemaining)</span>
+                                    }
+                                </div>
+                                <div style="font-size: 0.8em; color: var(--color-text-muted); margin-top: 4px;">
+                                    Arrival: @mission.ArrivalTime.ToString("HH:mm:ss") | 
                                     Return: @mission.ReturnTime.ToString("HH:mm:ss")
                                 </div>
+                            </div>
+                            <div class="text-muted" style="font-size: 0.9em;">
+                                <div>Target: [@mission.TargetCoordinates]</div>
                                 <div style="margin-top: 5px;">
                                     Ships:
                                     @foreach(var s in mission.Ships)
@@ -255,6 +269,28 @@
         errorMessage = "";
         calculatedFlightTime = FleetService.CalculateFlightTime(ships, TargetGalaxy, TargetSystem, TargetPosition);
         calculatedFuel = FleetService.CalculateFuelConsumption(ships, TargetGalaxy, TargetSystem, TargetPosition);
+    }
+
+    private TimeSpan GetTimeRemaining(FleetMission mission)
+    {
+        if (mission.Status == FleetStatus.Flight)
+        {
+            return mission.ArrivalTime > DateTime.Now ? mission.ArrivalTime - DateTime.Now : TimeSpan.Zero;
+        }
+        else if (mission.Status == FleetStatus.Return)
+        {
+            return mission.ReturnTime > DateTime.Now ? mission.ReturnTime - DateTime.Now : TimeSpan.Zero;
+        }
+        return TimeSpan.Zero;
+    }
+
+    private string FormatTimeSpan(TimeSpan timeSpan)
+    {
+        if (timeSpan.TotalDays >= 1)
+        {
+            return $"{timeSpan.Days}d {timeSpan.Hours:D2}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}";
+        }
+        return $"{timeSpan.Hours:D2}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}";
     }
 
     private void LaunchFleet()
