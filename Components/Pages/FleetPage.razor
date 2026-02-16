@@ -130,7 +130,7 @@
 
         <!-- Ships Selection Grid - Golden Ratio Cards (Responsive) -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: clamp(15px, 3vw, 30px); margin-top: 20px; justify-items: center;">
-            @foreach (var ship in FleetService.ShipDefinitions)
+            @foreach (var ship in GetFilteredShips())
             {
                 var count = FleetService.GetShipCount(ship.Id);
                 if(count > 0)
@@ -269,6 +269,19 @@
             TargetPosition = GalaxyService.HomePosition;
             SelectedMission = "Attack";
         }
+    }
+
+    private List<Ship> GetFilteredShips()
+    {
+        var ships = FleetService.ShipDefinitions;
+        
+        return SelectedMission switch
+        {
+            "Espionage" => ships.Where(s => s.IsEspionageCapable).ToList(),
+            "Colonize" => ships.Where(s => s.IsColonizationCapable).ToList(),
+            "Recycle" => ships.Where(s => s.IsRecyclingCapable).ToList(),
+            _ => ships.ToList()
+        };
     }
 
     private FleetInputModel GetInputModel(string id) => inputs.First(i => i.ShipId == id);

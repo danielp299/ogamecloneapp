@@ -16,4 +16,9 @@ public class GameState
     public bool DevModeEnabled { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime LastSavedAt { get; set; } = DateTime.UtcNow;
+    
+    // Player home planet location
+    public int HomeGalaxy { get; set; } = 1;
+    public int HomeSystem { get; set; } = 1;
+    public int HomePosition { get; set; } = 1;
 }

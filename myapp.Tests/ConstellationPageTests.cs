@@ -1,8 +1,11 @@
 //csharp
 using Bunit;
 using Bunit.TestDoubles; // Add this for FakeNavigationManager
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using myapp.Components.Pages;
+using myapp.Data;
 using myapp.Services;
 using Xunit;
 using System.Linq;
@@ -11,8 +14,22 @@ namespace myapp.Tests.Components.Pages
 {
     public class ConstellationPageTests : TestContext
     {
+        private GameDbContext CreateDbContext()
+        {
+            var connection = new SqliteConnection("DataSource=:memory:");
+            connection.Open();
+            var options = new DbContextOptionsBuilder<GameDbContext>()
+                .UseSqlite(connection)
+                .Options;
+            var dbContext = new GameDbContext(options);
+            dbContext.Database.EnsureCreated();
+            return dbContext;
+        }
+
         [Fact]
         public void ConstellationPage_Render_Should_Render_Page() {
+            var dbContext = CreateDbContext();
+            Services.AddSingleton(dbContext);
             Services.AddSingleton<GalaxyService>();
             RenderComponent<ConstellationPage>();
         }
@@ -21,7 +38,8 @@ namespace myapp.Tests.Components.Pages
         public void Clicking_Attack_Navigates_To_FleetPage_With_Correct_Params()
         {
             // Arrange
-            var galaxyService = new GalaxyService();
+            var dbContext = CreateDbContext();
+            var galaxyService = new GalaxyService(dbContext);
             // Force a planet to be an enemy at 1:1:5
             var system = galaxyService.GetSystem(1, 1);
             var targetPlanet = system.FirstOrDefault(p => p.Position == 5);
@@ -32,8 +50,9 @@ namespace myapp.Tests.Components.Pages
                 targetPlanet.PlayerName = "Enemy";
             }
 
+            Services.AddSingleton(dbContext);
             Services.AddSingleton(galaxyService);
-            
+             
             var cut = RenderComponent<ConstellationPage>();
 
             // Act

@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
+using myapp.Data;
+using myapp.Data.Entities;
 
 namespace myapp.Services;
 
@@ -23,6 +26,8 @@ public class GalaxyPlanet
 
 public class GalaxyService
 {
+    private readonly GameDbContext _dbContext;
+    
     // Key: "galaxy:system" (e.g., "1:1") -> List of 15 planets
     private Dictionary<string, List<GalaxyPlanet>> _universe = new();
     private Random _random = new Random();
@@ -39,12 +44,12 @@ public class GalaxyService
     public const int MaxGalaxies = 10;
     public const int MaxSystemsPerGalaxy = 10;
 
-    public GalaxyService()
+    public GalaxyService(GameDbContext dbContext)
     {
-        // Randomize home coordinates
-        HomeGalaxy = _random.Next(1, MaxGalaxies + 1);
-        HomeSystem = _random.Next(1, MaxSystemsPerGalaxy + 1);
-        HomePosition = _random.Next(1, 16); // 1 to 15
+        _dbContext = dbContext;
+        
+        // Load or generate home coordinates
+        LoadOrGenerateHomeCoordinates();
 
         // Ensure home system exists and has the player
         var homeSystem = GetSystem(HomeGalaxy, HomeSystem);
@@ -54,6 +59,71 @@ public class GalaxyService
         if (homePlanet != null)
         {
             PlayerPlanets.Add(homePlanet);
+        }
+    }
+    
+    private void LoadOrGenerateHomeCoordinates()
+    {
+        try
+        {
+            var gameState = _dbContext.GameState.FirstOrDefault();
+            
+            if (gameState != null && gameState.HomeGalaxy > 0 && gameState.HomeSystem > 0 && gameState.HomePosition > 0)
+            {
+                // Load existing coordinates from database
+                HomeGalaxy = gameState.HomeGalaxy;
+                HomeSystem = gameState.HomeSystem;
+                HomePosition = gameState.HomePosition;
+                Console.WriteLine($"Loaded player home location: {HomeGalaxy}:{HomeSystem}:{HomePosition}");
+            }
+            else
+            {
+                // Generate random coordinates for new game
+                HomeGalaxy = _random.Next(1, MaxGalaxies + 1);
+                HomeSystem = _random.Next(1, MaxSystemsPerGalaxy + 1);
+                HomePosition = _random.Next(1, 16); // 1 to 15
+                
+                // Save to database
+                if (gameState == null)
+                {
+                    gameState = new GameState { Id = 1 };
+                    _dbContext.GameState.Add(gameState);
+                }
+                
+                gameState.HomeGalaxy = HomeGalaxy;
+                gameState.HomeSystem = HomeSystem;
+                gameState.HomePosition = HomePosition;
+                _dbContext.SaveChanges();
+                
+                Console.WriteLine($"Generated and saved new player home location: {HomeGalaxy}:{HomeSystem}:{HomePosition}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading home coordinates: {ex.Message}");
+            // Fallback to random coordinates
+            HomeGalaxy = _random.Next(1, MaxGalaxies + 1);
+            HomeSystem = _random.Next(1, MaxSystemsPerGalaxy + 1);
+            HomePosition = _random.Next(1, 16);
+        }
+    }
+    
+    public async Task SaveHomeCoordinatesAsync()
+    {
+        try
+        {
+            var gameState = await _dbContext.GameState.FirstOrDefaultAsync();
+            if (gameState != null)
+            {
+                gameState.HomeGalaxy = HomeGalaxy;
+                gameState.HomeSystem = HomeSystem;
+                gameState.HomePosition = HomePosition;
+                await _dbContext.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving home coordinates: {ex.Message}");
         }
     }
 

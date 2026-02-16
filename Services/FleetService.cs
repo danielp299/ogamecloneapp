@@ -34,7 +34,7 @@ public class FleetMission
         : TimeSpan.Zero;
 }
 
-public class Ship
+    public class Ship
 {
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
@@ -59,6 +59,11 @@ public class Ship
     
     // Requirements (Simplified names for matching)
     public Dictionary<string, int> Requirements { get; set; } = new();
+    
+    // Mission Capabilities
+    public bool IsEspionageCapable { get; set; }
+    public bool IsColonizationCapable { get; set; }
+    public bool IsRecyclingCapable { get; set; }
 }
 
 public class ShipyardItem
@@ -213,7 +218,8 @@ public class FleetService
             MetalCost = 10000, CrystalCost = 20000, DeuteriumCost = 10000,
             Structure = 30000, Shield = 100, Attack = 50, Capacity = 7500, BaseSpeed = 2500, FuelConsumption = 1000,
             BaseDuration = TimeSpan.FromMinutes(5),
-            Requirements = new() { { "Shipyard", 4 }, { "Impulse Drive", 3 } }
+            Requirements = new() { { "Shipyard", 4 }, { "Impulse Drive", 3 } },
+            IsColonizationCapable = true
         });
         
         ShipDefinitions.Add(new Ship
@@ -223,7 +229,8 @@ public class FleetService
             MetalCost = 10000, CrystalCost = 6000, DeuteriumCost = 2000,
             Structure = 16000, Shield = 10, Attack = 1, Capacity = 20000, BaseSpeed = 2000, FuelConsumption = 300,
             BaseDuration = TimeSpan.FromMinutes(3),
-            Requirements = new() { { "Shipyard", 4 }, { "Combustion Drive", 6 }, { "Shielding Technology", 2 } }
+            Requirements = new() { { "Shipyard", 4 }, { "Combustion Drive", 6 }, { "Shielding Technology", 2 } },
+            IsRecyclingCapable = true
         });
 
         ShipDefinitions.Add(new Ship
@@ -233,7 +240,8 @@ public class FleetService
             MetalCost = 0, CrystalCost = 1000, DeuteriumCost = 0,
             Structure = 1000, Shield = 0, Attack = 0, Capacity = 5, BaseSpeed = 100000000, FuelConsumption = 1,
             BaseDuration = TimeSpan.FromSeconds(5),
-            Requirements = new() { { "Shipyard", 3 }, { "Combustion Drive", 3 }, { "Espionage Technology", 2 } }
+            Requirements = new() { { "Shipyard", 3 }, { "Combustion Drive", 3 }, { "Espionage Technology", 2 } },
+            IsEspionageCapable = true
         });
 
         ShipDefinitions.Add(new Ship

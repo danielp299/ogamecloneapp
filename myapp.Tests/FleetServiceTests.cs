@@ -40,7 +40,7 @@ namespace myapp.Tests.Services
             var devModeService = new DevModeService(_dbContext);
             var messageService = new MessageService(_dbContext);
             var resourceService = new ResourceService(_dbContext, devModeService);
-            var galaxyService = new GalaxyService();
+            var galaxyService = new GalaxyService(_dbContext);
             var enemyService = new EnemyService(_dbContext, galaxyService);
             var buildingService = new BuildingService(_dbContext, resourceService, devModeService, enemyService);
             var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<TechnologyService>();
