@@ -20,12 +20,12 @@
             <div style="display: flex; align-items: center; gap: 15px;">
                 <div>
                     <label style="font-weight: bold; margin-right: 5px;">Galaxy</label>
-                    <input type="number" min="1" max="9" @bind="CurrentGalaxy"
+                    <input type="number" min="1" max="10" @bind="CurrentGalaxy"
                            style="width: 60px; padding: 5px; text-align: center; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
                 </div>
                 <div>
                     <label style="font-weight: bold; margin-right: 5px;">System</label>
-                    <input type="number" min="1" max="499" @bind="CurrentSystem"
+                    <input type="number" min="1" max="10" @bind="CurrentSystem"
                            style="width: 60px; padding: 5px; text-align: center; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
                 </div>
                 <button class="ogame-btn ogame-btn-primary" @onclick="LoadSystem">Go</button>
@@ -137,9 +137,22 @@
 </div>
 
 @code {
-    private int CurrentGalaxy = 1;
-    private int CurrentSystem = 1;
+    private int _currentGalaxy = 1;
+    private int _currentSystem = 1;
     private List<GalaxyPlanet> CurrentPlanets;
+
+    // Properties with validation to enforce limits
+    private int CurrentGalaxy
+    {
+        get => _currentGalaxy;
+        set => _currentGalaxy = Math.Clamp(value, 1, GalaxyService.MaxGalaxies);
+    }
+
+    private int CurrentSystem
+    {
+        get => _currentSystem;
+        set => _currentSystem = Math.Clamp(value, 1, GalaxyService.MaxSystemsPerGalaxy);
+    }
 
     protected override void OnInitialized()
     {
@@ -162,7 +175,7 @@
 
     private void NextSystem()
     {
-        if (CurrentSystem < 499)
+        if (CurrentSystem < 10)
         {
             CurrentSystem++;
             LoadSystem();

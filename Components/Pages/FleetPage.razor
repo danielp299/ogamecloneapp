@@ -1,8 +1,10 @@
 @page "/fleet"
 @using myapp.Services
+@using Microsoft.AspNetCore.WebUtilities
 @inject NavigationManager Navigation
 @inject ResourceService ResourceService
 @inject FleetService FleetService
+@inject GalaxyService GalaxyService
 @implements IDisposable
 
 <PageTitle>Fleet</PageTitle>
@@ -91,7 +93,7 @@
     <div class="ogame-panel">
         <h3>Send Fleet</h3>
 
-        @if (!string.IsNullOrEmpty(errorMessage))
+@if (!string.IsNullOrEmpty(errorMessage))
         {
             <div style="color: var(--color-danger); margin: 10px 0; padding: 10px; background-color: rgba(244, 67, 54, 0.1); border-radius: 5px; font-weight: bold;">
                 @errorMessage
@@ -104,9 +106,9 @@
                 <div>
                     <label style="margin-right: 10px; font-weight: bold;">Target:</label>
                     <label>G:</label>
-                    <input type="number" @bind="TargetGalaxy" style="width:50px; margin-right: 5px; padding: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
+                    <input type="number" min="1" max="10" @bind="TargetGalaxy" style="width:50px; margin-right: 5px; padding: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
                     <label>S:</label>
-                    <input type="number" @bind="TargetSystem" style="width:50px; margin-right: 5px; padding: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
+                    <input type="number" min="1" max="10" @bind="TargetSystem" style="width:50px; margin-right: 5px; padding: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
                     <label>P:</label>
                     <input type="number" @bind="TargetPosition" style="width:50px; padding: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
                 </div>
@@ -189,23 +191,24 @@
 @code {
     private System.Threading.Timer? _timer;
 
-    [SupplyParameterFromQuery]
-    public int? Galaxy { get; set; }
-
-    [SupplyParameterFromQuery]
-    public int? System { get; set; }
-
-    [SupplyParameterFromQuery]
-    public int? Position { get; set; }
-
-    [SupplyParameterFromQuery]
-    public string? Mission { get; set; }
-
-    private int TargetGalaxy = 1;
-    private int TargetSystem = 1;
+    private int _targetGalaxy = 1;
+    private int _targetSystem = 1;
     private int TargetPosition = 2;
     private string SelectedMission = "Attack";
     private string errorMessage = "";
+
+    // Properties with validation to enforce limits
+    private int TargetGalaxy
+    {
+        get => _targetGalaxy;
+        set => _targetGalaxy = Math.Clamp(value, 1, GalaxyService.MaxGalaxies);
+    }
+
+    private int TargetSystem
+    {
+        get => _targetSystem;
+        set => _targetSystem = Math.Clamp(value, 1, GalaxyService.MaxSystemsPerGalaxy);
+    }
 
     private TimeSpan calculatedFlightTime;
     private long calculatedFuel;
@@ -222,6 +225,7 @@
     {
         FleetService.OnChange += RefreshState;
         ResourceService.OnChange += RefreshState;
+        Navigation.LocationChanged += OnLocationChanged;
 
         _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 0, 1000);
 
@@ -230,10 +234,36 @@
             inputs.Add(new FleetInputModel { ShipId = s.Id });
         }
 
-        if (Galaxy.HasValue) TargetGalaxy = Galaxy.Value;
-        if (System.HasValue) TargetSystem = System.Value;
-        if (Position.HasValue) TargetPosition = Position.Value;
-        if (!string.IsNullOrEmpty(Mission)) SelectedMission = Mission;
+        ApplyQueryParameters();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        ApplyQueryParameters();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ApplyQueryParameters()
+    {
+        var uri = new Uri(Navigation.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("galaxy", out var g) && int.TryParse(g, out var galaxy) &&
+            query.TryGetValue("system", out var s) && int.TryParse(s, out var system) &&
+            query.TryGetValue("position", out var p) && int.TryParse(p, out var position))
+        {
+            TargetGalaxy = galaxy;
+            TargetSystem = system;
+            TargetPosition = position;
+            SelectedMission = query.TryGetValue("mission", out var m) ? m.ToString() : "Attack";
+        }
+        else
+        {
+            TargetGalaxy = 1;
+            TargetSystem = 1;
+            TargetPosition = 2;
+            SelectedMission = "Attack";
+        }
     }
 
     private FleetInputModel GetInputModel(string id) => inputs.First(i => i.ShipId == id);
@@ -295,6 +325,18 @@
 
     private void LaunchFleet()
     {
+        // Validate galaxy and system limits
+        if (TargetGalaxy < 1 || TargetGalaxy > GalaxyService.MaxGalaxies)
+        {
+            errorMessage = $"Galaxy must be between 1 and {GalaxyService.MaxGalaxies}.";
+            return;
+        }
+        if (TargetSystem < 1 || TargetSystem > GalaxyService.MaxSystemsPerGalaxy)
+        {
+            errorMessage = $"System must be between 1 and {GalaxyService.MaxSystemsPerGalaxy}.";
+            return;
+        }
+
         var ships = GetSelectedShips();
         var error = FleetService.SendFleet(ships, TargetGalaxy, TargetSystem, TargetPosition, SelectedMission);
 
@@ -313,6 +355,7 @@
     public void Dispose()
     {
         _timer?.Dispose();
+        Navigation.LocationChanged -= OnLocationChanged;
         FleetService.OnChange -= RefreshState;
         ResourceService.OnChange -= RefreshState;
     }

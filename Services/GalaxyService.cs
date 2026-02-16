@@ -35,6 +35,10 @@ public class GalaxyService
     public readonly int HomeSystem = 1;
     public readonly int HomePosition = 1;
 
+    // Universe limits: 10 galaxies, 10 systems per galaxy
+    public const int MaxGalaxies = 10;
+    public const int MaxSystemsPerGalaxy = 10;
+
     public GalaxyService()
     {
         // Ensure home system exists and has the player
@@ -66,6 +70,12 @@ public class GalaxyService
 
     public List<GalaxyPlanet> GetSystem(int galaxy, int system)
     {
+        // Validate limits
+        if (galaxy < 1 || galaxy > MaxGalaxies)
+            throw new ArgumentOutOfRangeException(nameof(galaxy), $"Galaxy must be between 1 and {MaxGalaxies}");
+        if (system < 1 || system > MaxSystemsPerGalaxy)
+            throw new ArgumentOutOfRangeException(nameof(system), $"System must be between 1 and {MaxSystemsPerGalaxy}");
+
         string key = $"{galaxy}:{system}";
         
         if (!_universe.ContainsKey(key))
