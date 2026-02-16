@@ -27,6 +27,7 @@ builder.Services.AddSingleton<DefenseService>();
 builder.Services.AddSingleton<GalaxyService>();
 builder.Services.AddSingleton<MessageService>();
 builder.Services.AddSingleton<DevModeService>();
+builder.Services.AddSingleton<EnemyService>();
 
 builder.Services.AddCors(options =>
 {

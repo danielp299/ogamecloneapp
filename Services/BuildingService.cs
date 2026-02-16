@@ -37,6 +37,7 @@ public class BuildingService
     private readonly GameDbContext _dbContext;
     private readonly ResourceService _resourceService;
     private readonly DevModeService _devModeService;
+    private readonly EnemyService _enemyService;
     public List<Building> Buildings { get; private set; } = new();
     public List<Building> ConstructionQueue { get; private set; } = new();
     
@@ -55,11 +56,12 @@ public class BuildingService
     
     public double ProductionFactor { get; private set; } = 1.0;
 
-    public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService)
+    public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService, EnemyService enemyService)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
         _devModeService = devModeService;
+        _enemyService = enemyService;
         InitializeBuildings();
         LoadFromDatabaseAsync().Wait();
         // Initial production calculation
@@ -470,6 +472,7 @@ public class BuildingService
             // Energy update is now handled INSIDE UpdateProduction(), so we don't need manual logic here anymore.
             // Just increment level and recalculate.
 
+            string upgradedBuildingName = currentBuilding.Title;
             currentBuilding.Level++;
             
             // Save to database
@@ -479,6 +482,9 @@ public class BuildingService
             
             // Recalculate production rates (and energy) with new levels
             UpdateProduction();
+            
+            // Notify enemy service that player upgraded a building
+            _ = _enemyService.OnPlayerBuildingUpgraded(upgradedBuildingName);
             
             NotifyStateChanged();
         }

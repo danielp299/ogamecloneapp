@@ -137,8 +137,8 @@
 </div>
 
 @code {
-    private int _currentGalaxy = 1;
-    private int _currentSystem = 1;
+    private int _currentGalaxy;
+    private int _currentSystem;
     private List<GalaxyPlanet> CurrentPlanets;
 
     // Properties with validation to enforce limits
@@ -156,6 +156,8 @@
 
     protected override void OnInitialized()
     {
+        _currentGalaxy = GalaxyService.HomeGalaxy;
+        _currentSystem = GalaxyService.HomeSystem;
         LoadSystem();
     }
 

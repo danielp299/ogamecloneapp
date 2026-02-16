@@ -40,13 +40,14 @@ namespace myapp.Tests.Services
             var devModeService = new DevModeService(_dbContext);
             var messageService = new MessageService(_dbContext);
             var resourceService = new ResourceService(_dbContext, devModeService);
-            var buildingService = new BuildingService(_dbContext, resourceService, devModeService);
-            var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<TechnologyService>();
-            var techService = new TechnologyService(_dbContext, resourceService, buildingService, devModeService, logger);
             var galaxyService = new GalaxyService();
-            var defenseService = new DefenseService(_dbContext, resourceService, buildingService, techService, devModeService);
+            var enemyService = new EnemyService(_dbContext, galaxyService);
+            var buildingService = new BuildingService(_dbContext, resourceService, devModeService, enemyService);
+            var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<TechnologyService>();
+            var techService = new TechnologyService(_dbContext, resourceService, buildingService, devModeService, enemyService, logger);
+            var defenseService = new DefenseService(_dbContext, resourceService, buildingService, techService, devModeService, enemyService);
             
-            var fleetService = new FleetService(_dbContext, resourceService, buildingService, techService, galaxyService, messageService, defenseService, devModeService);
+            var fleetService = new FleetService(_dbContext, resourceService, buildingService, techService, galaxyService, messageService, defenseService, devModeService, enemyService);
             
             // Create a mock mission that has arrived
             var mission = new FleetMission

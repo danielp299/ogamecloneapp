@@ -69,6 +69,7 @@ public class TechnologyService
     private readonly ResourceService _resourceService;
     private readonly BuildingService _buildingService;
     private readonly DevModeService _devModeService;
+    private readonly EnemyService _enemyService;
     private readonly ILogger<TechnologyService> _logger;
 
     public List<Technology> Technologies { get; private set; } = new();
@@ -77,12 +78,13 @@ public class TechnologyService
     public event Action? OnChange;
     private bool _isProcessingResearch = false;
 
-    public TechnologyService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, DevModeService devModeService, ILogger<TechnologyService> logger)
+    public TechnologyService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, DevModeService devModeService, EnemyService enemyService, ILogger<TechnologyService> logger)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
         _buildingService = buildingService;
         _devModeService = devModeService;
+        _enemyService = enemyService;
         _logger = logger;
         InitializeTechnologies();
         LoadFromDatabaseAsync().Wait();
@@ -509,11 +511,15 @@ public class TechnologyService
                 if (CurrentResearch != tech) continue;
 
                 // Complete
+                string researchedTechName = tech.Title;
                 _logger.LogInformation("Research completed: {Tech} -> Level {Level}", tech.Title, tech.Level + 1);
                 tech.IsResearching = false;
                 tech.Level++;
                 await SaveToDatabaseAsync();
                 CurrentResearch = null;
+
+                // Notify enemy service that player researched a technology
+                _ = _enemyService.OnPlayerTechnologyResearched(researchedTechName);
 
                 NotifyStateChanged();
             }

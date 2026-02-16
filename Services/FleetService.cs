@@ -79,6 +79,7 @@ public class FleetService
     private readonly MessageService _messageService;
     private readonly DefenseService _defenseService;
     private readonly DevModeService _devModeService;
+    private readonly EnemyService _enemyService;
 
     public List<Ship> ShipDefinitions { get; private set; } = new();
     
@@ -95,7 +96,7 @@ public class FleetService
 
     private bool _isProcessingQueue = false;
 
-    public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, MessageService messageService, DefenseService defenseService, DevModeService devModeService)
+    public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, MessageService messageService, DefenseService defenseService, DevModeService devModeService, EnemyService enemyService)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
@@ -105,6 +106,7 @@ public class FleetService
         _messageService = messageService;
         _defenseService = defenseService;
         _devModeService = devModeService;
+        _enemyService = enemyService;
         
         InitializeShips();
         LoadFromDatabaseAsync().Wait();
@@ -281,8 +283,10 @@ public class FleetService
     public long CalculateFuelConsumption(Dictionary<string, int> shipsToSend, int targetGalaxy, int targetSystem, int targetPosition)
     {
         // Placeholder distance: 1 System = 1000 units, 1 Galaxy = 20000 units
-        // Current coordinates assumed 1:1:1 for simplicity
-        long distance = Math.Abs(targetGalaxy - 1) * 20000 + Math.Abs(targetSystem - 1) * 1000 + Math.Abs(targetPosition - 1) * 5 + 1000;
+        // Calculate distance from Home Planet
+        long distance = Math.Abs(targetGalaxy - _galaxyService.HomeGalaxy) * 20000 + 
+                        Math.Abs(targetSystem - _galaxyService.HomeSystem) * 1000 + 
+                        Math.Abs(targetPosition - _galaxyService.HomePosition) * 5 + 1000;
         
         long totalFuel = 0;
         foreach(var kvp in shipsToSend)
@@ -308,7 +312,9 @@ public class FleetService
         }
         
         // Distance
-        long distance = Math.Abs(targetGalaxy - 1) * 20000 + Math.Abs(targetSystem - 1) * 1000 + Math.Abs(targetPosition - 1) * 5 + 1000;
+        long distance = Math.Abs(targetGalaxy - _galaxyService.HomeGalaxy) * 20000 + 
+                        Math.Abs(targetSystem - _galaxyService.HomeSystem) * 1000 + 
+                        Math.Abs(targetPosition - _galaxyService.HomePosition) * 5 + 1000;
         
         // Time = Distance / Speed * Factor (e.g. 100)
         // With x100 speed universe, we divide result by 100
@@ -768,14 +774,14 @@ public class FleetService
         long attackerStructure = 0;
         long attackerShield = 0;
 
-        foreach(var s in mission.Ships)
+        foreach(var shipEntry in mission.Ships)
         {
-             var def = ShipDefinitions.FirstOrDefault(x => x.Id == s.Key);
+             var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key);
              if(def != null) 
              {
-                 attackerAttack += def.Attack * s.Value;
-                 attackerStructure += def.Structure * s.Value;
-                 attackerShield += def.Shield * s.Value;
+                 attackerAttack += def.Attack * shipEntry.Value;
+                 attackerStructure += def.Structure * shipEntry.Value;
+                 attackerShield += def.Shield * shipEntry.Value;
              }
         }
         
@@ -806,14 +812,14 @@ public class FleetService
         }
         
         // Add Ships to Defender
-        foreach(var s in ships)
+        foreach(var shipEntry in ships)
         {
-             var def = ShipDefinitions.FirstOrDefault(x => x.Name == s.Key);
+             var def = ShipDefinitions.FirstOrDefault(x => x.Name == shipEntry.Key);
              if(def != null) 
              {
-                 defenderAttack += def.Attack * s.Value;
-                 defenderStructure += def.Structure * s.Value;
-                 defenderShield += def.Shield * s.Value;
+                 defenderAttack += def.Attack * shipEntry.Value;
+                 defenderStructure += def.Structure * shipEntry.Value;
+                 defenderShield += def.Shield * shipEntry.Value;
              }
         }
 
@@ -838,9 +844,9 @@ public class FleetService
             
             // Cap by capacity
             long totalCapacity = 0;
-            foreach(var s in mission.Ships) {
-                 var def = ShipDefinitions.FirstOrDefault(x => x.Id == s.Key);
-                 if(def!=null) totalCapacity += def.Capacity * s.Value;
+            foreach(var shipEntry in mission.Ships) {
+                 var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key);
+                 if(def!=null) totalCapacity += def.Capacity * shipEntry.Value;
             }
             
             long totalLoot = lootM + lootC + lootD;
@@ -889,13 +895,13 @@ public class FleetService
             }
             
             // Also debris from destroyed Defender Ships (30%)
-            foreach(var s in ships)
+            foreach(var shipEntry in ships)
             {
-                 var def = ShipDefinitions.FirstOrDefault(x => x.Name == s.Key);
+                 var def = ShipDefinitions.FirstOrDefault(x => x.Name == shipEntry.Key);
                  if (def != null)
                  {
-                     debrisM += (long)(def.MetalCost * s.Value * 0.3);
-                     debrisC += (long)(def.CrystalCost * s.Value * 0.3);
+                     debrisM += (long)(def.MetalCost * shipEntry.Value * 0.3);
+                     debrisC += (long)(def.CrystalCost * shipEntry.Value * 0.3);
                  }
             }
             
@@ -954,6 +960,17 @@ public class FleetService
         }
         
         _messageService.AddMessage($"Combat Report [{mission.TargetCoordinates}]", result, "Combat");
+        
+        // Notify enemy service about the attack
+        var parts = mission.TargetCoordinates.Split(':');
+        if (parts.Length == 3 && 
+            int.TryParse(parts[0], out int g) && 
+            int.TryParse(parts[1], out int s) && 
+            int.TryParse(parts[2], out int p))
+        {
+            bool wasVictory = attackerScore > defenderScore;
+            _ = _enemyService.OnPlayerAttack(g, s, p, wasVictory);
+        }
     }
 
     // Helper to generate consistent state for a planet based on its coordinate
@@ -1140,6 +1157,9 @@ public class FleetService
                 DurationPerUnit = finalDuration,
                 TimeRemaining = finalDuration
             });
+            
+            // Notify enemy service that player is building ships
+            _ = _enemyService.OnPlayerShipBuilt(ship.Id, quantity);
             
             NotifyStateChanged();
         }

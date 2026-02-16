@@ -193,7 +193,7 @@
 
     private int _targetGalaxy = 1;
     private int _targetSystem = 1;
-    private int TargetPosition = 2;
+    private int TargetPosition = 1;
     private string SelectedMission = "Attack";
     private string errorMessage = "";
 
@@ -223,6 +223,11 @@
 
     protected override void OnInitialized()
     {
+        // Set defaults to Home Planet
+        _targetGalaxy = GalaxyService.HomeGalaxy;
+        _targetSystem = GalaxyService.HomeSystem;
+        TargetPosition = GalaxyService.HomePosition;
+
         FleetService.OnChange += RefreshState;
         ResourceService.OnChange += RefreshState;
         Navigation.LocationChanged += OnLocationChanged;
@@ -259,9 +264,9 @@
         }
         else
         {
-            TargetGalaxy = 1;
-            TargetSystem = 1;
-            TargetPosition = 2;
+            TargetGalaxy = GalaxyService.HomeGalaxy;
+            TargetSystem = GalaxyService.HomeSystem;
+            TargetPosition = GalaxyService.HomePosition;
             SelectedMission = "Attack";
         }
     }

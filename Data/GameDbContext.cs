@@ -21,6 +21,7 @@ public class GameDbContext : DbContext
     public DbSet<FleetMissionEntity> FleetMissions { get; set; } = null!;
     public DbSet<FleetMissionShipEntity> FleetMissionShips { get; set; } = null!;
     public DbSet<GameMessageEntity> Messages { get; set; } = null!;
+    public DbSet<EnemyEntity> Enemies { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -95,6 +96,12 @@ public class GameDbContext : DbContext
         modelBuilder.Entity<GameMessageEntity>(entity =>
         {
             entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<EnemyEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.Galaxy, e.System, e.Position }).IsUnique();
         });
     }
 }

@@ -30,10 +30,10 @@ public class GalaxyService
     // List of planets owned by the player
     public List<GalaxyPlanet> PlayerPlanets { get; private set; } = new();
 
-    // Define the player's home planet for reference (1:1:2 is default in FleetPage, let's assume 1:1:1 is Home)
-    public readonly int HomeGalaxy = 1;
-    public readonly int HomeSystem = 1;
-    public readonly int HomePosition = 1;
+    // Define the player's home planet for reference
+    public int HomeGalaxy { get; private set; }
+    public int HomeSystem { get; private set; }
+    public int HomePosition { get; private set; }
 
     // Universe limits: 10 galaxies, 10 systems per galaxy
     public const int MaxGalaxies = 10;
@@ -41,6 +41,11 @@ public class GalaxyService
 
     public GalaxyService()
     {
+        // Randomize home coordinates
+        HomeGalaxy = _random.Next(1, MaxGalaxies + 1);
+        HomeSystem = _random.Next(1, MaxSystemsPerGalaxy + 1);
+        HomePosition = _random.Next(1, 16); // 1 to 15
+
         // Ensure home system exists and has the player
         var homeSystem = GetSystem(HomeGalaxy, HomeSystem);
         

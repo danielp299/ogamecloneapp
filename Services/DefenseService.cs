@@ -42,6 +42,7 @@ public class DefenseService
     private readonly BuildingService _buildingService;
     private readonly TechnologyService _technologyService;
     private readonly DevModeService _devModeService;
+    private readonly EnemyService _enemyService;
 
     public List<DefenseUnit> DefenseDefinitions { get; private set; } = new();
     
@@ -53,13 +54,14 @@ public class DefenseService
 
     public event Action? OnChange;
 
-    public DefenseService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService)
+    public DefenseService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService, EnemyService enemyService)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
         _buildingService = buildingService;
         _technologyService = technologyService;
         _devModeService = devModeService;
+        _enemyService = enemyService;
         
         InitializeDefenses();
         LoadFromDatabaseAsync().Wait();
@@ -243,6 +245,9 @@ public class DefenseService
                 DurationPerUnit = finalDuration,
                 TimeRemaining = finalDuration
             });
+            
+            // Notify enemy service that player is building defenses
+            _ = _enemyService.OnPlayerDefenseBuilt(unit.Name, quantity);
             
             NotifyStateChanged();
         }
