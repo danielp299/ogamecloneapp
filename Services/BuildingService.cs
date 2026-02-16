@@ -386,7 +386,7 @@ public class BuildingService
             _resourceService.ConsumeResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
             
             // Set initial state for queue
-            var duration = _devModeService.GetDuration(building.Duration, 5);
+            var duration = _devModeService.GetDuration(building.Duration, 1);
             building.ConstructionDuration = duration;
             building.TimeRemaining = duration;
             

@@ -112,26 +112,39 @@
             </div>
         </div>
 
-        <!-- Ships Selection Grid -->
-        <div class="ogame-grid-sm mt-md">
+        <!-- Ships Selection Grid - Golden Ratio Cards (Responsive) -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: clamp(15px, 3vw, 30px); margin-top: 20px; justify-items: center;">
             @foreach (var ship in FleetService.ShipDefinitions)
             {
                 var count = FleetService.GetShipCount(ship.Id);
                 if(count > 0)
                 {
                     var input = GetInputModel(ship.Id);
+                    // Golden ratio: height = width * 1.618
+                    // Responsive width using clamp for min/max bounds - doubled size
 
-                    <div class="ogame-card">
-                        <img src="@ship.Image" alt="@ship.Name" style="width: 96px; height: 96px;" />
-                        <h3 style="font-size: 1em;">@ship.Name</h3>
-                        <div class="ogame-badge">@count</div>
-                        <p class="text-muted" style="font-size: 0.85em;">Speed: @ship.BaseSpeed</p>
-                        <input type="number" @bind="input.QuantityToSend" min="0" max="@count"
-                               style="width: 100%; padding: 8px; margin-top: 5px; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px; text-align: center;" />
-                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm ogame-btn-block mt-sm"
-                                @onclick="() => input.QuantityToSend = count">
-                            All (@count)
-                        </button>
+                    <div class="ogame-card" style="width: 100%; max-width: 320px; aspect-ratio: 1 / 1.618; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: clamp(8px, 1.5vw, 12px); box-sizing: border-box;">
+                        <!-- Image section - larger relative to card -->
+                        <div style="flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding: clamp(4px, 1vw, 8px);">
+                            <img src="@ship.Image" alt="@ship.Name" style="width: clamp(100px, 12vw, 140px); height: clamp(100px, 12vw, 140px); object-fit: contain;" />
+                        </div>
+                        
+                        <!-- Text section with reduced spacing -->
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: clamp(4px, 0.8vw, 8px);">
+                            <h3 style="font-size: clamp(1em, 1.8vw, 1.3em); margin: 0 0 clamp(4px, 0.8vw, 8px) 0; text-align: center; line-height: 1.2;">@ship.Name</h3>
+                            <div class="ogame-badge" style="font-size: clamp(0.9em, 1.3vw, 1.1em);">@count available</div>
+                        </div>
+                        
+                        <!-- Input section at bottom with reduced spacing -->
+                        <div style="width: 100%; margin-top: auto; padding-top: clamp(8px, 1.5vw, 12px);">
+                            <input type="number" @bind="input.QuantityToSend" min="0" max="@count"
+                                   style="width: 100%; padding: clamp(6px, 1.2vw, 10px); margin-bottom: clamp(6px, 1.2vw, 10px); background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px; text-align: center; font-size: clamp(0.9em, 1.3vw, 1.1em); box-sizing: border-box;" />
+                            <button class="ogame-btn ogame-btn-secondary ogame-btn-sm"
+                                    style="width: 100%; font-size: clamp(0.85em, 1.2vw, 1em); padding: clamp(6px, 1.2vw, 10px); box-sizing: border-box;"
+                                    @onclick="() => input.QuantityToSend = count">
+                                All
+                            </button>
+                        </div>
                     </div>
                 }
             }

@@ -4,7 +4,7 @@ namespace myapp.Services;
 
 public class DevModeService
 {
-    public bool IsEnabled { get; private set; } = false;
+    public bool IsEnabled { get; private set; } = true;
     public event Action OnChange;
 
     public void SetEnabled(bool enabled)

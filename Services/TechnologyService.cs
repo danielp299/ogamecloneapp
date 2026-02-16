@@ -413,7 +413,7 @@ public class TechnologyService
             CurrentResearch = tech;
             tech.IsResearching = true;
             
-            var duration = _devModeService.GetDuration(tech.Duration, 10);
+            var duration = _devModeService.GetDuration(tech.Duration, 1);
             tech.ConstructionDuration = duration;
             tech.TimeRemaining = duration;
             

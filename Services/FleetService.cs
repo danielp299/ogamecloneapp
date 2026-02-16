@@ -98,6 +98,12 @@ public class FleetService
         
         InitializeShips();
         
+        // DevMode: Add 10 ships of each type
+        if (_devModeService.IsEnabled)
+        {
+            AddDevModeShips();
+        }
+        
         // Start loops
         _ = ProcessQueueLoop();
         _ = ProcessFleetLoop();
@@ -214,6 +220,22 @@ public class FleetService
             BaseDuration = TimeSpan.FromHours(5),
             Requirements = new() { { "Shipyard", 12 }, { "Hyperspace Drive", 7 }, { "Graviton Technology", 1 } }
         });
+    }
+
+    private void AddDevModeShips()
+    {
+        foreach (var ship in ShipDefinitions)
+        {
+            if (DockedShips.ContainsKey(ship.Id))
+            {
+                DockedShips[ship.Id] += 10;
+            }
+            else
+            {
+                DockedShips[ship.Id] = 10;
+            }
+        }
+        NotifyStateChanged();
     }
 
     public int GetShipCount(string shipId)
