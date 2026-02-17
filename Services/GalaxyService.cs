@@ -27,6 +27,7 @@ public class GalaxyPlanet
 public class GalaxyService
 {
     private readonly GameDbContext _dbContext;
+    private readonly GamePersistenceService _persistenceService;
     
     // Key: "galaxy:system" (e.g., "1:1") -> List of 15 planets
     private Dictionary<string, List<GalaxyPlanet>> _universe = new();
@@ -44,9 +45,10 @@ public class GalaxyService
     public const int MaxGalaxies = 10;
     public const int MaxSystemsPerGalaxy = 10;
 
-    public GalaxyService(GameDbContext dbContext)
+    public GalaxyService(GameDbContext dbContext, GamePersistenceService persistenceService)
     {
         _dbContext = dbContext;
+        _persistenceService = persistenceService;
         
         // Load or generate home coordinates
         LoadOrGenerateHomeCoordinates();
@@ -74,6 +76,15 @@ public class GalaxyService
                 HomeGalaxy = gameState.HomeGalaxy;
                 HomeSystem = gameState.HomeSystem;
                 HomePosition = gameState.HomePosition;
+                
+                // Ensure planet state exists at these coordinates (might be missing if DB was reset)
+                var planetExists = _dbContext.PlanetStates.Any(ps => ps.Galaxy == HomeGalaxy && ps.System == HomeSystem && ps.Position == HomePosition);
+                if (!planetExists)
+                {
+                    Console.WriteLine($"Planet state missing at {HomeGalaxy}:{HomeSystem}:{HomePosition}, initializing...");
+                    _persistenceService.InitializePlanetAsync(HomeGalaxy, HomeSystem, HomePosition).Wait();
+                }
+                
                 Console.WriteLine($"Loaded player home location: {HomeGalaxy}:{HomeSystem}:{HomePosition}");
             }
             else
@@ -94,6 +105,9 @@ public class GalaxyService
                 gameState.HomeSystem = HomeSystem;
                 gameState.HomePosition = HomePosition;
                 _dbContext.SaveChanges();
+                
+                // Initialize planet state at the new home coordinates
+                _persistenceService.InitializePlanetAsync(HomeGalaxy, HomeSystem, HomePosition).Wait();
                 
                 Console.WriteLine($"Generated and saved new player home location: {HomeGalaxy}:{HomeSystem}:{HomePosition}");
             }

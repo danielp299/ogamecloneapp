@@ -41,7 +41,7 @@ namespace myapp.Tests.Services
             var messageService = new MessageService(_dbContext);
             var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
             var persistenceService = new GamePersistenceService(_dbContext, loggerFactory.CreateLogger<GamePersistenceService>());
-            var galaxyService = new GalaxyService(_dbContext);
+            var galaxyService = new GalaxyService(_dbContext, persistenceService);
             var playerStateService = new PlayerStateService(galaxyService);
             var resourceService = new ResourceService(_dbContext, devModeService, playerStateService);
             var enemyService = new EnemyService(_dbContext, galaxyService);

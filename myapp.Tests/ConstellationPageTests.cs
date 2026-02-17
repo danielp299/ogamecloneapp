@@ -30,7 +30,9 @@ namespace myapp.Tests.Components.Pages
         public void ConstellationPage_Render_Should_Render_Page() {
             var dbContext = CreateDbContext();
             Services.AddSingleton(dbContext);
-            var galaxyService = new GalaxyService(dbContext);
+            var persistenceService = new GamePersistenceService(dbContext, null);
+            Services.AddSingleton(persistenceService);
+            var galaxyService = new GalaxyService(dbContext, persistenceService);
             Services.AddSingleton(galaxyService);
             Services.AddSingleton<PlayerStateService>();
             RenderComponent<ConstellationPage>();
@@ -41,7 +43,8 @@ namespace myapp.Tests.Components.Pages
         {
             // Arrange
             var dbContext = CreateDbContext();
-            var galaxyService = new GalaxyService(dbContext);
+            var persistenceService = new GamePersistenceService(dbContext, null);
+            var galaxyService = new GalaxyService(dbContext, persistenceService);
             // Force a planet to be an enemy at 1:1:5
             var system = galaxyService.GetSystem(1, 1);
             var targetPlanet = system.FirstOrDefault(p => p.Position == 5);

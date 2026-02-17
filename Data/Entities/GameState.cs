@@ -17,8 +17,8 @@ public class GameState
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime LastSavedAt { get; set; } = DateTime.UtcNow;
     
-    // Player home planet location
-    public int HomeGalaxy { get; set; } = 1;
-    public int HomeSystem { get; set; } = 1;
-    public int HomePosition { get; set; } = 1;
+    // Player home planet location (0,0,0 = not set, will generate random)
+    public int HomeGalaxy { get; set; } = 0;
+    public int HomeSystem { get; set; } = 0;
+    public int HomePosition { get; set; } = 0;
 }
