@@ -48,24 +48,30 @@ public class GamePersistenceService
         _dbContext.GameState.Add(gameState);
         await _dbContext.SaveChangesAsync();
 
-        // Initialize buildings
-        await InitializeBuildingsAsync();
-        
-        // Initialize technologies
-        await InitializeTechnologiesAsync();
-        
-        // Initialize ships
-        await InitializeShipsAsync();
-        
-        // Initialize defenses
-        await InitializeDefensesAsync();
+        // Initialize home planet state and buildings
+        await InitializePlanetAsync(gameState.HomeGalaxy, gameState.HomeSystem, gameState.HomePosition);
 
         _logger.LogInformation("Game state initialized");
         return gameState;
     }
 
-    private async Task InitializeBuildingsAsync()
+    public async Task InitializePlanetAsync(int g, int s, int p)
     {
+        // Add PlanetState
+        if (!await _dbContext.PlanetStates.AnyAsync(ps => ps.Galaxy == g && ps.System == s && ps.Position == p))
+        {
+            _dbContext.PlanetStates.Add(new PlanetState
+            {
+                Galaxy = g,
+                System = s,
+                Position = p,
+                Metal = 500,
+                Crystal = 500,
+                Deuterium = 0
+            });
+        }
+
+        // Initialize buildings for this planet
         var buildingTypes = new[]
         {
             "Metal Mine", "Crystal Mine", "Deuterium Synthesizer", "Solar Plant",
@@ -76,14 +82,59 @@ public class GamePersistenceService
 
         foreach (var type in buildingTypes)
         {
-            _dbContext.Buildings.Add(new Data.Entities.BuildingEntity
+            if (!await _dbContext.Buildings.AnyAsync(b => b.BuildingType == type && b.Galaxy == g && b.System == s && b.Position == p))
             {
-                BuildingType = type,
-                Level = 0
-            });
+                _dbContext.Buildings.Add(new BuildingEntity
+                {
+                    BuildingType = type,
+                    Level = 0,
+                    Galaxy = g,
+                    System = s,
+                    Position = p
+                });
+            }
+        }
+
+        // Ships and Defenses are also per planet
+        var shipTypes = new[] { "SC", "LC", "LF", "HF", "CR", "BS", "CS", "REC", "ESP", "DST", "RIP" };
+        foreach (var type in shipTypes)
+        {
+            if (!await _dbContext.Ships.AnyAsync(sh => sh.ShipType == type && sh.Galaxy == g && sh.System == s && sh.Position == p))
+            {
+                _dbContext.Ships.Add(new ShipEntity
+                {
+                    ShipType = type,
+                    Quantity = 0,
+                    Galaxy = g,
+                    System = s,
+                    Position = p
+                });
+            }
+        }
+
+        var defenseTypes = new[] { "RL", "LL", "HL", "GC", "IC", "PT", "SSD", "LSD", "ABM", "IPM" };
+        foreach (var type in defenseTypes)
+        {
+            if (!await _dbContext.Defenses.AnyAsync(d => d.DefenseType == type && d.Galaxy == g && d.System == s && d.Position == p))
+            {
+                _dbContext.Defenses.Add(new DefenseEntity
+                {
+                    DefenseType = type,
+                    Quantity = 0,
+                    Galaxy = g,
+                    System = s,
+                    Position = p
+                });
+            }
         }
 
         await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task InitializeBuildingsAsync()
+    {
+        // This method is now redundant but kept for compatibility if called elsewhere, 
+        // though it should probably be removed or redirected.
     }
 
     private async Task InitializeTechnologiesAsync()

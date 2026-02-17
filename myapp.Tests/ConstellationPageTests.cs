@@ -30,7 +30,9 @@ namespace myapp.Tests.Components.Pages
         public void ConstellationPage_Render_Should_Render_Page() {
             var dbContext = CreateDbContext();
             Services.AddSingleton(dbContext);
-            Services.AddSingleton<GalaxyService>();
+            var galaxyService = new GalaxyService(dbContext);
+            Services.AddSingleton(galaxyService);
+            Services.AddSingleton<PlayerStateService>();
             RenderComponent<ConstellationPage>();
         }
 

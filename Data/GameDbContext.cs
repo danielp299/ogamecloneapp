@@ -10,6 +10,7 @@ public class GameDbContext : DbContext
     }
 
     public DbSet<GameState> GameState { get; set; } = null!;
+    public DbSet<PlanetState> PlanetStates { get; set; } = null!;
     public DbSet<BuildingEntity> Buildings { get; set; } = null!;
     public DbSet<TechnologyEntity> Technologies { get; set; } = null!;
     public DbSet<ShipEntity> Ships { get; set; } = null!;
@@ -38,25 +39,31 @@ public class GameDbContext : DbContext
         modelBuilder.Entity<BuildingEntity>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.BuildingType).IsUnique();
+            entity.HasIndex(e => new { e.BuildingType, e.Galaxy, e.System, e.Position }).IsUnique();
         });
 
         modelBuilder.Entity<TechnologyEntity>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.TechnologyType).IsUnique();
+            entity.HasIndex(e => e.TechnologyType).IsUnique(); // Tech is global
         });
 
         modelBuilder.Entity<ShipEntity>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.ShipType).IsUnique();
+            entity.HasIndex(e => new { e.ShipType, e.Galaxy, e.System, e.Position }).IsUnique();
         });
 
         modelBuilder.Entity<DefenseEntity>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.DefenseType).IsUnique();
+            entity.HasIndex(e => new { e.DefenseType, e.Galaxy, e.System, e.Position }).IsUnique();
+        });
+
+        modelBuilder.Entity<PlanetState>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.Galaxy, e.System, e.Position }).IsUnique();
         });
 
         modelBuilder.Entity<BuildingQueueEntity>(entity =>

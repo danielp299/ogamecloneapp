@@ -39,15 +39,18 @@ namespace myapp.Tests.Services
             // Arrange
             var devModeService = new DevModeService(_dbContext);
             var messageService = new MessageService(_dbContext);
-            var resourceService = new ResourceService(_dbContext, devModeService);
+            var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+            var persistenceService = new GamePersistenceService(_dbContext, loggerFactory.CreateLogger<GamePersistenceService>());
             var galaxyService = new GalaxyService(_dbContext);
+            var playerStateService = new PlayerStateService(galaxyService);
+            var resourceService = new ResourceService(_dbContext, devModeService, playerStateService);
             var enemyService = new EnemyService(_dbContext, galaxyService);
-            var buildingService = new BuildingService(_dbContext, resourceService, devModeService, enemyService);
-            var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<TechnologyService>();
-            var techService = new TechnologyService(_dbContext, resourceService, buildingService, devModeService, enemyService, logger);
+            var buildingService = new BuildingService(_dbContext, resourceService, devModeService, enemyService, playerStateService);
+            var techLogger = loggerFactory.CreateLogger<TechnologyService>();
+            var techService = new TechnologyService(_dbContext, resourceService, buildingService, devModeService, enemyService, techLogger);
             var defenseService = new DefenseService(_dbContext, resourceService, buildingService, techService, devModeService, enemyService);
             
-            var fleetService = new FleetService(_dbContext, resourceService, buildingService, techService, galaxyService, messageService, defenseService, devModeService, enemyService);
+            var fleetService = new FleetService(_dbContext, resourceService, buildingService, techService, galaxyService, persistenceService, messageService, defenseService, devModeService, enemyService, playerStateService);
             
             // Create a mock mission that has arrived
             var mission = new FleetMission

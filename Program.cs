@@ -18,6 +18,7 @@ builder.Services.AddDbContext<GameDbContext>(options =>
 builder.Services.AddSingleton<GamePersistenceService>();
 
 // Register game services
+builder.Services.AddSingleton<PlayerStateService>();
 builder.Services.AddSingleton<ResourceService>();
 builder.Services.AddSingleton<BuildingService>();
 builder.Services.AddSingleton<TechnologyService>();

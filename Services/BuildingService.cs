@@ -38,6 +38,7 @@ public class BuildingService
     private readonly ResourceService _resourceService;
     private readonly DevModeService _devModeService;
     private readonly EnemyService _enemyService;
+    private readonly PlayerStateService _playerStateService;
     public List<Building> Buildings { get; private set; } = new();
     public List<Building> ConstructionQueue { get; private set; } = new();
     
@@ -56,36 +57,63 @@ public class BuildingService
     
     public double ProductionFactor { get; private set; } = 1.0;
 
-    public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService, EnemyService enemyService)
+    public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
         _devModeService = devModeService;
         _enemyService = enemyService;
+        _playerStateService = playerStateService;
+        
         InitializeBuildings();
         LoadFromDatabaseAsync().Wait();
+        
+        _playerStateService.OnChange += async () => 
+        {
+            await LoadFromDatabaseAsync();
+            UpdateProduction();
+            NotifyStateChanged();
+        };
+
         // Initial production calculation
         UpdateProduction();
     }
 
     private async Task LoadFromDatabaseAsync()
     {
-        var dbBuildings = await _dbContext.Buildings.ToListAsync();
-        foreach (var dbBuilding in dbBuildings)
+        int g = _playerStateService.ActiveGalaxy;
+        int s = _playerStateService.ActiveSystem;
+        int p = _playerStateService.ActivePosition;
+
+        var dbBuildings = await _dbContext.Buildings
+            .Where(b => b.Galaxy == g && b.System == s && b.Position == p)
+            .ToListAsync();
+
+        foreach (var building in Buildings)
         {
-            var building = Buildings.FirstOrDefault(b => b.Title == dbBuilding.BuildingType);
-            if (building != null)
+            var dbBuilding = dbBuildings.FirstOrDefault(b => b.BuildingType == building.Title);
+            if (dbBuilding != null)
             {
                 building.Level = dbBuilding.Level;
+            }
+            else
+            {
+                building.Level = 0;
             }
         }
     }
 
     private async Task SaveToDatabaseAsync()
     {
+        int g = _playerStateService.ActiveGalaxy;
+        int s = _playerStateService.ActiveSystem;
+        int p = _playerStateService.ActivePosition;
+
         foreach (var building in Buildings)
         {
-            var dbBuilding = await _dbContext.Buildings.FirstOrDefaultAsync(b => b.BuildingType == building.Title);
+            var dbBuilding = await _dbContext.Buildings.FirstOrDefaultAsync(b => 
+                b.BuildingType == building.Title && b.Galaxy == g && b.System == s && b.Position == p);
+            
             if (dbBuilding != null)
             {
                 dbBuilding.Level = building.Level;

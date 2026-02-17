@@ -8,17 +8,22 @@ public class ResourceService
 {
     private readonly GameDbContext _dbContext;
     private readonly DevModeService _devModeService;
+    private readonly PlayerStateService _playerStateService;
     private GameState? _cachedState;
+    private Dictionary<string, PlanetState> _cachedPlanetStates = new();
 
     // Refund percentage for cancelled buildings/research (1-100)
     public double CancelRefundPercentage { get; set; } = 100.0;
 
     public event Action? OnChange;
 
-    public ResourceService(GameDbContext dbContext, DevModeService devModeService)
+    public ResourceService(GameDbContext dbContext, DevModeService devModeService, PlayerStateService playerStateService)
     {
         _dbContext = dbContext;
         _devModeService = devModeService;
+        _playerStateService = playerStateService;
+        
+        _playerStateService.OnChange += () => NotifyStateChanged();
     }
 
     public async Task LoadStateAsync()
@@ -35,55 +40,54 @@ public class ResourceService
         return _cachedState ?? throw new InvalidOperationException("Game state not initialized");
     }
 
-    public long Metal
+    private async Task<PlanetState> GetPlanetStateAsync(int g, int s, int p)
     {
-        get
+        string key = $"{g}:{s}:{p}";
+        if (!_cachedPlanetStates.TryGetValue(key, out var state))
         {
-            var state = GetStateAsync().Result;
-            var now = DateTime.UtcNow;
-            var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
-            return (long)(state.Metal + (MetalProductionRate * elapsedSeconds));
+            state = await _dbContext.PlanetStates.FirstOrDefaultAsync(ps => ps.Galaxy == g && ps.System == s && ps.Position == p);
+            if (state == null)
+            {
+                // If it doesn't exist, we might be in a race condition during colonization, 
+                // but usually we should have it.
+                throw new InvalidOperationException($"Planet state for {key} not found");
+            }
+            _cachedPlanetStates[key] = state;
         }
+        return state;
     }
-    public long Crystal
+
+    private PlanetState GetActivePlanetState()
     {
-        get
-        {
-            var state = GetStateAsync().Result;
-            var now = DateTime.UtcNow;
-            var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
-            return (long)(state.Crystal + (CrystalProductionRate * elapsedSeconds));
-        }
+        return GetPlanetStateAsync(_playerStateService.ActiveGalaxy, _playerStateService.ActiveSystem, _playerStateService.ActivePosition).Result;
     }
-    public long Deuterium
-    {
-        get
-        {
-            var state = GetStateAsync().Result;
-            var now = DateTime.UtcNow;
-            var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
-            return (long)(state.Deuterium + (DeuteriumProductionRate * elapsedSeconds));
-        }
-    }
+
+    public long Metal => (long)GetActivePlanetState().Metal;
+    public long Crystal => (long)GetActivePlanetState().Crystal;
+    public long Deuterium => (long)GetActivePlanetState().Deuterium;
     public long DarkMatter => (long)(GetStateAsync().Result.DarkMatter);
-    public long Energy => GetStateAsync().Result.Energy;
+    public long Energy => GetActivePlanetState().Energy;
 
     public double MetalProductionRate { get; set; }
     public double CrystalProductionRate { get; set; }
     public double DeuteriumProductionRate { get; set; }
+
+    // ... updated methods follow ...
 
 private async Task SaveStateAsync()
     {
         await _dbContext.SaveChangesAsync();
     }
 
-    private void EnsureCurrentResourcesCalculated(GameState state)
+    private void EnsureCurrentResourcesCalculated(PlanetState state)
     {
         var now = DateTime.UtcNow;
         var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
 
         if (elapsedSeconds > 0)
         {
+            // Note: This still uses the SHARED MetalProductionRate. 
+            // We'll need to fix this in BuildingService soon.
             state.Metal += MetalProductionRate * elapsedSeconds;
             state.Crystal += CrystalProductionRate * elapsedSeconds;
             state.Deuterium += DeuteriumProductionRate * elapsedSeconds;
@@ -93,7 +97,7 @@ private async Task SaveStateAsync()
 
     public bool HasResources(long metal, long crystal, long deuterium)
     {
-        var state = GetStateAsync().Result;
+        var state = GetActivePlanetState();
         EnsureCurrentResourcesCalculated(state);
         return state.Metal >= metal && state.Crystal >= crystal && state.Deuterium >= deuterium;
     }
@@ -105,7 +109,7 @@ private async Task SaveStateAsync()
             return false;
         }
 
-        var state = GetStateAsync().Result;
+        var state = GetActivePlanetState();
         EnsureCurrentResourcesCalculated(state);
         state.Metal -= metal;
         state.Crystal -= crystal;
@@ -118,7 +122,7 @@ private async Task SaveStateAsync()
 
     public void AddResources(double metal, double crystal, double deuterium)
     {
-        var state = GetStateAsync().Result;
+        var state = GetActivePlanetState();
         EnsureCurrentResourcesCalculated(state);
         state.Metal += metal;
         state.Crystal += crystal;
@@ -126,6 +130,22 @@ private async Task SaveStateAsync()
 
         _dbContext.SaveChanges();
         NotifyStateChanged();
+    }
+
+    public void AddResourcesToPlanet(int g, int s, int p, double metal, double crystal, double deuterium)
+    {
+        var state = GetPlanetStateAsync(g, s, p).Result;
+        EnsureCurrentResourcesCalculated(state);
+        state.Metal += metal;
+        state.Crystal += crystal;
+        state.Deuterium += deuterium;
+
+        _dbContext.SaveChanges();
+        // We only notify if it's the active planet
+        if (_playerStateService.ActiveGalaxy == g && _playerStateService.ActiveSystem == s && _playerStateService.ActivePosition == p)
+        {
+            NotifyStateChanged();
+        }
     }
 
     public void AddDarkMatter(long amount)
@@ -145,7 +165,7 @@ private async Task SaveStateAsync()
 
     public void SetEnergy(long energy)
     {
-        var state = GetStateAsync().Result;
+        var state = GetActivePlanetState();
         state.Energy = energy;
 
         _dbContext.SaveChanges();
@@ -154,7 +174,7 @@ private async Task SaveStateAsync()
 
     public void UpdateEnergy(long deltaEnergy)
     {
-        var state = GetStateAsync().Result;
+        var state = GetActivePlanetState();
         state.Energy += deltaEnergy;
 
         _dbContext.SaveChanges();

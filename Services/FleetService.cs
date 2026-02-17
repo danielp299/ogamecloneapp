@@ -15,6 +15,7 @@ public class FleetMission
 {
     public Guid Id { get; set; }
     public string MissionType { get; set; } = "";
+    public string OriginCoordinates { get; set; } = "";
     public string TargetCoordinates { get; set; } = "";
     public Dictionary<string, int> Ships { get; set; } = new();
     public DateTime StartTime { get; set; }
@@ -81,6 +82,8 @@ public class FleetService
     private readonly BuildingService _buildingService;
     private readonly TechnologyService _technologyService;
     private readonly GalaxyService _galaxyService;
+    private readonly GamePersistenceService _persistenceService;
+    private readonly PlayerStateService _playerStateService;
     private readonly MessageService _messageService;
     private readonly DefenseService _defenseService;
     private readonly DevModeService _devModeService;
@@ -101,20 +104,28 @@ public class FleetService
 
     private bool _isProcessingQueue = false;
 
-    public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, MessageService messageService, DefenseService defenseService, DevModeService devModeService, EnemyService enemyService)
+    public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, GamePersistenceService persistenceService, MessageService messageService, DefenseService defenseService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
         _buildingService = buildingService;
         _technologyService = technologyService;
         _galaxyService = galaxyService;
+        _persistenceService = persistenceService;
         _messageService = messageService;
         _defenseService = defenseService;
         _devModeService = devModeService;
         _enemyService = enemyService;
+        _playerStateService = playerStateService;
         
         InitializeShips();
         LoadFromDatabaseAsync().Wait();
+
+        _playerStateService.OnChange += async () => 
+        {
+            await LoadFromDatabaseAsync();
+            NotifyStateChanged();
+        };
         
         // DevMode: Add 10 ships of each type
         if (_devModeService.IsEnabled)
@@ -129,7 +140,17 @@ public class FleetService
 
     private async Task LoadFromDatabaseAsync()
     {
-        var dbShips = await _dbContext.Ships.ToListAsync();
+        int g = _playerStateService.ActiveGalaxy;
+        int s = _playerStateService.ActiveSystem;
+        int p = _playerStateService.ActivePosition;
+
+        var dbShips = await _dbContext.Ships
+            .Where(sh => sh.Galaxy == g && sh.System == s && sh.Position == p)
+            .ToListAsync();
+        
+        // Reset counts
+        foreach (var ship in ShipDefinitions) DockedShips[ship.Id] = 0;
+
         foreach (var dbShip in dbShips)
         {
             DockedShips[dbShip.ShipType] = dbShip.Quantity;
@@ -138,12 +159,42 @@ public class FleetService
 
     private async Task SaveToDatabaseAsync()
     {
+        int g = _playerStateService.ActiveGalaxy;
+        int s = _playerStateService.ActiveSystem;
+        int p = _playerStateService.ActivePosition;
+
         foreach (var kvp in DockedShips)
         {
-            var dbShip = await _dbContext.Ships.FirstOrDefaultAsync(s => s.ShipType == kvp.Key);
+            var dbShip = await _dbContext.Ships.FirstOrDefaultAsync(sh => 
+                sh.ShipType == kvp.Key && sh.Galaxy == g && sh.System == s && sh.Position == p);
+            
             if (dbShip != null)
             {
                 dbShip.Quantity = kvp.Value;
+            }
+        }
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SaveShipsToPlanetAsync(int g, int s, int p, Dictionary<string, int> ships)
+    {
+        foreach (var kvp in ships)
+        {
+            var dbShip = await _dbContext.Ships.FirstOrDefaultAsync(sh => sh.ShipType == kvp.Key && sh.Galaxy == g && sh.System == s && sh.Position == p);
+            if (dbShip != null)
+            {
+                dbShip.Quantity += kvp.Value;
+            }
+            else
+            {
+                _dbContext.Ships.Add(new ShipEntity
+                {
+                    ShipType = kvp.Key,
+                    Quantity = kvp.Value,
+                    Galaxy = g,
+                    System = s,
+                    Position = p
+                });
             }
         }
         await _dbContext.SaveChangesAsync();
@@ -371,6 +422,7 @@ public class FleetService
         {
             Id = Guid.NewGuid(),
             MissionType = missionType,
+            OriginCoordinates = $"{_playerStateService.ActiveGalaxy}:{_playerStateService.ActiveSystem}:{_playerStateService.ActivePosition}",
             TargetCoordinates = $"{g}:{s}:{p}",
             Ships = new Dictionary<string, int>(shipsToSend),
             StartTime = DateTime.Now,
@@ -433,11 +485,12 @@ public class FleetService
                     if (now >= mission.ReturnTime)
                     {
                         // Returned to base
-                        foreach(var kvp in mission.Ships)
-                        {
-                            if (!DockedShips.ContainsKey(kvp.Key)) DockedShips[kvp.Key] = 0;
-                            DockedShips[kvp.Key] += kvp.Value;
-                        }
+                        var originParts = mission.OriginCoordinates.Split(':');
+                        int og = int.Parse(originParts[0]);
+                        int os = int.Parse(originParts[1]);
+                        int op = int.Parse(originParts[2]);
+
+                        await SaveShipsToPlanetAsync(og, os, op, mission.Ships);
 
                         // Unload Cargo
                         if (mission.Cargo.Count > 0)
@@ -445,13 +498,17 @@ public class FleetService
                             long m = mission.Cargo.ContainsKey("Metal") ? mission.Cargo["Metal"] : 0;
                             long c = mission.Cargo.ContainsKey("Crystal") ? mission.Cargo["Crystal"] : 0;
                             long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
-                            _resourceService.AddResources(m, c, d);
+                            _resourceService.AddResourcesToPlanet(og, os, op, m, c, d);
                         }
                         
-                        await SaveToDatabaseAsync();
+                        // We also need to reload active view if we are on that planet
+                        if (_playerStateService.ActiveGalaxy == og && _playerStateService.ActiveSystem == os && _playerStateService.ActivePosition == op)
+                        {
+                            await LoadFromDatabaseAsync();
+                        }
                         
                         _messageService.AddMessage("Fleet Return", 
-                            $"Your fleet from {mission.TargetCoordinates} has returned to base.", 
+                            $"Your fleet from {mission.TargetCoordinates} has returned to {mission.OriginCoordinates}.", 
                             "General");
                         
                         completedMissions.Add(mission);
@@ -490,6 +547,12 @@ public class FleetService
                 break;
             case "Attack":
                 HandleCombat(mission, planet);
+                break;
+            case "Transport":
+                HandleTransport(mission, planet);
+                break;
+            case "Deploy":
+                HandleDeploy(mission, planet);
                 break;
             case "Colonize":
                 HandleColonization(mission, planet);
@@ -996,6 +1059,64 @@ public class FleetService
         return (new(), new(), new(), 0, new(), new());
     }
 
+    private void HandleTransport(FleetMission mission, GalaxyPlanet? planet)
+    {
+        if (planet == null || !planet.IsOccupied)
+        {
+            _messageService.AddMessage("Transport Failed", "Destination is empty.", "General");
+            return;
+        }
+
+        long m = mission.Cargo.ContainsKey("Metal") ? mission.Cargo["Metal"] : 0;
+        long c = mission.Cargo.ContainsKey("Crystal") ? mission.Cargo["Crystal"] : 0;
+        long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
+
+        if (planet.IsMyPlanet)
+        {
+            _resourceService.AddResourcesToPlanet(planet.Galaxy, planet.System, planet.Position, m, c, d);
+        }
+        else
+        {
+            // If it's an enemy, it's basically a gift? In OGame you can transport to anyone.
+            // For now let's just handle player planets.
+            _messageService.AddMessage("Transport", "Resources delivered to target.", "General");
+        }
+
+        mission.Cargo.Clear();
+        _messageService.AddMessage("Transport Successful", $"Resources delivered to {mission.TargetCoordinates}.", "General");
+    }
+
+    private void HandleDeploy(FleetMission mission, GalaxyPlanet? planet)
+    {
+        if (planet == null || !planet.IsMyPlanet)
+        {
+            _messageService.AddMessage("Deployment Failed", "You can only deploy to your own planets.", "General");
+            return;
+        }
+
+        // Unload Cargo
+        long m = mission.Cargo.ContainsKey("Metal") ? mission.Cargo["Metal"] : 0;
+        long c = mission.Cargo.ContainsKey("Crystal") ? mission.Cargo["Crystal"] : 0;
+        long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
+        _resourceService.AddResourcesToPlanet(planet.Galaxy, planet.System, planet.Position, m, c, d);
+        mission.Cargo.Clear();
+
+        // Transfer ships to the planet's docked ships
+        SaveShipsToPlanetAsync(planet.Galaxy, planet.System, planet.Position, mission.Ships).Wait();
+        
+        // If we are on that planet, reload
+        if (_playerStateService.ActiveGalaxy == planet.Galaxy && _playerStateService.ActiveSystem == planet.System && _playerStateService.ActivePosition == planet.Position)
+        {
+            LoadFromDatabaseAsync().Wait();
+        }
+
+        _messageService.AddMessage("Deployment successful", $"Fleet deployed to {mission.TargetCoordinates}.", "General");
+        
+        // Deployment doesn't return
+        mission.Ships.Clear(); // They stay at target
+        // Logic to add them to target planet's inventory needed here.
+    }
+
     private void HandleColonization(FleetMission mission, GalaxyPlanet? planet)
     {
         if (planet == null || planet.IsOccupied)
@@ -1036,6 +1157,9 @@ public class FleetService
         planet.Image = "assets/planets/planet_colony.jpg";
         
         _galaxyService.RegisterPlanet(planet);
+
+        // Initialize new planet state (Resources, Buildings, etc.)
+        _persistenceService.InitializePlanetAsync(planet.Galaxy, planet.System, planet.Position).Wait();
 
         _messageService.AddMessage("Colonization Successful", 
             $"You have successfully colonized position {mission.TargetCoordinates}!", "General");
