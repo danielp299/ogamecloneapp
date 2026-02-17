@@ -1,8 +1,21 @@
 @implements IDisposable
 @inject myapp.Services.ResourceService ResourceService
 @inject myapp.Services.BuildingService BuildingService
+@inject myapp.Services.PlayerStateService PlayerStateService
+@inject myapp.Services.GalaxyService GalaxyService
 
 <div class="top-menu">
+    <div class="resource-selector" style="margin-right: 20px;">
+        <select @onchange="OnPlanetChanged" style="background: var(--color-bg-tertiary); color: white; border: 1px solid var(--color-border-medium); padding: 5px; border-radius: 4px;">
+            @foreach (var planet in GalaxyService.PlayerPlanets)
+            {
+                <option value="@($"{planet.Galaxy}:{planet.System}:{planet.Position}")" 
+                        selected="@IsSelected(planet)">
+                    @planet.Name [@planet.Galaxy:@planet.System:@planet.Position]
+                </option>
+            }
+        </select>
+    </div>
     <div class="resource" title="Total Production: @BuildingService.MetalHourlyProduction.ToString("N0")/h
 Energy Use: @BuildingService.MetalMineEnergyConsumption
 Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
@@ -47,6 +60,28 @@ Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         
         // Update the UI
         InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsSelected(myapp.Services.GalaxyPlanet planet)
+    {
+        return planet.Galaxy == PlayerStateService.ActiveGalaxy && 
+               planet.System == PlayerStateService.ActiveSystem && 
+               planet.Position == PlayerStateService.ActivePosition;
+    }
+
+    private void OnPlanetChanged(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        if (string.IsNullOrEmpty(val)) return;
+
+        var parts = val.Split(':');
+        if (parts.Length == 3 && 
+            int.TryParse(parts[0], out int g) && 
+            int.TryParse(parts[1], out int s) && 
+            int.TryParse(parts[2], out int p))
+        {
+            PlayerStateService.SetActivePlanet(g, s, p);
+        }
     }
 
     public void Dispose()

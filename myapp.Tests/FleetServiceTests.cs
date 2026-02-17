@@ -48,7 +48,7 @@ namespace myapp.Tests.Services
             var buildingService = new BuildingService(_dbContext, resourceService, devModeService, enemyService, playerStateService);
             var techLogger = loggerFactory.CreateLogger<TechnologyService>();
             var techService = new TechnologyService(_dbContext, resourceService, buildingService, devModeService, enemyService, techLogger);
-            var defenseService = new DefenseService(_dbContext, resourceService, buildingService, techService, devModeService, enemyService);
+            var defenseService = new DefenseService(_dbContext, resourceService, buildingService, techService, devModeService, enemyService, playerStateService);
             
             var fleetService = new FleetService(_dbContext, resourceService, buildingService, techService, galaxyService, persistenceService, messageService, defenseService, devModeService, enemyService, playerStateService);
             

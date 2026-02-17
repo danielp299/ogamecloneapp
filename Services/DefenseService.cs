@@ -43,6 +43,7 @@ public class DefenseService
     private readonly TechnologyService _technologyService;
     private readonly DevModeService _devModeService;
     private readonly EnemyService _enemyService;
+    private readonly PlayerStateService _playerStateService;
 
     public List<DefenseUnit> DefenseDefinitions { get; private set; } = new();
     
@@ -54,7 +55,7 @@ public class DefenseService
 
     public event Action? OnChange;
 
-    public DefenseService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService, EnemyService enemyService)
+    public DefenseService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
@@ -62,9 +63,16 @@ public class DefenseService
         _technologyService = technologyService;
         _devModeService = devModeService;
         _enemyService = enemyService;
+        _playerStateService = playerStateService;
         
         InitializeDefenses();
         LoadFromDatabaseAsync().Wait();
+
+        _playerStateService.OnChange += async () => 
+        {
+            await LoadFromDatabaseAsync();
+            NotifyStateChanged();
+        };
         
         // Start queue processor
         _ = ProcessQueueLoop();
@@ -72,7 +80,17 @@ public class DefenseService
 
     private async Task LoadFromDatabaseAsync()
     {
-        var dbDefenses = await _dbContext.Defenses.ToListAsync();
+        int g = _playerStateService.ActiveGalaxy;
+        int s = _playerStateService.ActiveSystem;
+        int p = _playerStateService.ActivePosition;
+
+        var dbDefenses = await _dbContext.Defenses
+            .Where(d => d.Galaxy == g && d.System == s && d.Position == p)
+            .ToListAsync();
+        
+        // Reset counts
+        foreach (var def in DefenseDefinitions) BuiltDefenses[def.Id] = 0;
+
         foreach (var dbDefense in dbDefenses)
         {
             BuiltDefenses[dbDefense.DefenseType] = dbDefense.Quantity;
@@ -81,9 +99,15 @@ public class DefenseService
 
     private async Task SaveToDatabaseAsync()
     {
+        int g = _playerStateService.ActiveGalaxy;
+        int s = _playerStateService.ActiveSystem;
+        int p = _playerStateService.ActivePosition;
+
         foreach (var kvp in BuiltDefenses)
         {
-            var dbDefense = await _dbContext.Defenses.FirstOrDefaultAsync(d => d.DefenseType == kvp.Key);
+            var dbDefense = await _dbContext.Defenses.FirstOrDefaultAsync(d => 
+                d.DefenseType == kvp.Key && d.Galaxy == g && d.System == s && d.Position == p);
+            
             if (dbDefense != null)
             {
                 dbDefense.Quantity = kvp.Value;
