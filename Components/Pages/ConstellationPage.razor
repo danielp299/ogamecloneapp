@@ -171,17 +171,45 @@
         if (CurrentSystem > 1)
         {
             CurrentSystem--;
-            LoadSystem();
         }
+        else
+        {
+            if (CurrentGalaxy > 1)
+            {
+                CurrentGalaxy--;
+            }
+            else
+            {
+                CurrentGalaxy = GalaxyService.MaxGalaxies;
+            }
+
+            CurrentSystem = GalaxyService.MaxSystemsPerGalaxy;
+        }
+
+        LoadSystem();
     }
 
     private void NextSystem()
     {
-        if (CurrentSystem < 10)
+        if (CurrentSystem < GalaxyService.MaxSystemsPerGalaxy)
         {
             CurrentSystem++;
-            LoadSystem();
         }
+        else
+        {
+            if (CurrentGalaxy < GalaxyService.MaxGalaxies)
+            {
+                CurrentGalaxy++;
+            }
+            else
+            {
+                CurrentGalaxy = 1;
+            }
+
+            CurrentSystem = 1;
+        }
+
+        LoadSystem();
     }
 
     private void SendFleet(int position, int missionCode)
