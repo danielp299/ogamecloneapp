@@ -1007,7 +1007,7 @@ public class FleetService
 
         // Check Astrophysics Limit
         int astroLevel = _technologyService.GetTechLevel(TechType.Astrophysics);
-        int maxPlanets = 1 + (astroLevel + 1) / 2;
+        int maxPlanets = 4; // Hardcoded limit as requested
 
         if (_galaxyService.PlayerPlanets.Count >= maxPlanets)
         {
