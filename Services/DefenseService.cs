@@ -317,4 +317,12 @@ public class DefenseService
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
+
+    public void ResetState()
+    {
+        DefenseDefinitions.Clear();
+        BuiltDefenses.Clear();
+        ConstructionQueue.Clear();
+        InitializeDefenses();
+    }
 }

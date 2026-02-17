@@ -44,6 +44,9 @@ public class Enemy
     // Alliance marker
     public bool IsBot { get; set; } = false;
     
+    // Colony tracking
+    public int ColonyCount { get; set; } = 0;
+    
     public string Coordinates => $"{Galaxy}:{System}:{Position}";
 }
 
@@ -83,7 +86,8 @@ public class EnemyService
         "Espionage Technology", "Computer Technology", "Weapons Technology",
         "Shielding Technology", "Armour Technology", "Energy Technology",
         "Hyperspace Technology", "Combustion Drive", "Impulse Drive",
-        "Hyperspace Drive", "Laser Technology", "Ion Technology", "Plasma Technology"
+        "Hyperspace Drive", "Laser Technology", "Ion Technology", "Plasma Technology",
+        "Intergalactic Research Network", "Astrophysics", "Graviton Technology"
     };
     
     // Available defense types
@@ -125,7 +129,10 @@ public class EnemyService
         ["Hyperspace Drive"] = new() { ["Research Lab"] = 7, ["Hyperspace Technology"] = 3 },
         ["Laser Technology"] = new() { ["Research Lab"] = 1, ["Energy Technology"] = 2 },
         ["Ion Technology"] = new() { ["Research Lab"] = 4, ["Laser Technology"] = 5, ["Energy Technology"] = 4 },
-        ["Plasma Technology"] = new() { ["Research Lab"] = 4, ["Energy Technology"] = 8, ["Laser Technology"] = 10, ["Ion Technology"] = 5 }
+        ["Plasma Technology"] = new() { ["Research Lab"] = 4, ["Energy Technology"] = 8, ["Laser Technology"] = 10, ["Ion Technology"] = 5 },
+        ["Intergalactic Research Network"] = new() { ["Research Lab"] = 10, ["Computer Technology"] = 8, ["Hyperspace Technology"] = 8 },
+        ["Astrophysics"] = new() { ["Research Lab"] = 3, ["Espionage Technology"] = 4, ["Impulse Drive"] = 3 },
+        ["Graviton Technology"] = new() { ["Research Lab"] = 12 }
     };
     
     // Ship requirements - which buildings and techs needed to build ships
@@ -158,15 +165,36 @@ public class EnemyService
         ["Anti-Ballistic Missile"] = new() { ["Shipyard"] = 1, ["Missile Silo"] = 2 }
     };
     
+    private bool _isInitialized = false;
+
     public EnemyService(GameDbContext dbContext, GalaxyService galaxyService)
     {
         _dbContext = dbContext;
         _galaxyService = galaxyService;
-        
-        // Load enemies from database
+        // NOTA: La inicialización es lazy via Initialize() o GenerateInitialEnemiesAsync()
+    }
+
+    public void Initialize()
+    {
+        if (_isInitialized) return;
         LoadEnemiesAsync().Wait();
-        
-        // No background loop - enemies only act when player acts
+        _isInitialized = true;
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+        await LoadEnemiesAsync();
+        _isInitialized = true;
+    }
+
+    public void ResetState()
+    {
+        lock (_lockObject)
+        {
+            _enemies.Clear();
+            _isInitialized = false;
+        }
     }
     
     private async Task LoadEnemiesAsync()
@@ -193,7 +221,8 @@ public class EnemyService
                         Energy = dbEnemy.Energy,
                         LastResourceUpdate = dbEnemy.LastResourceUpdate,
                         LastActivity = dbEnemy.LastActivity,
-                        IsBot = dbEnemy.IsBot
+                        IsBot = dbEnemy.IsBot,
+                        ColonyCount = dbEnemy.ColonyCount
                     };
                     
                     // Deserialize buildings
@@ -226,23 +255,21 @@ public class EnemyService
                     var key = $"{enemy.Galaxy}:{enemy.System}:{enemy.Position}";
                     _enemies[key] = enemy;
                 }
-            }
-            else
-            {
-                // Generate new enemies
-                await GenerateEnemies();
+
+                Console.WriteLine($"Loaded {dbEnemies.Count} enemies from database");
             }
         }
         catch (Exception ex)
         {
-            // If database error, generate enemies anyway
             Console.WriteLine($"Error loading enemies: {ex.Message}");
-            await GenerateEnemies();
+            // Don't generate enemies here - let GameInitializationService handle it
         }
     }
-    
-    private async Task GenerateEnemies()
+
+    public async Task GenerateInitialEnemiesAsync(int playerGalaxy, int playerSystem, int playerPosition)
     {
+        if (_isInitialized) return;
+
         int enemiesCreated = 0;
         
         lock (_lockObject)
@@ -263,19 +290,12 @@ public class EnemyService
                 
                 var key = $"{galaxy}:{system}:{position}";
                 
-                // Skip if this position is already occupied by an enemy or player
+                // Skip if this position is already occupied by an enemy
                 if (_enemies.ContainsKey(key))
                     continue;
                 
                 // Skip if this is the player's home planet
-                if (galaxy == _galaxyService.HomeGalaxy && 
-                    system == _galaxyService.HomeSystem && 
-                    position == _galaxyService.HomePosition)
-                    continue;
-                
-                // Check if there's already a planet there in GalaxyService
-                var planet = _galaxyService.GetPlanet(galaxy, system, position);
-                if (planet != null && planet.IsOccupied && planet.IsMyPlanet)
+                if (galaxy == playerGalaxy && system == playerSystem && position == playerPosition)
                     continue;
                 
                 // Create enemy
@@ -322,8 +342,9 @@ public class EnemyService
         // Save to database
         await SaveEnemiesAsync();
         
+        _isInitialized = true;
         NotifyStateChanged();
-        Console.WriteLine($"Generated {enemiesCreated} enemies");
+        Console.WriteLine($"Generated {enemiesCreated} initial enemies");
     }
     
     private void UpdateEnemyProductionRates(Enemy enemy)
@@ -674,7 +695,8 @@ public class EnemyService
                         Energy = enemy.Energy,
                         LastResourceUpdate = enemy.LastResourceUpdate,
                         LastActivity = enemy.LastActivity,
-                        IsBot = enemy.IsBot
+                        IsBot = enemy.IsBot,
+                        ColonyCount = enemy.ColonyCount
                     };
                     _dbContext.Enemies.Add(dbEnemy);
                 }
@@ -688,6 +710,7 @@ public class EnemyService
                     dbEnemy.Energy = enemy.Energy;
                     dbEnemy.LastResourceUpdate = enemy.LastResourceUpdate;
                     dbEnemy.LastActivity = enemy.LastActivity;
+                    dbEnemy.ColonyCount = enemy.ColonyCount;
                 }
                 
                 // Serialize dictionaries
@@ -826,6 +849,30 @@ public class EnemyService
 
     private async Task TryEnemyColonize(Enemy parentEnemy)
     {
+        // Check if enemy has Astrophysics technology
+        if (!parentEnemy.Technologies.ContainsKey("Astrophysics") || parentEnemy.Technologies["Astrophysics"] < 1)
+        {
+            Console.WriteLine($"Enemy {parentEnemy.Name} cannot colonize - lacks Astrophysics technology");
+            return;
+        }
+        
+        // Check if enemy has at least 1 Colony Ship
+        if (!parentEnemy.Ships.ContainsKey("CS") || parentEnemy.Ships["CS"] < 1)
+        {
+            Console.WriteLine($"Enemy {parentEnemy.Name} cannot colonize - no Colony Ships available");
+            return;
+        }
+        
+        // Check planet limit based on Astrophysics level
+        int astroLevel = parentEnemy.Technologies["Astrophysics"];
+        int maxColonies = (int)Math.Ceiling(astroLevel / 2.0);
+        
+        if (parentEnemy.ColonyCount >= maxColonies)
+        {
+            Console.WriteLine($"Enemy {parentEnemy.Name} cannot colonize - limit reached ({parentEnemy.ColonyCount}/{maxColonies} colonies, Astrophysics {astroLevel})");
+            return;
+        }
+        
         // Find an empty spot
         int galaxy = parentEnemy.Galaxy;
         int system = parentEnemy.System;
@@ -839,6 +886,13 @@ public class EnemyService
                 var planet = _galaxyService.GetPlanet(galaxy, system, p);
                 if (planet != null && !planet.IsOccupied)
                 {
+                    // Consume Colony Ship
+                    parentEnemy.Ships["CS"]--;
+                    if (parentEnemy.Ships["CS"] <= 0)
+                    {
+                        parentEnemy.Ships.Remove("CS");
+                    }
+                    
                     // Colonize!
                     var newEnemy = new Enemy
                     {
@@ -863,7 +917,10 @@ public class EnemyService
                     planet.PlayerName = newEnemy.Name;
                     planet.Alliance = "[BOTS]";
                     
-                    Console.WriteLine($"Enemy {parentEnemy.Name} colonized {key}");
+                    // Increment colony count
+                    parentEnemy.ColonyCount++;
+                    
+                    Console.WriteLine($"Enemy {parentEnemy.Name} colonized {key} (Colony {parentEnemy.ColonyCount}/{maxColonies}, Astrophysics {astroLevel})");
                     break;
                 }
             }
@@ -1540,8 +1597,13 @@ public class EnemyService
         _dbContext.Enemies.RemoveRange(allEnemies);
         await _dbContext.SaveChangesAsync();
         
-        // Generate new enemies
-        await GenerateEnemies();
+        // Generate new enemies using current player location
+        _isInitialized = false;
+        await GenerateInitialEnemiesAsync(
+            _galaxyService.HomeGalaxy,
+            _galaxyService.HomeSystem,
+            _galaxyService.HomePosition
+        );
     }
     
     private void NotifyStateChanged() => OnChange?.Invoke();

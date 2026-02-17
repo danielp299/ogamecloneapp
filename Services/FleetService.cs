@@ -1296,4 +1296,13 @@ public class FleetService
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
+
+    public void ResetState()
+    {
+        DockedShips.Clear();
+        ConstructionQueue.Clear();
+        ActiveFleets.Clear();
+        _isProcessingQueue = false;
+        InitializeShips();
+    }
 }

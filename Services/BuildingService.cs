@@ -57,6 +57,8 @@ public class BuildingService
     
     public double ProductionFactor { get; private set; } = 1.0;
 
+    private bool _isInitialized = false;
+
     public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
     {
         _dbContext = dbContext;
@@ -66,7 +68,7 @@ public class BuildingService
         _playerStateService = playerStateService;
         
         InitializeBuildings();
-        LoadFromDatabaseAsync().Wait();
+        // NOTA: La carga de datos es lazy via Initialize()
         
         _playerStateService.OnChange += async () => 
         {
@@ -74,9 +76,32 @@ public class BuildingService
             UpdateProduction();
             NotifyStateChanged();
         };
+    }
 
-        // Initial production calculation
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+        
+        await LoadFromDatabaseAsync();
         UpdateProduction();
+        
+        _isInitialized = true;
+    }
+
+    public void ResetState()
+    {
+        Buildings.Clear();
+        ConstructionQueue.Clear();
+        MetalHourlyProduction = 0;
+        CrystalHourlyProduction = 0;
+        DeuteriumHourlyProduction = 0;
+        MetalMineEnergyConsumption = 0;
+        CrystalMineEnergyConsumption = 0;
+        DeuteriumSynthesizerEnergyConsumption = 0;
+        ProductionFactor = 1.0;
+        _isInitialized = false;
+        _isProcessingQueue = false;
+        InitializeBuildings();
     }
 
     private async Task LoadFromDatabaseAsync()

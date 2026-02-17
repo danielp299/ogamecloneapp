@@ -1,6 +1,8 @@
 @page "/options"
 @using myapp.Services
 @inject GamePersistenceService PersistenceService
+@inject GameInitializationService GameInitializationService
+@inject PlayerStateService PlayerStateService
 @inject DevModeService DevModeService
 @inject NavigationManager Navigation
 @implements IDisposable
@@ -187,9 +189,14 @@
     {
         try
         {
-            await PersistenceService.ResetGameAsync();
+            ShowStatus("Resetting game and creating new universe...", false);
+            StateHasChanged();
+            
+            // Use the new complete reset method
+            await GameInitializationService.ResetAndReinitializeGameAsync(PlayerStateService);
+            
             showResetConfirmation = false;
-            ShowStatus("Game data has been reset successfully!", false);
+            ShowStatus("Game reset successfully! New universe created.", false);
             
             // Reload page after a short delay
             await Task.Delay(2000);

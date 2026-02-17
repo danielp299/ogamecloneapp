@@ -45,13 +45,28 @@ public class GalaxyService
     public const int MaxGalaxies = 10;
     public const int MaxSystemsPerGalaxy = 10;
 
+    public event Action? OnChange;
+    private void NotifyStateChanged() => OnChange?.Invoke();
+
+    private bool _isInitialized = false;
+
     public GalaxyService(GameDbContext dbContext, GamePersistenceService persistenceService)
     {
         _dbContext = dbContext;
         _persistenceService = persistenceService;
-        
-        // Load or generate home coordinates
-        LoadOrGenerateHomeCoordinates();
+        // NOTA: La inicialización se hace de forma lazy via Initialize()
+    }
+
+    public void SetHomeCoordinates(int galaxy, int system, int position)
+    {
+        HomeGalaxy = galaxy;
+        HomeSystem = system;
+        HomePosition = position;
+    }
+
+    public void Initialize()
+    {
+        if (_isInitialized) return;
 
         // Ensure home system exists and has the player
         var homeSystem = GetSystem(HomeGalaxy, HomeSystem);
@@ -62,64 +77,35 @@ public class GalaxyService
         {
             PlayerPlanets.Add(homePlanet);
         }
+
+        _isInitialized = true;
+        Console.WriteLine($"GalaxyService initialized with home: {HomeGalaxy}:{HomeSystem}:{HomePosition}");
     }
-    
-    private void LoadOrGenerateHomeCoordinates()
+
+    public void RefreshSystems()
     {
-        try
+        // Clear universe cache to reload with enemy data
+        _universe.Clear();
+        
+        // Re-initialize home system
+        var homeSystem = GetSystem(HomeGalaxy, HomeSystem);
+        var homePlanet = homeSystem.FirstOrDefault(p => p.Position == HomePosition);
+        if (homePlanet != null && !PlayerPlanets.Contains(homePlanet))
         {
-            var gameState = _dbContext.GameState.FirstOrDefault();
-            
-            if (gameState != null && gameState.HomeGalaxy > 0 && gameState.HomeSystem > 0 && gameState.HomePosition > 0)
-            {
-                // Load existing coordinates from database
-                HomeGalaxy = gameState.HomeGalaxy;
-                HomeSystem = gameState.HomeSystem;
-                HomePosition = gameState.HomePosition;
-                
-                // Ensure planet state exists at these coordinates (might be missing if DB was reset)
-                var planetExists = _dbContext.PlanetStates.Any(ps => ps.Galaxy == HomeGalaxy && ps.System == HomeSystem && ps.Position == HomePosition);
-                if (!planetExists)
-                {
-                    Console.WriteLine($"Planet state missing at {HomeGalaxy}:{HomeSystem}:{HomePosition}, initializing...");
-                    _persistenceService.InitializePlanetAsync(HomeGalaxy, HomeSystem, HomePosition).Wait();
-                }
-                
-                Console.WriteLine($"Loaded player home location: {HomeGalaxy}:{HomeSystem}:{HomePosition}");
-            }
-            else
-            {
-                // Generate random coordinates for new game
-                HomeGalaxy = _random.Next(1, MaxGalaxies + 1);
-                HomeSystem = _random.Next(1, MaxSystemsPerGalaxy + 1);
-                HomePosition = _random.Next(1, 16); // 1 to 15
-                
-                // Save to database
-                if (gameState == null)
-                {
-                    gameState = new GameState { Id = 1 };
-                    _dbContext.GameState.Add(gameState);
-                }
-                
-                gameState.HomeGalaxy = HomeGalaxy;
-                gameState.HomeSystem = HomeSystem;
-                gameState.HomePosition = HomePosition;
-                _dbContext.SaveChanges();
-                
-                // Initialize planet state at the new home coordinates
-                _persistenceService.InitializePlanetAsync(HomeGalaxy, HomeSystem, HomePosition).Wait();
-                
-                Console.WriteLine($"Generated and saved new player home location: {HomeGalaxy}:{HomeSystem}:{HomePosition}");
-            }
+            PlayerPlanets.Add(homePlanet);
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading home coordinates: {ex.Message}");
-            // Fallback to random coordinates
-            HomeGalaxy = _random.Next(1, MaxGalaxies + 1);
-            HomeSystem = _random.Next(1, MaxSystemsPerGalaxy + 1);
-            HomePosition = _random.Next(1, 16);
-        }
+        
+        NotifyStateChanged();
+    }
+
+    public void ResetState()
+    {
+        _universe.Clear();
+        PlayerPlanets.Clear();
+        HomeGalaxy = 0;
+        HomeSystem = 0;
+        HomePosition = 0;
+        _isInitialized = false;
     }
     
     public async Task SaveHomeCoordinatesAsync()

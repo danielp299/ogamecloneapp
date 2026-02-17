@@ -542,4 +542,12 @@ public class TechnologyService
         var tech = Technologies.FirstOrDefault(t => t.Type == type);
         return tech?.Level ?? 0;
     }
+
+    public void ResetState()
+    {
+        Technologies.Clear();
+        CurrentResearch = null;
+        _isProcessingResearch = false;
+        InitializeTechnologies();
+    }
 }

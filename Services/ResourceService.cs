@@ -182,4 +182,11 @@ private async Task SaveStateAsync()
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
+
+    public void ResetState()
+    {
+        _cachedState = null;
+        _cachedPlanetStates.Clear();
+        CancelRefundPercentage = 100.0;
+    }
 }

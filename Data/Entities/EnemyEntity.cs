@@ -26,6 +26,9 @@ public class EnemyEntity
     // Flags
     public bool IsBot { get; set; } = false;
     
+    // Colony tracking
+    public int ColonyCount { get; set; } = 0;
+    
     // Serialized data for buildings, technologies, defenses, ships
     public string BuildingsJson { get; set; } = "{}";
     public string TechnologiesJson { get; set; } = "{}";
