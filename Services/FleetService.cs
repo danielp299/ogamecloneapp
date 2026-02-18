@@ -103,6 +103,9 @@ public class FleetService
     public event Action? OnChange;
 
     private bool _isProcessingQueue = false;
+    
+    // Maximum number of planets a player can have (colonization limit)
+    public const int MaxPlanets = 4;
 
     public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, GamePersistenceService persistenceService, MessageService messageService, DefenseService defenseService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
     {
@@ -393,7 +396,7 @@ public class FleetService
         if (!shipsToSend.Any()) return "No ships selected.";
 
         // Validate mission requirements
-        var validationError = ValidateMission(missionType, g, s, p);
+        var validationError = ValidateMission(missionType, g, s, p, shipsToSend);
         if (validationError != null) return validationError;
 
         // 1. Check Ship Availability
@@ -438,7 +441,7 @@ public class FleetService
         return null; // Success
     }
 
-    private string? ValidateMission(string missionType, int g, int s, int p)
+    private string? ValidateMission(string missionType, int g, int s, int p, Dictionary<string, int> shipsToSend)
     {
         var planet = _galaxyService.GetPlanet(g, s, p);
 
@@ -450,12 +453,49 @@ public class FleetService
             "Recycle" => planet?.HasDebris == true 
                 ? null 
                 : $"No debris field at [{g}:{s}:{p}]. Cannot perform recycle mission.",
-            "Colonize" => planet?.IsOccupied == false 
-                ? null 
-                : $"Planet [{g}:{s}:{p}] is already occupied. Cannot colonize.",
-            "Expedition" => null, // Expedition doesn't require planet validation
+            "Colonize" => ValidateColonize(g, s, p, planet, shipsToSend),
+            "Expedition" => ValidateExpedition(shipsToSend),
             _ => null
         };
+    }
+
+    private string? ValidateColonize(int g, int s, int p, GalaxyPlanet? planet, Dictionary<string, int> shipsToSend)
+    {
+        // 1. Check if planet exists and is unoccupied
+        if (planet == null)
+            return $"Target [{g}:{s}:{p}] does not exist. Cannot colonize.";
+        
+        if (planet.IsOccupied)
+            return $"Planet [{g}:{s}:{p}] is already occupied. Cannot colonize.";
+
+        // 2. Check Astrophysics requirement
+        int astroLevel = _technologyService.GetTechLevel(TechType.Astrophysics);
+        if (astroLevel < 1)
+            return "Colonization requires Astrophysics Technology Level 1. Research Astrophysics first.";
+
+        // 3. Check planet limit (using global constant MaxPlanets = 4)
+        int currentPlanetCount = _galaxyService.PlayerPlanets.Count;
+        if (currentPlanetCount >= MaxPlanets)
+            return $"You have reached the maximum number of planets ({currentPlanetCount}/{MaxPlanets}). You cannot colonize more planets.";
+
+        // 4. Check for Colony Ship
+        if (!shipsToSend.ContainsKey("CS") || shipsToSend["CS"] < 1)
+            return "A Colony Ship (CS) is required to colonize a new planet.";
+
+        // All validations passed
+        return null;
+    }
+
+    private string? ValidateExpedition(Dictionary<string, int> shipsToSend)
+    {
+        // Expedition requires at least one ship
+        if (!shipsToSend.Any())
+            return "Expedition requires at least one ship.";
+
+        // Check for Pathfinder (optional but recommended)
+        // In OGame, Pathfinders give bonuses but aren't strictly required
+        // We'll allow any ship for expedition
+        return null;
     }
 
     private async Task ProcessFleetLoop()
@@ -1126,14 +1166,20 @@ public class FleetService
              return;
         }
 
-        // Check Astrophysics Limit
+        // Check Astrophysics requirement
         int astroLevel = _technologyService.GetTechLevel(TechType.Astrophysics);
-        int maxPlanets = 4; // Hardcoded limit as requested
-
-        if (_galaxyService.PlayerPlanets.Count >= maxPlanets)
+        if (astroLevel < 1)
         {
             _messageService.AddMessage("Colonization Failed", 
-                 $"Astrophysics Level {astroLevel} allows only {maxPlanets} planets. Upgrade Astrophysics to colonize more.", "General");
+                 "Colonization requires Astrophysics Technology Level 1.", "General");
+             return;
+        }
+
+        // Check Astrophysics Limit (using global constant MaxPlanets = 4)
+        if (_galaxyService.PlayerPlanets.Count >= MaxPlanets)
+        {
+            _messageService.AddMessage("Colonization Failed", 
+                 $"You have reached the maximum number of planets ({_galaxyService.PlayerPlanets.Count}/{MaxPlanets}). You cannot colonize more.", "General");
              return;
         }
 
