@@ -1205,7 +1205,8 @@ public class FleetService
         _galaxyService.RegisterPlanet(planet);
 
         // Initialize new planet state (Resources, Buildings, etc.)
-        _persistenceService.InitializePlanetAsync(planet.Galaxy, planet.System, planet.Position).Wait();
+        _persistenceService.InitializePlanetAsync(planet.Galaxy, planet.System, planet.Position, true).Wait();
+        _persistenceService.AddOrUpdatePlayerPlanetAsync(planet.Galaxy, planet.System, planet.Position, planet.Name, planet.Image, false).Wait();
 
         _messageService.AddMessage("Colonization Successful", 
             $"You have successfully colonized position {mission.TargetCoordinates}!", "General");

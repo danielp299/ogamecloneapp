@@ -129,7 +129,7 @@ public class GalaxyService
 
     public void RegisterPlanet(GalaxyPlanet planet)
     {
-        if (!PlayerPlanets.Contains(planet))
+        if (!PlayerPlanets.Any(p => p.Galaxy == planet.Galaxy && p.System == planet.System && p.Position == planet.Position))
         {
             PlayerPlanets.Add(planet);
         }

@@ -109,7 +109,41 @@ public class GameInitializationService
             gameState.HomeSystem,
             gameState.HomePosition
         );
+
+        var storedPlanets = await _dbContext.PlayerPlanets.ToListAsync();
+        if (!storedPlanets.Any())
+        {
+            _dbContext.PlayerPlanets.Add(new PlayerPlanetEntity
+            {
+                Galaxy = gameState.HomeGalaxy,
+                System = gameState.HomeSystem,
+                Position = gameState.HomePosition,
+                Name = "Homeworld",
+                Image = "assets/planets/planet_home.jpg",
+                IsHomeworld = true
+            });
+            await _dbContext.SaveChangesAsync();
+            storedPlanets = await _dbContext.PlayerPlanets.ToListAsync();
+        }
+
+        foreach (var planet in storedPlanets.Where(p => !p.IsHomeworld))
+        {
+            _galaxyService.RegisterPlanet(new GalaxyPlanet
+            {
+                Galaxy = planet.Galaxy,
+                System = planet.System,
+                Position = planet.Position,
+                Name = planet.Name,
+                PlayerName = "Commander",
+                Image = planet.Image,
+                IsOccupied = true,
+                IsMyPlanet = true,
+                IsHomeworld = false
+            });
+        }
+
         _galaxyService.Initialize();
+        _galaxyService.RefreshSystems();
 
         // Inicializar PlayerStateService (después de GalaxyService)
         playerStateService.Initialize();
@@ -167,6 +201,17 @@ public class GameInitializationService
 
         // 7. Inicializar estado del planeta del jugador (ANTES de BuildingService)
         await InitializePlayerPlanetAsync(homeGalaxy, homeSystem, homePosition);
+
+        _dbContext.PlayerPlanets.Add(new PlayerPlanetEntity
+        {
+            Galaxy = homeGalaxy,
+            System = homeSystem,
+            Position = homePosition,
+            Name = "Homeworld",
+            Image = "assets/planets/planet_home.jpg",
+            IsHomeworld = true
+        });
+        await _dbContext.SaveChangesAsync();
 
         // 8. Inicializar BuildingService (después de que el planeta existe)
         await _buildingService.InitializeAsync();

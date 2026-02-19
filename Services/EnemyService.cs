@@ -11,6 +11,9 @@ public class Enemy
     public int Galaxy { get; set; }
     public int System { get; set; }
     public int Position { get; set; }
+
+    public Guid EmpireId { get; set; } = Guid.Empty;
+    public bool IsHomeworld { get; set; } = false;
     
     // Resources
     public long Metal { get; set; } = 1000;
@@ -215,6 +218,8 @@ public class EnemyService
                         Galaxy = dbEnemy.Galaxy,
                         System = dbEnemy.System,
                         Position = dbEnemy.Position,
+                        EmpireId = dbEnemy.EmpireId == Guid.Empty ? dbEnemy.Id : dbEnemy.EmpireId,
+                        IsHomeworld = dbEnemy.IsHomeworld,
                         Metal = dbEnemy.Metal,
                         Crystal = dbEnemy.Crystal,
                         Deuterium = dbEnemy.Deuterium,
@@ -224,6 +229,11 @@ public class EnemyService
                         IsBot = dbEnemy.IsBot,
                         ColonyCount = dbEnemy.ColonyCount
                     };
+
+                    if (enemy.EmpireId == enemy.Id)
+                    {
+                        enemy.IsHomeworld = true;
+                    }
                     
                     // Deserialize buildings
                     if (!string.IsNullOrEmpty(dbEnemy.BuildingsJson))
@@ -257,6 +267,15 @@ public class EnemyService
                 }
 
                 Console.WriteLine($"Loaded {dbEnemies.Count} enemies from database");
+            }
+
+            foreach (var group in _enemies.Values.GroupBy(e => e.EmpireId))
+            {
+                int colonyCount = group.Count(e => !e.IsHomeworld);
+                foreach (var enemy in group)
+                {
+                    enemy.ColonyCount = colonyCount;
+                }
             }
         }
         catch (Exception ex)
@@ -307,6 +326,9 @@ public class EnemyService
                     Position = position,
                     IsBot = true
                 };
+
+                enemy.EmpireId = enemy.Id;
+                enemy.IsHomeworld = true;
                 
                 // Initialize buildings at level 0-1 (same as starting player level)
                 foreach (var buildingType in BuildingTypes)
@@ -447,6 +469,190 @@ public class EnemyService
         
         // OGame storage formula
         return (long)(10000 * Math.Pow(1.6, level));
+    }
+
+    private List<Enemy> GetEmpirePlanets(Enemy enemy)
+    {
+        return _enemies.Values.Where(e => e.EmpireId == enemy.EmpireId).ToList();
+    }
+
+    private void UpdateEmpireColonyCount(Guid empireId)
+    {
+        var empirePlanets = _enemies.Values.Where(e => e.EmpireId == empireId).ToList();
+        int colonyCount = empirePlanets.Count(e => !e.IsHomeworld);
+        foreach (var planet in empirePlanets)
+        {
+            planet.ColonyCount = colonyCount;
+        }
+    }
+
+    private void ExecuteAttackReaction(Enemy enemy)
+    {
+        UpdateEnemyResources(enemy);
+
+        var availableDefenses = GetAvailableDefenses(enemy);
+        var availableShips = GetAvailableShips(enemy);
+        var availableBuildings = GetAvailableBuildings(enemy);
+        var availableTechs = GetAvailableTechnologies(enemy);
+
+        int actionsToPerform = _random.Next(1, Math.Min(3, MAX_ACTIONS_PER_EVENT + 1));
+        int actionsPerformed = 0;
+
+        var possibleActions = new List<string>();
+        if (availableDefenses.Any()) possibleActions.Add("defense");
+        if (availableShips.Any()) possibleActions.Add("ship");
+        if (availableBuildings.Any()) possibleActions.Add("building");
+        if (availableTechs.Any()) possibleActions.Add("research");
+
+        while (actionsPerformed < actionsToPerform && possibleActions.Any())
+        {
+            string actionType = possibleActions[_random.Next(possibleActions.Count)];
+            bool actionSuccess = false;
+
+            switch (actionType)
+            {
+                case "defense":
+                    string defenseType = availableDefenses[_random.Next(availableDefenses.Count)];
+                    actionSuccess = TryBuildDefense(enemy, defenseType);
+                    break;
+
+                case "ship":
+                    string shipType = availableShips[_random.Next(availableShips.Count)];
+                    actionSuccess = TryBuildShip(enemy, shipType);
+                    break;
+
+                case "building":
+                    string building = availableBuildings[_random.Next(availableBuildings.Count)];
+                    actionSuccess = TryUpgradeBuilding(enemy, building);
+                    if (actionSuccess) UpdateEnemyProductionRates(enemy);
+                    break;
+
+                case "research":
+                    string tech = availableTechs[_random.Next(availableTechs.Count)];
+                    actionSuccess = TryResearchTechnology(enemy, tech);
+                    break;
+            }
+
+            if (actionSuccess)
+            {
+                actionsPerformed++;
+            }
+            else
+            {
+                possibleActions.Remove(actionType);
+            }
+        }
+
+        enemy.LastActivity = DateTime.Now;
+    }
+
+    private void ExecuteEmpireAction(Enemy enemy, string? preferredBuilding, string? preferredTech, string? preferredShip, string? preferredDefense)
+    {
+        var availableBuildings = GetAvailableBuildings(enemy);
+        var availableTechs = GetAvailableTechnologies(enemy);
+        var availableDefenses = GetAvailableDefenses(enemy);
+        var availableShips = GetAvailableShips(enemy);
+
+        int actionsToPerform = _random.Next(1, Math.Min(3, MAX_ACTIONS_PER_EVENT + 1));
+        int actionsPerformed = 0;
+
+        var possibleActions = new List<string>();
+        if (availableBuildings.Any()) possibleActions.Add("building");
+        if (availableTechs.Any()) possibleActions.Add("research");
+        if (availableDefenses.Any()) possibleActions.Add("defense");
+        if (availableShips.Any()) possibleActions.Add("ship");
+
+        while (actionsPerformed < actionsToPerform && possibleActions.Any())
+        {
+            string actionType = possibleActions[_random.Next(possibleActions.Count)];
+            bool actionSuccess = false;
+
+            switch (actionType)
+            {
+                case "building":
+                    string buildingToUpgrade;
+                    bool sameBuildingAvailable = !string.IsNullOrEmpty(preferredBuilding) &&
+                                                 availableBuildings.Contains(preferredBuilding);
+
+                    if (_random.NextDouble() < 0.5 && sameBuildingAvailable)
+                    {
+                        buildingToUpgrade = preferredBuilding!;
+                    }
+                    else
+                    {
+                        buildingToUpgrade = availableBuildings[_random.Next(availableBuildings.Count)];
+                    }
+
+                    actionSuccess = TryUpgradeBuilding(enemy, buildingToUpgrade);
+                    if (actionSuccess)
+                    {
+                        UpdateEnemyProductionRates(enemy);
+                    }
+                    break;
+
+                case "research":
+                    string techToResearch;
+                    bool sameTechAvailable = !string.IsNullOrEmpty(preferredTech) &&
+                                             availableTechs.Contains(preferredTech);
+
+                    if (_random.NextDouble() < 0.5 && sameTechAvailable)
+                    {
+                        techToResearch = preferredTech!;
+                    }
+                    else
+                    {
+                        techToResearch = availableTechs[_random.Next(availableTechs.Count)];
+                    }
+
+                    actionSuccess = TryResearchTechnology(enemy, techToResearch);
+                    break;
+
+                case "defense":
+                    string defenseToBuild;
+                    bool sameDefenseAvailable = !string.IsNullOrEmpty(preferredDefense) &&
+                                                availableDefenses.Contains(preferredDefense);
+
+                    if (_random.NextDouble() < 0.5 && sameDefenseAvailable)
+                    {
+                        defenseToBuild = preferredDefense!;
+                    }
+                    else
+                    {
+                        defenseToBuild = availableDefenses[_random.Next(availableDefenses.Count)];
+                    }
+
+                    actionSuccess = TryBuildDefense(enemy, defenseToBuild);
+                    break;
+
+                case "ship":
+                    string shipToBuild;
+                    bool sameShipAvailable = !string.IsNullOrEmpty(preferredShip) &&
+                                             availableShips.Contains(preferredShip);
+
+                    if (_random.NextDouble() < 0.5 && sameShipAvailable)
+                    {
+                        shipToBuild = preferredShip!;
+                    }
+                    else
+                    {
+                        shipToBuild = availableShips[_random.Next(availableShips.Count)];
+                    }
+
+                    actionSuccess = TryBuildShip(enemy, shipToBuild);
+                    break;
+            }
+
+            if (actionSuccess)
+            {
+                actionsPerformed++;
+            }
+            else
+            {
+                possibleActions.Remove(actionType);
+            }
+        }
+
+        enemy.LastActivity = DateTime.Now;
     }
     
     // ===== REQUIREMENTS CHECKING METHODS =====
@@ -689,6 +895,8 @@ public class EnemyService
                         Galaxy = enemy.Galaxy,
                         System = enemy.System,
                         Position = enemy.Position,
+                        EmpireId = enemy.EmpireId,
+                        IsHomeworld = enemy.IsHomeworld,
                         Metal = enemy.Metal,
                         Crystal = enemy.Crystal,
                         Deuterium = enemy.Deuterium,
@@ -711,6 +919,8 @@ public class EnemyService
                     dbEnemy.LastResourceUpdate = enemy.LastResourceUpdate;
                     dbEnemy.LastActivity = enemy.LastActivity;
                     dbEnemy.ColonyCount = enemy.ColonyCount;
+                    dbEnemy.EmpireId = enemy.EmpireId;
+                    dbEnemy.IsHomeworld = enemy.IsHomeworld;
                 }
                 
                 // Serialize dictionaries
@@ -731,115 +941,28 @@ public class EnemyService
     // Triggered when player upgrades a building - 70% of enemies upgrade buildings
     public async Task OnPlayerBuildingUpgraded(string buildingName)
     {
-        List<Enemy> currentEnemies;
+        List<IGrouping<Guid, Enemy>> enemyEmpires;
         lock (_lockObject)
         {
-            currentEnemies = _enemies.Values.ToList();
+            enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
         }
 
-        foreach (var enemy in currentEnemies)
+        foreach (var empire in enemyEmpires)
         {
-            // First, update resources based on time elapsed
-            UpdateEnemyResources(enemy);
-            
-            // 70% chance this enemy will take action
-            if (_random.NextDouble() < BUILDING_UPGRADE_CHANCE)
+            bool empireActs = _random.NextDouble() < BUILDING_UPGRADE_CHANCE;
+            foreach (var enemy in empire)
             {
-                // Get whitelists of available options
-                var availableBuildings = GetAvailableBuildings(enemy);
-                var availableTechs = GetAvailableTechnologies(enemy);
-                var availableDefenses = GetAvailableDefenses(enemy);
-                var availableShips = GetAvailableShips(enemy);
-                
-                // Determine number of actions (1 or 2, but respecting MAX_ACTIONS_PER_EVENT)
-                int actionsToPerform = _random.Next(1, Math.Min(3, MAX_ACTIONS_PER_EVENT + 1));
-                int actionsPerformed = 0;
-                
-                // Build list of possible action types
-                var possibleActions = new List<string>();
-                if (availableBuildings.Any()) possibleActions.Add("building");
-                if (availableTechs.Any()) possibleActions.Add("research");
-                if (availableDefenses.Any()) possibleActions.Add("defense");
-                if (availableShips.Any()) possibleActions.Add("ship");
-                
-                // Perform actions up to the limit
-                while (actionsPerformed < actionsToPerform && possibleActions.Any())
+                UpdateEnemyResources(enemy);
+                if (empireActs)
                 {
-                    // Randomly select action type
-                    string actionType = possibleActions[_random.Next(possibleActions.Count)];
-                    bool actionSuccess = false;
-                    
-                    switch (actionType)
-                    {
-                        case "building":
-                            // 50% chance to upgrade the same building type if available
-                            string buildingToUpgrade;
-                            bool sameBuildingAvailable = enemy.Buildings.ContainsKey(buildingName) && 
-                                                         availableBuildings.Contains(buildingName);
-                            
-                            if (_random.NextDouble() < 0.5 && sameBuildingAvailable)
-                            {
-                                buildingToUpgrade = buildingName;
-                            }
-                            else
-                            {
-                                buildingToUpgrade = availableBuildings[_random.Next(availableBuildings.Count)];
-                            }
-                            
-                            actionSuccess = TryUpgradeBuilding(enemy, buildingToUpgrade);
-                            if (actionSuccess)
-                            {
-                                Console.WriteLine($"Enemy {enemy.Name} upgraded {buildingToUpgrade} to level {enemy.Buildings[buildingToUpgrade]}");
-                                UpdateEnemyProductionRates(enemy);
-                            }
-                            break;
-                            
-                        case "research":
-                            string techToResearch = availableTechs[_random.Next(availableTechs.Count)];
-                            actionSuccess = TryResearchTechnology(enemy, techToResearch);
-                            if (actionSuccess)
-                            {
-                                Console.WriteLine($"Enemy {enemy.Name} researched {techToResearch} to level {enemy.Technologies[techToResearch]}");
-                            }
-                            break;
-                            
-                        case "defense":
-                            string defenseType = availableDefenses[_random.Next(availableDefenses.Count)];
-                            actionSuccess = TryBuildDefense(enemy, defenseType);
-                            if (actionSuccess)
-                            {
-                                Console.WriteLine($"Enemy {enemy.Name} built a {defenseType}");
-                            }
-                            break;
-                            
-                        case "ship":
-                            string shipType = availableShips[_random.Next(availableShips.Count)];
-                            actionSuccess = TryBuildShip(enemy, shipType);
-                            if (actionSuccess)
-                            {
-                                Console.WriteLine($"Enemy {enemy.Name} built a {shipType}");
-                            }
-                            break;
-                    }
-                    
-                    if (actionSuccess)
-                    {
-                        actionsPerformed++;
-                    }
-                    else
-                    {
-                        // Remove this action type from possibilities if it failed
-                        possibleActions.Remove(actionType);
-                    }
+                    ExecuteEmpireAction(enemy, buildingName, null, null, null);
                 }
-                
-                enemy.LastActivity = DateTime.Now;
             }
-            
-            // 5% chance to colonize a new planet
+
             if (_random.NextDouble() < 0.05)
             {
-                await TryEnemyColonize(enemy);
+                var homeworld = empire.FirstOrDefault(e => e.IsHomeworld) ?? empire.First();
+                await TryEnemyColonize(homeworld);
             }
         }
         
@@ -866,10 +989,11 @@ public class EnemyService
         // Check planet limit based on Astrophysics level
         int astroLevel = parentEnemy.Technologies["Astrophysics"];
         int maxColonies = (int)Math.Ceiling(astroLevel / 2.0);
-        
-        if (parentEnemy.ColonyCount >= maxColonies)
+
+        int currentColonies = GetEmpirePlanets(parentEnemy).Count(e => !e.IsHomeworld);
+        if (currentColonies >= maxColonies)
         {
-            Console.WriteLine($"Enemy {parentEnemy.Name} cannot colonize - limit reached ({parentEnemy.ColonyCount}/{maxColonies} colonies, Astrophysics {astroLevel})");
+            Console.WriteLine($"Enemy {parentEnemy.Name} cannot colonize - limit reached ({currentColonies}/{maxColonies} colonies, Astrophysics {astroLevel})");
             return;
         }
         
@@ -900,7 +1024,9 @@ public class EnemyService
                         Galaxy = galaxy,
                         System = system,
                         Position = p,
-                        IsBot = true
+                        IsBot = true,
+                        EmpireId = parentEnemy.EmpireId,
+                        IsHomeworld = false
                     };
                     
                     // Basic buildings
@@ -917,10 +1043,9 @@ public class EnemyService
                     planet.PlayerName = newEnemy.Name;
                     planet.Alliance = "[BOTS]";
                     
-                    // Increment colony count
-                    parentEnemy.ColonyCount++;
+                    UpdateEmpireColonyCount(parentEnemy.EmpireId);
                     
-                    Console.WriteLine($"Enemy {parentEnemy.Name} colonized {key} (Colony {parentEnemy.ColonyCount}/{maxColonies}, Astrophysics {astroLevel})");
+                    Console.WriteLine($"Enemy {parentEnemy.Name} colonized {key} (Colony {currentColonies + 1}/{maxColonies}, Astrophysics {astroLevel})");
                     break;
                 }
             }
@@ -928,105 +1053,21 @@ public class EnemyService
     }
     public async Task OnPlayerTechnologyResearched(string techName)
     {
+        List<IGrouping<Guid, Enemy>> enemyEmpires;
         lock (_lockObject)
         {
-            foreach (var enemy in _enemies.Values)
+            enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
+        }
+
+        foreach (var empire in enemyEmpires)
+        {
+            bool empireActs = _random.NextDouble() < RESEARCH_CHANCE;
+            foreach (var enemy in empire)
             {
-                // First, update resources based on time elapsed
                 UpdateEnemyResources(enemy);
-                
-                // 80% chance this enemy will do something
-                if (_random.NextDouble() < RESEARCH_CHANCE)
+                if (empireActs)
                 {
-                    // Get whitelists of available options
-                    var availableBuildings = GetAvailableBuildings(enemy);
-                    var availableTechs = GetAvailableTechnologies(enemy);
-                    var availableDefenses = GetAvailableDefenses(enemy);
-                    var availableShips = GetAvailableShips(enemy);
-                    
-                    // Determine number of actions (1 or 2, but respecting MAX_ACTIONS_PER_EVENT)
-                    int actionsToPerform = _random.Next(1, Math.Min(3, MAX_ACTIONS_PER_EVENT + 1));
-                    int actionsPerformed = 0;
-                    
-                    // Build list of possible action types
-                    var possibleActions = new List<string>();
-                    if (availableTechs.Any()) possibleActions.Add("research");
-                    if (availableBuildings.Any()) possibleActions.Add("building");
-                    if (availableDefenses.Any()) possibleActions.Add("defense");
-                    if (availableShips.Any()) possibleActions.Add("ship");
-                    
-                    // Perform actions up to the limit
-                    while (actionsPerformed < actionsToPerform && possibleActions.Any())
-                    {
-                        // Randomly select action type
-                        string actionType = possibleActions[_random.Next(possibleActions.Count)];
-                        bool actionSuccess = false;
-                        
-                        switch (actionType)
-                        {
-                            case "research":
-                                // 50% chance to research the same tech if available
-                                string techToResearch;
-                                bool sameTechAvailable = enemy.Technologies.ContainsKey(techName) && 
-                                                         availableTechs.Contains(techName);
-                                
-                                if (_random.NextDouble() < 0.5 && sameTechAvailable)
-                                {
-                                    techToResearch = techName;
-                                }
-                                else
-                                {
-                                    techToResearch = availableTechs[_random.Next(availableTechs.Count)];
-                                }
-                                
-                                actionSuccess = TryResearchTechnology(enemy, techToResearch);
-                                if (actionSuccess)
-                                {
-                                    Console.WriteLine($"Enemy {enemy.Name} researched {techToResearch} to level {enemy.Technologies[techToResearch]}");
-                                }
-                                break;
-                                
-                            case "building":
-                                string buildingToUpgrade = availableBuildings[_random.Next(availableBuildings.Count)];
-                                actionSuccess = TryUpgradeBuilding(enemy, buildingToUpgrade);
-                                if (actionSuccess)
-                                {
-                                    Console.WriteLine($"Enemy {enemy.Name} upgraded {buildingToUpgrade} to level {enemy.Buildings[buildingToUpgrade]}");
-                                    UpdateEnemyProductionRates(enemy);
-                                }
-                                break;
-                                
-                            case "defense":
-                                string defenseType = availableDefenses[_random.Next(availableDefenses.Count)];
-                                actionSuccess = TryBuildDefense(enemy, defenseType);
-                                if (actionSuccess)
-                                {
-                                    Console.WriteLine($"Enemy {enemy.Name} built a {defenseType}");
-                                }
-                                break;
-                                
-                            case "ship":
-                                string ship = availableShips[_random.Next(availableShips.Count)];
-                                actionSuccess = TryBuildShip(enemy, ship);
-                                if (actionSuccess)
-                                {
-                                    Console.WriteLine($"Enemy {enemy.Name} built a {ship}");
-                                }
-                                break;
-                        }
-                        
-                        if (actionSuccess)
-                        {
-                            actionsPerformed++;
-                        }
-                        else
-                        {
-                            // Remove this action type from possibilities if it failed
-                            possibleActions.Remove(actionType);
-                        }
-                    }
-                    
-                    enemy.LastActivity = DateTime.Now;
+                    ExecuteEmpireAction(enemy, null, techName, null, null);
                 }
             }
         }
@@ -1038,89 +1079,18 @@ public class EnemyService
     // Triggered when player builds ships - enemies react with limited actions
     public async Task OnPlayerShipBuilt(string shipType, int quantity)
     {
+        List<IGrouping<Guid, Enemy>> enemyEmpires;
         lock (_lockObject)
         {
-            foreach (var enemy in _enemies.Values)
+            enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
+        }
+
+        foreach (var empire in enemyEmpires)
+        {
+            foreach (var enemy in empire)
             {
-                // First, update resources based on time elapsed
                 UpdateEnemyResources(enemy);
-                
-                // Get whitelists of available options
-                var availableDefenses = GetAvailableDefenses(enemy);
-                var availableShips = GetAvailableShips(enemy);
-                var availableBuildings = GetAvailableBuildings(enemy);
-                var availableTechs = GetAvailableTechnologies(enemy);
-                
-                // Determine number of actions (1 or 2, respecting MAX_ACTIONS_PER_EVENT)
-                int actionsToPerform = _random.Next(1, Math.Min(3, MAX_ACTIONS_PER_EVENT + 1));
-                int actionsPerformed = 0;
-                
-                // Build list of possible action types (prioritize defenses when ships are built)
-                var possibleActions = new List<string>();
-                if (availableDefenses.Any()) possibleActions.Add("defense");
-                if (availableShips.Any()) possibleActions.Add("ship");
-                if (availableBuildings.Any()) possibleActions.Add("building");
-                if (availableTechs.Any()) possibleActions.Add("research");
-                
-                // Perform actions up to the limit
-                while (actionsPerformed < actionsToPerform && possibleActions.Any())
-                {
-                    // Randomly select action type
-                    string actionType = possibleActions[_random.Next(possibleActions.Count)];
-                    bool actionSuccess = false;
-                    
-                    switch (actionType)
-                    {
-                        case "defense":
-                            string defenseToBuild = availableDefenses[_random.Next(availableDefenses.Count)];
-                            actionSuccess = TryBuildDefense(enemy, defenseToBuild);
-                            if (actionSuccess)
-                            {
-                                Console.WriteLine($"Enemy {enemy.Name} built a {defenseToBuild}");
-                            }
-                            break;
-                            
-                        case "ship":
-                            string shipToBuild = availableShips[_random.Next(availableShips.Count)];
-                            actionSuccess = TryBuildShip(enemy, shipToBuild);
-                            if (actionSuccess)
-                            {
-                                Console.WriteLine($"Enemy {enemy.Name} built a {shipToBuild}");
-                            }
-                            break;
-                            
-                        case "building":
-                            string building = availableBuildings[_random.Next(availableBuildings.Count)];
-                            actionSuccess = TryUpgradeBuilding(enemy, building);
-                            if (actionSuccess)
-                            {
-                                Console.WriteLine($"Enemy {enemy.Name} upgraded {building} to level {enemy.Buildings[building]}");
-                                UpdateEnemyProductionRates(enemy);
-                            }
-                            break;
-                            
-                        case "research":
-                            string tech = availableTechs[_random.Next(availableTechs.Count)];
-                            actionSuccess = TryResearchTechnology(enemy, tech);
-                            if (actionSuccess)
-                            {
-                                Console.WriteLine($"Enemy {enemy.Name} researched {tech} to level {enemy.Technologies[tech]}");
-                            }
-                            break;
-                    }
-                    
-                    if (actionSuccess)
-                    {
-                        actionsPerformed++;
-                    }
-                    else
-                    {
-                        // Remove this action type from possibilities if it failed
-                        possibleActions.Remove(actionType);
-                    }
-                }
-                
-                enemy.LastActivity = DateTime.Now;
+                ExecuteEmpireAction(enemy, null, null, shipType, null);
             }
         }
         
@@ -1138,67 +1108,11 @@ public class EnemyService
             // Find the target enemy
             if (_enemies.TryGetValue(key, out var targetEnemy))
             {
-                // First, update resources for the target enemy
-                UpdateEnemyResources(targetEnemy);
-                
-                // Get whitelists for target enemy
-                var availableDefenses = GetAvailableDefenses(targetEnemy);
-                var availableShips = GetAvailableShips(targetEnemy);
-                var availableBuildings = GetAvailableBuildings(targetEnemy);
-                var availableTechs = GetAvailableTechnologies(targetEnemy);
-                
-                // Determine number of actions for target enemy (1 or 2, respecting MAX_ACTIONS_PER_EVENT)
-                int targetActionsToPerform = _random.Next(1, Math.Min(3, MAX_ACTIONS_PER_EVENT + 1));
-                int targetActionsPerformed = 0;
-                
-                // Target enemy prioritizes defenses and ships when attacked
-                var targetPossibleActions = new List<string>();
-                if (availableDefenses.Any()) targetPossibleActions.Add("defense");
-                if (availableShips.Any()) targetPossibleActions.Add("ship");
-                if (availableBuildings.Any()) targetPossibleActions.Add("building");
-                if (availableTechs.Any()) targetPossibleActions.Add("research");
-                
-                // Perform actions for target enemy up to the limit
-                while (targetActionsPerformed < targetActionsToPerform && targetPossibleActions.Any())
+                var empirePlanets = GetEmpirePlanets(targetEnemy);
+                foreach (var planet in empirePlanets)
                 {
-                    string actionType = targetPossibleActions[_random.Next(targetPossibleActions.Count)];
-                    bool actionSuccess = false;
-                    
-                    switch (actionType)
-                    {
-                        case "defense":
-                            string defenseType = availableDefenses[_random.Next(availableDefenses.Count)];
-                            actionSuccess = TryBuildDefense(targetEnemy, defenseType);
-                            break;
-                            
-                        case "ship":
-                            string shipType = availableShips[_random.Next(availableShips.Count)];
-                            actionSuccess = TryBuildShip(targetEnemy, shipType);
-                            break;
-                            
-                        case "building":
-                            string building = availableBuildings[_random.Next(availableBuildings.Count)];
-                            actionSuccess = TryUpgradeBuilding(targetEnemy, building);
-                            if (actionSuccess) UpdateEnemyProductionRates(targetEnemy);
-                            break;
-                            
-                        case "research":
-                            string tech = availableTechs[_random.Next(availableTechs.Count)];
-                            actionSuccess = TryResearchTechnology(targetEnemy, tech);
-                            break;
-                    }
-                    
-                    if (actionSuccess)
-                    {
-                        targetActionsPerformed++;
-                    }
-                    else
-                    {
-                        targetPossibleActions.Remove(actionType);
-                    }
+                    ExecuteAttackReaction(planet);
                 }
-                
-                targetEnemy.LastActivity = DateTime.Now;
             }
             
             // Other enemies may also react to the attack (fear factor)
@@ -1207,62 +1121,7 @@ public class EnemyService
                 if (enemy.Coordinates != key && _random.NextDouble() < 0.3) // 30% of other enemies react
                 {
                     // First update their resources
-                    UpdateEnemyResources(enemy);
-                    
-                    // Get whitelists for this enemy
-                    var availableDefenses = GetAvailableDefenses(enemy);
-                    var availableShips = GetAvailableShips(enemy);
-                    var availableBuildings = GetAvailableBuildings(enemy);
-                    var availableTechs = GetAvailableTechnologies(enemy);
-                    
-                    // Other enemies also limited to max 2 actions
-                    int otherActionsToPerform = _random.Next(1, Math.Min(3, MAX_ACTIONS_PER_EVENT + 1));
-                    int otherActionsPerformed = 0;
-                    
-                    var otherPossibleActions = new List<string>();
-                    if (availableDefenses.Any()) otherPossibleActions.Add("defense");
-                    if (availableShips.Any()) otherPossibleActions.Add("ship");
-                    if (availableBuildings.Any()) otherPossibleActions.Add("building");
-                    if (availableTechs.Any()) otherPossibleActions.Add("research");
-                    
-                    while (otherActionsPerformed < otherActionsToPerform && otherPossibleActions.Any())
-                    {
-                        string actionType = otherPossibleActions[_random.Next(otherPossibleActions.Count)];
-                        bool actionSuccess = false;
-                        
-                        switch (actionType)
-                        {
-                            case "defense":
-                                string defenseType = availableDefenses[_random.Next(availableDefenses.Count)];
-                                actionSuccess = TryBuildDefense(enemy, defenseType);
-                                break;
-                                
-                            case "ship":
-                                string shipType = availableShips[_random.Next(availableShips.Count)];
-                                actionSuccess = TryBuildShip(enemy, shipType);
-                                break;
-                                
-                            case "building":
-                                string building = availableBuildings[_random.Next(availableBuildings.Count)];
-                                actionSuccess = TryUpgradeBuilding(enemy, building);
-                                if (actionSuccess) UpdateEnemyProductionRates(enemy);
-                                break;
-                                
-                            case "research":
-                                string tech = availableTechs[_random.Next(availableTechs.Count)];
-                                actionSuccess = TryResearchTechnology(enemy, tech);
-                                break;
-                        }
-                        
-                        if (actionSuccess)
-                        {
-                            otherActionsPerformed++;
-                        }
-                        else
-                        {
-                            otherPossibleActions.Remove(actionType);
-                        }
-                    }
+                    ExecuteAttackReaction(enemy);
                 }
             }
         }
@@ -1274,92 +1133,21 @@ public class EnemyService
     // Triggered when player builds defenses - enemies react with limited actions
     public async Task OnPlayerDefenseBuilt(string defenseType, int quantity)
     {
+        List<IGrouping<Guid, Enemy>> enemyEmpires;
         lock (_lockObject)
         {
-            foreach (var enemy in _enemies.Values)
+            enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
+        }
+
+        foreach (var empire in enemyEmpires)
+        {
+            bool empireActs = _random.NextDouble() < DEFENSE_BUILD_CHANCE;
+            foreach (var enemy in empire)
             {
-                // First, update resources based on time elapsed
                 UpdateEnemyResources(enemy);
-                
-                // Get whitelists of available options
-                var availableDefenses = GetAvailableDefenses(enemy);
-                var availableShips = GetAvailableShips(enemy);
-                var availableBuildings = GetAvailableBuildings(enemy);
-                
-                if (_random.NextDouble() < DEFENSE_BUILD_CHANCE)
+                if (empireActs)
                 {
-                    // Determine number of actions (1 or 2, respecting MAX_ACTIONS_PER_EVENT)
-                    int actionsToPerform = _random.Next(1, Math.Min(3, MAX_ACTIONS_PER_EVENT + 1));
-                    int actionsPerformed = 0;
-                    
-                    // Build list of possible action types (prioritize defenses)
-                    var possibleActions = new List<string>();
-                    if (availableDefenses.Any()) possibleActions.Add("defense");
-                    if (availableShips.Any()) possibleActions.Add("ship");
-                    if (availableBuildings.Any()) possibleActions.Add("building");
-                    
-                    // Perform actions up to the limit
-                    while (actionsPerformed < actionsToPerform && possibleActions.Any())
-                    {
-                        // Randomly select action type
-                        string actionType = possibleActions[_random.Next(possibleActions.Count)];
-                        bool actionSuccess = false;
-                        
-                        switch (actionType)
-                        {
-                            case "defense":
-                                // 50% same type if available, 50% random from whitelist
-                                string typeToBuild;
-                                bool sameTypeAvailable = availableDefenses.Contains(defenseType);
-                                
-                                if (_random.NextDouble() < 0.5 && sameTypeAvailable)
-                                {
-                                    typeToBuild = defenseType;
-                                }
-                                else
-                                {
-                                    typeToBuild = availableDefenses[_random.Next(availableDefenses.Count)];
-                                }
-                                
-                                actionSuccess = TryBuildDefense(enemy, typeToBuild);
-                                if (actionSuccess)
-                                {
-                                    Console.WriteLine($"Enemy {enemy.Name} built a {typeToBuild}");
-                                }
-                                break;
-                                
-                            case "ship":
-                                string shipType = availableShips[_random.Next(availableShips.Count)];
-                                actionSuccess = TryBuildShip(enemy, shipType);
-                                if (actionSuccess)
-                                {
-                                    Console.WriteLine($"Enemy {enemy.Name} built a {shipType}");
-                                }
-                                break;
-                                
-                            case "building":
-                                string building = availableBuildings[_random.Next(availableBuildings.Count)];
-                                actionSuccess = TryUpgradeBuilding(enemy, building);
-                                if (actionSuccess)
-                                {
-                                    Console.WriteLine($"Enemy {enemy.Name} upgraded {building}");
-                                    UpdateEnemyProductionRates(enemy);
-                                }
-                                break;
-                        }
-                        
-                        if (actionSuccess)
-                        {
-                            actionsPerformed++;
-                        }
-                        else
-                        {
-                            // Remove this action type from possibilities if it failed
-                            possibleActions.Remove(actionType);
-                        }
-                    }
-                    
-                    enemy.LastActivity = DateTime.Now;
+                    ExecuteEmpireAction(enemy, null, null, null, defenseType);
                 }
             }
         }

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "lmstudio": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LM Studio (local)",
+      "options": {
+        "baseURL": "http://127.0.0.1:40416/v1"
+      },
+      "models": {
+        "deepseek-coder-33b-secure": {
+          "name": "DeepSeek Coder 33B Secure (local)"
+        }
+      }
+    }
+  },
+  "model": "lmstudio/deepseek-coder-33b-secure"
+}
