@@ -71,11 +71,11 @@ public class GalaxyService
         // Ensure home system exists and has the player
         var homeSystem = GetSystem(HomeGalaxy, HomeSystem);
         
-        // Find and register home planet
+        // Find and register home planet using RegisterPlanet to prevent duplicates
         var homePlanet = homeSystem.FirstOrDefault(p => p.Position == HomePosition);
         if (homePlanet != null)
         {
-            PlayerPlanets.Add(homePlanet);
+            RegisterPlanet(homePlanet);
         }
 
         _isInitialized = true;
@@ -87,12 +87,12 @@ public class GalaxyService
         // Clear universe cache to reload with enemy data
         _universe.Clear();
         
-        // Re-initialize home system
+        // Re-initialize home system and register planets using RegisterPlanet
         var homeSystem = GetSystem(HomeGalaxy, HomeSystem);
         var homePlanet = homeSystem.FirstOrDefault(p => p.Position == HomePosition);
-        if (homePlanet != null && !PlayerPlanets.Contains(homePlanet))
+        if (homePlanet != null)
         {
-            PlayerPlanets.Add(homePlanet);
+            RegisterPlanet(homePlanet);
         }
         
         NotifyStateChanged();

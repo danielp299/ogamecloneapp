@@ -445,6 +445,9 @@
         FleetService.OnChange += RefreshState;
         DefenseService.OnChange += RefreshState;
 
+        // Force immediate resource calculation when entering home screen
+        BuildingService.UpdateProduction();
+
         // Timer to tick every second for smooth countdowns
         _timer = new System.Threading.Timer(async _ =>
         {

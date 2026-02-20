@@ -1,8 +1,8 @@
 # AI Development Rules & Context
 
 ## 1. Environment & Tools
-- **Git:** DO NOT execute git commands (commit, push, status). The user manages version control externally using **Fork**.
-- **Commits:** When a task is finished, provide a "Ready for Fork" summary with changed files and a suggested commit message.
+- **Git:** The user has explicitly authorized the AI agent to execute git commands (commit, add, status) to optimize the workflow.
+- **Commits:** Provide clear, descriptive commit messages when committing changes.
 - **Server:** .NET 8 / Blazor Web App. Run using `dotnet run`.
 
 ## 2. Project Architecture
