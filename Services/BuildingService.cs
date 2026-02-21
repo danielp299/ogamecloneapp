@@ -57,7 +57,14 @@ public class BuildingService
     
     public double ProductionFactor { get; private set; } = 1.0;
 
-    private bool _isInitialized = false;
+private bool _isInitialized = false;
+    private int _maxQueueSize = 5;
+
+    public int MaxQueueSize
+    {
+        get => _maxQueueSize;
+        set => _maxQueueSize = Math.Max(1, value);
+    }
 
     public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
     {
@@ -457,7 +464,7 @@ public class BuildingService
         // Important: Update resources before spending them!
         UpdateProduction();
 
-        if (ConstructionQueue.Count >= 5) return;
+        if (ConstructionQueue.Count >= MaxQueueSize) return;
         
         if (_resourceService.HasResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost))
         {

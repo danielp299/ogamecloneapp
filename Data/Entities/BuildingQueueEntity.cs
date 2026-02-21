@@ -9,4 +9,8 @@ public class BuildingQueueEntity
     public DateTime EndTime { get; set; }
     public bool IsProcessing { get; set; } = false;
     public int QueuePosition { get; set; } = 0;
+
+    public TimeSpan Duration => EndTime - StartTime;
+    public bool IsCompleted => DateTime.UtcNow >= EndTime;
+    public TimeSpan TimeRemaining => IsCompleted ? TimeSpan.Zero : EndTime - DateTime.UtcNow;
 }
