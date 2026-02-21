@@ -4,6 +4,9 @@ using myapp.Data.Entities;
 
 namespace myapp.Services;
 
+// Refer to wiki/business-rules/Defense.md for business rules documentation
+// Refer to wiki/business-rules/Factory.md for shipyard and defense construction rules
+
 public class DefenseUnit
 {
     public string Id { get; set; } = "";
@@ -224,6 +227,24 @@ public class DefenseService
         return BuiltDefenses.ContainsKey(id) ? BuiltDefenses[id] : 0;
     }
 
+    public TimeSpan CalculateDefenseConstructionDuration(DefenseUnit unit)
+    {
+        int shipyardLevel = _buildingService.GetBuildingLevel("Shipyard");
+        int naniteLevel = _buildingService.GetBuildingLevel("Nanite Factory");
+        
+        long metalCost = unit.MetalCost;
+        long crystalCost = unit.CrystalCost;
+        
+        // Formula: Time(hours) = (Metal + Crystal) / (5000 * (1 + Shipyard) * 2^Nanite * UniverseSpeed)
+        double universeSpeed = 1.0;
+        double divisor = 5000.0 * (1.0 + shipyardLevel) * Math.Pow(2, naniteLevel) * universeSpeed;
+        
+        double hours = (metalCost + crystalCost) / divisor;
+        double seconds = hours * 3600.0;
+        
+        return TimeSpan.FromSeconds(seconds);
+    }
+
     public void AddToQueue(DefenseUnit unit, int quantity)
     {
         if (quantity <= 0) return;
@@ -249,18 +270,8 @@ public class DefenseService
         {
             _resourceService.ConsumeResources(totalMetal, totalCrystal, totalDeuterium);
             
-            // Duration logic (same as Shipyard)
-            var shipyardLevel = _buildingService.GetBuildingLevel("Shipyard");
-            var naniteLevel = _buildingService.GetBuildingLevel("Nanite Factory");
-            
-            double divisor = (1 + shipyardLevel) * Math.Pow(2, naniteLevel);
-            if (divisor < 1) divisor = 1;
-
-            double durationSeconds = unit.BaseDuration.TotalSeconds / divisor / 100.0; // x100 speed
-            if (durationSeconds < 1) durationSeconds = 1;
-
-            var finalDuration = TimeSpan.FromSeconds(durationSeconds);
-            finalDuration = _devModeService.GetDuration(finalDuration, 5);
+            var calculatedDuration = CalculateDefenseConstructionDuration(unit);
+            var finalDuration = _devModeService.GetDuration(calculatedDuration, 1);
 
             ConstructionQueue.Add(new DefenseQueueItem
             {

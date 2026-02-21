@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 
 namespace myapp.Services;
 
+// Refer to wiki/business-rules/Technology.md for business rules documentation
+
 public enum TechType
 {
     Espionage = 1,
@@ -59,8 +61,7 @@ public class Technology
     public long DeuteriumCost => (long)(BaseDeuteriumCost * Math.Pow(Scaling, Level));
     public long EnergyCost => (long)(BaseEnergyCost * Math.Pow(Scaling, Level));
     
-    // Duration logic placeholder
-    public TimeSpan Duration => BaseDuration; 
+    public TimeSpan Duration { get; set; } 
 }
 
 public class TechnologyService
@@ -444,7 +445,8 @@ public class TechnologyService
             CurrentResearch = tech;
             tech.IsResearching = true;
             
-            var duration = _devModeService.GetDuration(tech.Duration, 1);
+            var calculatedDuration = CalculateResearchDuration(tech);
+            var duration = _devModeService.GetDuration(calculatedDuration, 1);
             tech.ConstructionDuration = duration;
             tech.TimeRemaining = duration;
             
@@ -541,6 +543,29 @@ public class TechnologyService
     {
         var tech = Technologies.FirstOrDefault(t => t.Type == type);
         return tech?.Level ?? 0;
+    }
+
+    public TimeSpan CalculateResearchDuration(Technology tech)
+    {
+        int researchLabLevel = _buildingService.GetBuildingLevel("Research Lab");
+        
+        long metalCost = tech.MetalCost;
+        long crystalCost = tech.CrystalCost;
+        
+        // Formula: Time(hours) = (Metal + Crystal) / (1000 * (1 + Research Lab) * UniverseSpeed)
+        double universeSpeed = 1.0;
+        double divisor = 1000.0 * (1.0 + researchLabLevel) * universeSpeed;
+        
+        double hours = (metalCost + crystalCost) / divisor;
+        double seconds = hours * 3600.0;
+        
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    public TimeSpan GetResearchTime(Technology tech)
+    {
+        var calculatedDuration = CalculateResearchDuration(tech);
+        return _devModeService.GetDuration(calculatedDuration, 1);
     }
 
     public void ResetState()

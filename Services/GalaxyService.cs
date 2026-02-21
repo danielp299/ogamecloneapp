@@ -7,6 +7,8 @@ using myapp.Data.Entities;
 
 namespace myapp.Services;
 
+// Refer to wiki/business-rules/Constellation.md for business rules documentation
+
 public class GalaxyPlanet
 {
     public int Galaxy { get; set; }

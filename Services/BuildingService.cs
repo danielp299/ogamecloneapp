@@ -4,6 +4,8 @@ using myapp.Data.Entities;
 
 namespace myapp.Services;
 
+// Refer to wiki/business-rules/Buildings.md for business rules documentation
+
 public class Building
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -28,8 +30,9 @@ public class Building
     public long MetalCost => (long)(BaseMetalCost * Math.Pow(Scaling, Level));
     public long CrystalCost => (long)(BaseCrystalCost * Math.Pow(Scaling, Level));
     public long DeuteriumCost => (long)(BaseDeuteriumCost * Math.Pow(Scaling, Level));
-    // Duration logic can be improved later
-    public TimeSpan Duration => BaseDuration; 
+    
+    // Duration calculated by BuildingService.CalculateConstructionDuration()
+    public TimeSpan Duration { get; set; }
 }
 
 public class BuildingService
@@ -284,6 +287,30 @@ private bool _isInitialized = false;
         _resourceService.DeuteriumProductionRate = deuteriumProduction;
     }
 
+    public TimeSpan CalculateConstructionDuration(Building building)
+    {
+        int roboticsLevel = GetBuildingLevel("Robotics Factory");
+        int naniteLevel = GetBuildingLevel("Nanite Factory");
+        
+        long metalCost = building.MetalCost;
+        long crystalCost = building.CrystalCost;
+        
+        // Formula: Time(hours) = (Metal + Crystal) / (2500 * (1 + Robotics) * 2^Nanite * UniverseSpeed)
+        double universeSpeed = 1.0;
+        double divisor = 2500.0 * (1.0 + roboticsLevel) * Math.Pow(2, naniteLevel) * universeSpeed;
+        
+        double hours = (metalCost + crystalCost) / divisor;
+        double seconds = hours * 3600.0;
+        
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    public TimeSpan GetConstructionTime(Building building)
+    {
+        var calculatedDuration = CalculateConstructionDuration(building);
+        return _devModeService.GetDuration(calculatedDuration, 1);
+    }
+
     private void InitializeBuildings()
     {
          Buildings.Add(new Building
@@ -470,8 +497,8 @@ private bool _isInitialized = false;
         {
             _resourceService.ConsumeResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
             
-            // Set initial state for queue
-            var duration = _devModeService.GetDuration(building.Duration, 1);
+            var calculatedDuration = CalculateConstructionDuration(building);
+            var duration = _devModeService.GetDuration(calculatedDuration, 1);
             building.ConstructionDuration = duration;
             building.TimeRemaining = duration;
             

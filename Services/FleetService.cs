@@ -4,6 +4,10 @@ using myapp.Data.Entities;
 
 namespace myapp.Services;
 
+// Refer to wiki/business-rules/Fleet.md for business rules documentation
+// Refer to wiki/business-rules/Combat.md for combat mechanics
+// Refer to wiki/business-rules/Factory.md for shipyard and ship construction rules
+
 public enum FleetStatus
 {
     Flight,
@@ -74,6 +78,8 @@ public class ShipyardItem
     public TimeSpan DurationPerUnit { get; set; }
     public TimeSpan TimeRemaining { get; set; } // For the current unit being built
 }
+
+// Refer to wiki/business-rules/Fleet.md for business rules documentation (includes combat logic)
 
 public class FleetService
 {
@@ -1257,6 +1263,24 @@ public class FleetService
             $"Harvested {gatheredMetal:N0} Metal and {gatheredCrystal:N0} Crystal from debris field.", "General");
     }
 
+    public TimeSpan CalculateShipConstructionDuration(Ship ship)
+    {
+        int shipyardLevel = _buildingService.GetBuildingLevel("Shipyard");
+        int naniteLevel = _buildingService.GetBuildingLevel("Nanite Factory");
+        
+        long metalCost = ship.MetalCost;
+        long crystalCost = ship.CrystalCost;
+        
+        // Formula: Time(hours) = (Metal + Crystal) / (5000 * (1 + Shipyard) * 2^Nanite * UniverseSpeed)
+        double universeSpeed = 1.0;
+        double divisor = 5000.0 * (1.0 + shipyardLevel) * Math.Pow(2, naniteLevel) * universeSpeed;
+        
+        double hours = (metalCost + crystalCost) / divisor;
+        double seconds = hours * 3600.0;
+        
+        return TimeSpan.FromSeconds(seconds);
+    }
+
     public void AddToQueue(Ship ship, int quantity)
     {
         if (quantity <= 0) return;
@@ -1269,21 +1293,8 @@ public class FleetService
         {
             _resourceService.ConsumeResources(totalMetal, totalCrystal, totalDeuterium);
             
-            // Calculate duration based on Shipyard and Nanite levels
-            // Formula: Duration = Base / (1 + Shipyard) * 2^Nanite * SpeedFactor
-            var shipyardLevel = _buildingService.GetBuildingLevel("Shipyard");
-            var naniteLevel = _buildingService.GetBuildingLevel("Nanite Factory");
-            
-            // Avoid division by zero if shipyard is somehow 0 (though requirements check should prevent this)
-            double divisor = (1 + shipyardLevel) * Math.Pow(2, naniteLevel);
-            if (divisor < 1) divisor = 1;
-
-            // Apply building speed multiplier from BuildingService for consistency/testing
-            double durationSeconds = ship.BaseDuration.TotalSeconds / divisor / 100.0; // Keeping x100 speed
-            if (durationSeconds < 1) durationSeconds = 1; // Minimum 1 second
-
-            var finalDuration = TimeSpan.FromSeconds(durationSeconds);
-            finalDuration = _devModeService.GetDuration(finalDuration, 5); // Dev override
+            var calculatedDuration = CalculateShipConstructionDuration(ship);
+            var finalDuration = _devModeService.GetDuration(calculatedDuration, 1);
 
             ConstructionQueue.Add(new ShipyardItem
             {

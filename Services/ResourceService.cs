@@ -4,6 +4,8 @@ using myapp.Data.Entities;
 
 namespace myapp.Services;
 
+// Refer to wiki/business-rules/RESOURCE_LOGIC_SUMMARY.md for business rules documentation
+
 public class ResourceService
 {
     private readonly GameDbContext _dbContext;

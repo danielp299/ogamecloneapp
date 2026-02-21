@@ -67,7 +67,7 @@
                         Deuterium: @building.DeuteriumCost.ToString("N0")
                     </div>
                     <div class="text-muted" style="margin-top: 8px; font-size: 0.85em;">
-                        <div>Duration: @building.Duration.ToString(@"hh\:mm\:ss")</div>
+                        <div>Duration: @BuildingService.GetConstructionTime(building).ToString(@"hh\:mm\:ss")</div>
                         <div>Energy: @building.EnergyConsumption</div>
                     </div>
                 </div>
