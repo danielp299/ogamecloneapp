@@ -38,4 +38,7 @@ public class EnemyEntity
     public string TechnologiesJson { get; set; } = "{}";
     public string DefensesJson { get; set; } = "{}";
     public string ShipsJson { get; set; } = "{}";
+    public string ExploredGalaxiesJson { get; set; } = "[]";
+    public string KnownEnemyCoordinatesJson { get; set; } = "[]";
+    public string SpiedEnemyPowerJson { get; set; } = "{}";
 }

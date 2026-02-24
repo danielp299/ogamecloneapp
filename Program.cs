@@ -51,8 +51,8 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<GameDbContext>();
-    await dbContext.Database.EnsureCreatedAsync();
-    Console.WriteLine("Database created/verified");
+    await dbContext.Database.MigrateAsync();
+    Console.WriteLine("Database migrated/verified");
 }
 
 // Step 2: Now initialize all services (they can safely access the database)

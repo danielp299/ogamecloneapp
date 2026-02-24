@@ -49,6 +49,11 @@ public class Enemy
     
     // Colony tracking
     public int ColonyCount { get; set; } = 0;
+
+    // Strategic memory
+    public HashSet<int> ExploredGalaxies { get; set; } = new();
+    public List<string> KnownEnemyCoordinates { get; set; } = new();
+    public Dictionary<string, long> SpiedEnemyPower { get; set; } = new();
     
     public string Coordinates => $"{Galaxy}:{System}:{Position}";
 }
@@ -66,6 +71,7 @@ public class EnemyService
     public List<Enemy> Enemies => _enemies.Values.ToList();
     
     public event Action? OnChange;
+    public event Action<string, string, Dictionary<string, int>>? OnEnemyAttackLaunched;
     
     private const int MAX_ENEMIES = 100;
     private const double BUILDING_UPGRADE_CHANCE = 0.70; // 70%
@@ -73,6 +79,9 @@ public class EnemyService
     private const double DEFENSE_BUILD_CHANCE = 0.60; // 60%
     private const double SHIP_BUILD_CHANCE = 0.50; // 50%
     private const double SPEND_RESOURCES_CHANCE = 0.40; // 40%
+    private const double EXPLORE_DISCOVERY_CHANCE = 0.30;
+    private const double ATTACK_POWER_ADVANTAGE = 1.20;
+    private const int MAX_KNOWN_ENEMIES_MEMORY = 10;
     
     // Maximum actions per enemy per player action event
     private const int MAX_ACTIONS_PER_EVENT = 2; // Limit to 2 actions maximum per event
@@ -169,6 +178,7 @@ public class EnemyService
     };
     
     private bool _isInitialized = false;
+    private bool _enemyMemoryColumnsReady = false;
 
     public EnemyService(GameDbContext dbContext, GalaxyService galaxyService)
     {
@@ -204,6 +214,7 @@ public class EnemyService
     {
         try
         {
+            await EnsureEnemyMemoryColumnsAsync();
             var dbEnemies = await _dbContext.Enemies.ToListAsync();
             
             if (dbEnemies.Any())
@@ -257,6 +268,21 @@ public class EnemyService
                     if (!string.IsNullOrEmpty(dbEnemy.ShipsJson))
                     {
                         enemy.Ships = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(dbEnemy.ShipsJson) ?? new();
+                    }
+
+                    if (!string.IsNullOrEmpty(dbEnemy.ExploredGalaxiesJson))
+                    {
+                        enemy.ExploredGalaxies = System.Text.Json.JsonSerializer.Deserialize<HashSet<int>>(dbEnemy.ExploredGalaxiesJson) ?? new();
+                    }
+
+                    if (!string.IsNullOrEmpty(dbEnemy.KnownEnemyCoordinatesJson))
+                    {
+                        enemy.KnownEnemyCoordinates = System.Text.Json.JsonSerializer.Deserialize<List<string>>(dbEnemy.KnownEnemyCoordinatesJson) ?? new();
+                    }
+
+                    if (!string.IsNullOrEmpty(dbEnemy.SpiedEnemyPowerJson))
+                    {
+                        enemy.SpiedEnemyPower = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, long>>(dbEnemy.SpiedEnemyPowerJson) ?? new();
                     }
                     
                     // Update production rates
@@ -503,6 +529,9 @@ public class EnemyService
         if (availableShips.Any()) possibleActions.Add("ship");
         if (availableBuildings.Any()) possibleActions.Add("building");
         if (availableTechs.Any()) possibleActions.Add("research");
+        possibleActions.Add("explore");
+        if (enemy.KnownEnemyCoordinates.Any()) possibleActions.Add("spy");
+        if (enemy.SpiedEnemyPower.Any()) possibleActions.Add("attack");
 
         while (actionsPerformed < actionsToPerform && possibleActions.Any())
         {
@@ -530,6 +559,15 @@ public class EnemyService
                 case "research":
                     string tech = availableTechs[_random.Next(availableTechs.Count)];
                     actionSuccess = TryResearchTechnology(enemy, tech);
+                    break;
+                case "explore":
+                    actionSuccess = TryExploreGalaxy(enemy);
+                    break;
+                case "spy":
+                    actionSuccess = TrySpyKnownEnemy(enemy);
+                    break;
+                case "attack":
+                    actionSuccess = TryLaunchAttack(enemy);
                     break;
             }
 
@@ -561,6 +599,9 @@ public class EnemyService
         if (availableTechs.Any()) possibleActions.Add("research");
         if (availableDefenses.Any()) possibleActions.Add("defense");
         if (availableShips.Any()) possibleActions.Add("ship");
+        possibleActions.Add("explore");
+        if (enemy.KnownEnemyCoordinates.Any()) possibleActions.Add("spy");
+        if (enemy.SpiedEnemyPower.Any()) possibleActions.Add("attack");
 
         while (actionsPerformed < actionsToPerform && possibleActions.Any())
         {
@@ -639,6 +680,15 @@ public class EnemyService
                     }
 
                     actionSuccess = TryBuildShip(enemy, shipToBuild);
+                    break;
+                case "explore":
+                    actionSuccess = TryExploreGalaxy(enemy);
+                    break;
+                case "spy":
+                    actionSuccess = TrySpyKnownEnemy(enemy);
+                    break;
+                case "attack":
+                    actionSuccess = TryLaunchAttack(enemy);
                     break;
             }
 
@@ -878,6 +928,7 @@ public class EnemyService
     {
         try
         {
+            await EnsureEnemyMemoryColumnsAsync();
             var existingEnemies = await _dbContext.Enemies.ToListAsync();
             var existingIds = existingEnemies.Select(e => e.Id).ToHashSet();
             
@@ -928,6 +979,9 @@ public class EnemyService
                 dbEnemy.TechnologiesJson = System.Text.Json.JsonSerializer.Serialize(enemy.Technologies);
                 dbEnemy.DefensesJson = System.Text.Json.JsonSerializer.Serialize(enemy.Defenses);
                 dbEnemy.ShipsJson = System.Text.Json.JsonSerializer.Serialize(enemy.Ships);
+                dbEnemy.ExploredGalaxiesJson = System.Text.Json.JsonSerializer.Serialize(enemy.ExploredGalaxies);
+                dbEnemy.KnownEnemyCoordinatesJson = System.Text.Json.JsonSerializer.Serialize(enemy.KnownEnemyCoordinates);
+                dbEnemy.SpiedEnemyPowerJson = System.Text.Json.JsonSerializer.Serialize(enemy.SpiedEnemyPower);
             }
             
             await _dbContext.SaveChangesAsync();
@@ -936,6 +990,46 @@ public class EnemyService
         {
             Console.WriteLine($"Error saving enemies: {ex.Message}");
         }
+    }
+
+    private async Task EnsureEnemyMemoryColumnsAsync()
+    {
+        if (_enemyMemoryColumnsReady) return;
+        if (!_dbContext.Database.IsSqlite()) return;
+
+        var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var connection = _dbContext.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info('Enemies')";
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                existingColumns.Add(reader.GetString(1));
+            }
+        }
+
+        if (!existingColumns.Contains("ExploredGalaxiesJson"))
+        {
+            await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Enemies ADD COLUMN ExploredGalaxiesJson TEXT NOT NULL DEFAULT '[]'");
+        }
+
+        if (!existingColumns.Contains("KnownEnemyCoordinatesJson"))
+        {
+            await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Enemies ADD COLUMN KnownEnemyCoordinatesJson TEXT NOT NULL DEFAULT '[]'");
+        }
+
+        if (!existingColumns.Contains("SpiedEnemyPowerJson"))
+        {
+            await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Enemies ADD COLUMN SpiedEnemyPowerJson TEXT NOT NULL DEFAULT '{}'");
+        }
+
+        _enemyMemoryColumnsReady = true;
     }
     
     // Triggered when player upgrades a building - 70% of enemies upgrade buildings
@@ -1154,6 +1248,123 @@ public class EnemyService
         
         await SaveEnemiesAsync();
         NotifyStateChanged();
+    }
+
+    private bool TryExploreGalaxy(Enemy enemy)
+    {
+        int galaxy = _random.Next(1, GalaxyService.MaxGalaxies + 1);
+        int system = _random.Next(1, GalaxyService.MaxSystemsPerGalaxy + 1);
+        enemy.ExploredGalaxies.Add(galaxy);
+
+        var planets = _galaxyService.GetSystem(galaxy, system)
+            .Where(p => p.IsOccupied && !(p.Galaxy == enemy.Galaxy && p.System == enemy.System && p.Position == enemy.Position))
+            .ToList();
+        if (!planets.Any()) return false;
+
+        var discoveredPlanet = planets[_random.Next(planets.Count)];
+        if (_random.NextDouble() > EXPLORE_DISCOVERY_CHANCE) return true;
+
+        string discoveredCoordinates = $"{discoveredPlanet.Galaxy}:{discoveredPlanet.System}:{discoveredPlanet.Position}";
+        AddKnownEnemyCoordinate(enemy, discoveredCoordinates);
+        return true;
+    }
+
+    private void AddKnownEnemyCoordinate(Enemy enemy, string coordinates)
+    {
+        if (enemy.KnownEnemyCoordinates.Contains(coordinates)) return;
+
+        enemy.KnownEnemyCoordinates.Add(coordinates);
+        if (enemy.KnownEnemyCoordinates.Count > MAX_KNOWN_ENEMIES_MEMORY)
+        {
+            string removed = enemy.KnownEnemyCoordinates[0];
+            enemy.KnownEnemyCoordinates.RemoveAt(0);
+            enemy.SpiedEnemyPower.Remove(removed);
+        }
+    }
+
+    private bool TrySpyKnownEnemy(Enemy enemy)
+    {
+        if (!enemy.KnownEnemyCoordinates.Any()) return false;
+
+        string targetCoordinates = enemy.KnownEnemyCoordinates[_random.Next(enemy.KnownEnemyCoordinates.Count)];
+        long targetPower = EstimateTargetPower(targetCoordinates);
+        enemy.SpiedEnemyPower[targetCoordinates] = targetPower;
+        return true;
+    }
+
+    private bool TryLaunchAttack(Enemy enemy)
+    {
+        if (!enemy.SpiedEnemyPower.Any()) return false;
+
+        long attackerPower = CalculateEnemyPower(enemy);
+        if (attackerPower <= 0) return false;
+
+        var viableTargets = enemy.SpiedEnemyPower
+            .Where(t => attackerPower >= t.Value * ATTACK_POWER_ADVANTAGE)
+            .Select(t => t.Key)
+            .ToList();
+        if (!viableTargets.Any()) return false;
+
+        var attackShips = enemy.Ships
+            .Where(s => s.Value > 0)
+            .ToDictionary(s => s.Key, s => s.Value);
+        if (!attackShips.Any()) return false;
+
+        string targetCoordinates = viableTargets[_random.Next(viableTargets.Count)];
+        OnEnemyAttackLaunched?.Invoke(enemy.Coordinates, targetCoordinates, attackShips);
+        enemy.LastActivity = DateTime.Now;
+        return true;
+    }
+
+    private long EstimateTargetPower(string coordinates)
+    {
+        if (!TryParseCoordinates(coordinates, out int g, out int s, out int p)) return 1;
+
+        lock (_lockObject)
+        {
+            if (_enemies.TryGetValue(coordinates, out var knownEnemy))
+            {
+                return CalculateEnemyPower(knownEnemy);
+            }
+        }
+
+        var planet = _galaxyService.GetPlanet(g, s, p);
+        if (planet == null || !planet.IsOccupied) return 1;
+
+        // Unknown planets are treated as moderate threat until spied repeatedly.
+        return 5000;
+    }
+
+    private static bool TryParseCoordinates(string coordinates, out int galaxy, out int system, out int position)
+    {
+        galaxy = 0;
+        system = 0;
+        position = 0;
+
+        var parts = coordinates.Split(':');
+        return parts.Length == 3 &&
+               int.TryParse(parts[0], out galaxy) &&
+               int.TryParse(parts[1], out system) &&
+               int.TryParse(parts[2], out position);
+    }
+
+    private long CalculateEnemyPower(Enemy enemy)
+    {
+        long shipPower = 0;
+        foreach (var ship in enemy.Ships)
+        {
+            var (metal, crystal, deuterium) = GetShipBaseCost(ship.Key);
+            shipPower += (metal + crystal + deuterium) * ship.Value;
+        }
+
+        long defensePower = 0;
+        foreach (var defense in enemy.Defenses)
+        {
+            var (metal, crystal, deuterium) = GetDefenseBaseCost(defense.Key);
+            defensePower += (metal + crystal + deuterium) * defense.Value;
+        }
+
+        return shipPower + defensePower;
     }
     
     private bool TryUpgradeBuilding(Enemy enemy, string buildingName)

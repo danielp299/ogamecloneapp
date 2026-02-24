@@ -28,6 +28,7 @@ public class FleetMission
     public FleetStatus Status { get; set; }
     public long FuelConsumed { get; set; }
     public Dictionary<string, long> Cargo { get; set; } = new();
+    public bool IsIncomingAttack { get; set; }
     
     // Calculated properties for countdown
     public TimeSpan TimeToArrival => Status == FleetStatus.Flight && ArrivalTime > DateTime.Now 
@@ -112,6 +113,8 @@ public class FleetService
     
     // Maximum number of planets a player can have (colonization limit)
     public const int MaxPlanets = 4;
+    public double CombatDefenseLossMinPercentage { get; private set; } = 0.10;
+    public double CombatDefenseLossMaxPercentage { get; private set; } = 0.25;
 
     public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, GamePersistenceService persistenceService, MessageService messageService, DefenseService defenseService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
     {
@@ -135,6 +138,8 @@ public class FleetService
             await LoadFromDatabaseAsync();
             NotifyStateChanged();
         };
+
+        _enemyService.OnEnemyAttackLaunched += HandleEnemyAttackLaunched;
         
         // DevMode: Add 10 ships of each type
         if (_devModeService.IsEnabled)
@@ -145,6 +150,37 @@ public class FleetService
         // Start loops
         _ = ProcessQueueLoop();
         _ = ProcessFleetLoop();
+    }
+
+    public void SetCombatDefenseLossPercentage(double percentage)
+    {
+        double clamped = Math.Clamp(percentage, 0.0, 1.0);
+        CombatDefenseLossMinPercentage = clamped;
+        CombatDefenseLossMaxPercentage = clamped;
+    }
+
+    public void SetCombatDefenseLossRange(double minPercentage, double maxPercentage)
+    {
+        double clampedMin = Math.Clamp(minPercentage, 0.0, 1.0);
+        double clampedMax = Math.Clamp(maxPercentage, 0.0, 1.0);
+
+        if (clampedMax < clampedMin)
+        {
+            (clampedMin, clampedMax) = (clampedMax, clampedMin);
+        }
+
+        CombatDefenseLossMinPercentage = clampedMin;
+        CombatDefenseLossMaxPercentage = clampedMax;
+    }
+
+    public bool HasAttackInProgress()
+    {
+        return ActiveFleets.Any(m => m.MissionType == "Attack" && m.Status == FleetStatus.Flight && !m.IsIncomingAttack);
+    }
+
+    public bool HasIncomingAttack()
+    {
+        return ActiveFleets.Any(m => m.MissionType == "Attack" && m.Status == FleetStatus.Flight && m.IsIncomingAttack);
     }
 
     private async Task LoadFromDatabaseAsync()
@@ -518,6 +554,14 @@ public class FleetService
                 {
                     if (now >= mission.ArrivalTime)
                     {
+                        if (mission.IsIncomingAttack)
+                        {
+                            HandleIncomingAttack(mission);
+                            completedMissions.Add(mission);
+                            NotifyStateChanged();
+                            continue;
+                        }
+
                         // Arrived!
                         ProcessMissionArrival(mission);
                         
@@ -1066,9 +1110,11 @@ public class FleetService
                      $"Your Fleet: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
                      $"Enemy Def: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
                      $"Your fleet was forced to retreat with heavy losses.<br/><br/>" +
-                     $"Debris Field Created:<br/>" +
-                     $"Metal: {debrisM:N0}, Crystal: {debrisC:N0}";
+                      $"Debris Field Created:<br/>" +
+                      $"Metal: {debrisM:N0}, Crystal: {debrisC:N0}";
         }
+
+        ApplyDefenseCombatLosses(defenses);
         
         _messageService.AddMessage($"Combat Report [{mission.TargetCoordinates}]", result, "Combat");
         
@@ -1082,6 +1128,7 @@ public class FleetService
             bool wasVictory = attackerScore > defenderScore;
             _ = _enemyService.OnPlayerAttack(g, s, p, wasVictory);
         }
+
     }
 
     // Helper to get real state for a planet
@@ -1103,6 +1150,112 @@ public class FleetService
 
         // Fallback for non-enemy (or if not found), e.g. player planets handled elsewhere or empty
         return (new(), new(), new(), 0, new(), new());
+    }
+
+    private void ApplyDefenseCombatLosses(Dictionary<string, int> defenses)
+    {
+        double minLossPercentage = Math.Clamp(CombatDefenseLossMinPercentage, 0.0, 1.0);
+        double maxLossPercentage = Math.Clamp(CombatDefenseLossMaxPercentage, 0.0, 1.0);
+        if (maxLossPercentage < minLossPercentage)
+        {
+            (minLossPercentage, maxLossPercentage) = (maxLossPercentage, minLossPercentage);
+        }
+        if (maxLossPercentage <= 0 || defenses.Count == 0) return;
+
+        double lossPercentage = minLossPercentage == maxLossPercentage
+            ? minLossPercentage
+            : minLossPercentage + (Random.Shared.NextDouble() * (maxLossPercentage - minLossPercentage));
+
+        foreach (var defenseType in defenses.Keys.ToList())
+        {
+            int currentTotal = defenses[defenseType];
+            if (currentTotal <= 0) continue;
+
+            int lostAmount = (int)Math.Floor(currentTotal * lossPercentage);
+            int updatedTotal = Math.Max(0, currentTotal - lostAmount);
+            defenses[defenseType] = updatedTotal;
+        }
+    }
+
+    private void HandleEnemyAttackLaunched(string originCoordinates, string targetCoordinates, Dictionary<string, int> ships)
+    {
+        var attackShips = ships.Where(s => s.Value > 0).ToDictionary(s => s.Key, s => s.Value);
+        if (!attackShips.Any()) return;
+
+        var targetParts = targetCoordinates.Split(':');
+        if (targetParts.Length != 3 ||
+            !int.TryParse(targetParts[0], out int tg) ||
+            !int.TryParse(targetParts[1], out int ts) ||
+            !int.TryParse(targetParts[2], out int tp))
+        {
+            return;
+        }
+
+        var targetPlanet = _galaxyService.GetPlanet(tg, ts, tp);
+        if (targetPlanet == null || !targetPlanet.IsMyPlanet) return;
+
+        if (!TryParseCoordinates(originCoordinates, out int og, out int os, out int op)) return;
+
+        TimeSpan flightTime = CalculateFlightTimeFromCoordinates(attackShips, og, os, op, tg, ts, tp);
+        if (flightTime <= TimeSpan.Zero) flightTime = TimeSpan.FromSeconds(30);
+
+        var incomingMission = new FleetMission
+        {
+            Id = Guid.NewGuid(),
+            MissionType = "Attack",
+            OriginCoordinates = originCoordinates,
+            TargetCoordinates = targetCoordinates,
+            Ships = new Dictionary<string, int>(attackShips),
+            StartTime = DateTime.Now,
+            ArrivalTime = DateTime.Now.Add(flightTime),
+            ReturnTime = DateTime.Now.Add(flightTime),
+            Status = FleetStatus.Flight,
+            IsIncomingAttack = true
+        };
+
+        ActiveFleets.Add(incomingMission);
+        _messageService.AddMessage("Incoming Attack Warning", $"Enemy fleet detected from {originCoordinates} to {targetCoordinates}.", "Combat");
+        NotifyStateChanged();
+    }
+
+    private TimeSpan CalculateFlightTimeFromCoordinates(Dictionary<string, int> shipsToSend, int originGalaxy, int originSystem, int originPosition, int targetGalaxy, int targetSystem, int targetPosition)
+    {
+        if (!shipsToSend.Any()) return TimeSpan.Zero;
+
+        int minSpeed = int.MaxValue;
+        foreach (var kvp in shipsToSend)
+        {
+            var ship = ShipDefinitions.FirstOrDefault(s => s.Id == kvp.Key);
+            if (ship != null && ship.BaseSpeed < minSpeed) minSpeed = ship.BaseSpeed;
+        }
+        if (minSpeed == int.MaxValue) return TimeSpan.Zero;
+
+        long distance = Math.Abs(targetGalaxy - originGalaxy) * 20000 +
+                        Math.Abs(targetSystem - originSystem) * 1000 +
+                        Math.Abs(targetPosition - originPosition) * 5 + 1000;
+
+        double hours = (double)distance / minSpeed;
+        double seconds = hours * 3600 / 100.0;
+        seconds = seconds * 0.1;
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    private static bool TryParseCoordinates(string coordinates, out int galaxy, out int system, out int position)
+    {
+        galaxy = 0;
+        system = 0;
+        position = 0;
+
+        var parts = coordinates.Split(':');
+        return parts.Length == 3 &&
+               int.TryParse(parts[0], out galaxy) &&
+               int.TryParse(parts[1], out system) &&
+               int.TryParse(parts[2], out position);
+    }
+
+    private void HandleIncomingAttack(FleetMission mission)
+    {
+        _messageService.AddMessage("Planet Under Attack", $"Enemy attack reached {mission.TargetCoordinates}.", "Combat");
     }
 
     private void HandleTransport(FleetMission mission, GalaxyPlanet? planet)

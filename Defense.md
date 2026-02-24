@@ -10,6 +10,7 @@ El módulo Defense permite construir estructuras defensivas fijas en planetas pa
   - **Escudos**: Small/Large Shield Dome – Absorben daño inicial.
 - **Costos y Tiempos**: Similares a edificios, pero sin ocupar campos. Tiempos reducidos por Shipyard y Nanite Factory.
 - **Reconstrucción Automática**: 70% de chance de reconstruir tras combate (excepto si destruido por IPM).
+- **Pérdida por Combate**: Al finalizar cada combate se pierde un porcentaje de defensas construidas dentro de un rango configurable (mínimo y máximo parametrizables; por defecto 10%-25%).
 - **No Cancelables**: Una vez iniciada, no se pueden recuperar recursos.
 
 ## Mecánicas de Juego

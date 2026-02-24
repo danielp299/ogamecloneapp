@@ -19,6 +19,18 @@
     <!-- Fleet Activity -->
     <div class="ogame-panel mb-lg">
         <h3>Fleet Movements</h3>
+        @if (FleetService.HasAttackInProgress())
+        {
+            <div style="margin: 10px 0; padding: 10px; border-radius: 5px; font-weight: bold; background-color: rgba(255, 152, 0, 0.15); color: #ffb74d;">
+                ⚔️ Attack in progress.
+            </div>
+        }
+        @if (FleetService.HasIncomingAttack())
+        {
+            <div style="margin: 10px 0; padding: 10px; border-radius: 5px; font-weight: bold; background-color: rgba(244, 67, 54, 0.15); color: #ef5350;">
+                🚨 Incoming attack detected.
+            </div>
+        }
         @if (FleetService.ActiveFleets.Any())
         {
             <div style="display: grid; gap: 10px; margin-top: 15px;">
@@ -28,7 +40,7 @@
                     <div class="ogame-card" style="padding: 15px;">
                         <div style="width: 100%; text-align: left;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                <strong style="color: var(--color-accent-gold);">@mission.MissionType</strong>
+                                <strong style="color: var(--color-accent-gold);">@(mission.IsIncomingAttack ? "Incoming Attack" : mission.MissionType)</strong>
                                 <span class="ogame-badge ogame-badge-@(mission.Status == FleetStatus.Return ? "warning" : "success")">
                                     @mission.Status
                                 </span>

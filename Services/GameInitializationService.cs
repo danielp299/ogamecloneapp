@@ -45,9 +45,9 @@ public class GameInitializationService
         _fleetService = fleetService;
         _defenseService = defenseService;
 
-        // 1. Crear BD si no existe (esto crea las tablas también)
-        await _dbContext.Database.EnsureCreatedAsync();
-        _logger.LogInformation("Database created/verified");
+        // 1. Aplicar migraciones de BD
+        await _dbContext.Database.MigrateAsync();
+        _logger.LogInformation("Database migrated/verified");
 
         // 2. Verificar si existe una partida guardada válida
         var gameState = await _dbContext.GameState.FirstOrDefaultAsync();
@@ -67,8 +67,8 @@ public class GameInitializationService
 
     public async Task EnsureDatabaseCreatedAsync()
     {
-        await _dbContext.Database.EnsureCreatedAsync();
-        _logger.LogInformation("Database created/verified");
+        await _dbContext.Database.MigrateAsync();
+        _logger.LogInformation("Database migrated/verified");
     }
 
     public async Task ResetAndReinitializeGameAsync(
@@ -92,7 +92,7 @@ public class GameInitializationService
         _logger.LogInformation("All service states reset");
         
         // 3. Recreate database and initialize new game
-        await _dbContext.Database.EnsureCreatedAsync();
+        await _dbContext.Database.MigrateAsync();
         _logger.LogInformation("Database recreated");
         
         // 4. Create new game with fresh initialization

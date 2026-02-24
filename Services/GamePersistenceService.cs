@@ -17,8 +17,8 @@ public class GamePersistenceService
 
     public async Task EnsureDatabaseCreatedAsync()
     {
-        await _dbContext.Database.EnsureCreatedAsync();
-        _logger.LogInformation("Database created/verified");
+        await _dbContext.Database.MigrateAsync();
+        _logger.LogInformation("Database migrated/verified");
     }
 
     public async Task<GameState?> GetGameStateAsync()

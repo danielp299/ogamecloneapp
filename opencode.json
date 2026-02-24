@@ -9,10 +9,18 @@
       },
       "models": {
         "deepseek-coder-33b-secure": {
-          "name": "DeepSeek Coder 33B Secure (local)"
+          "name": "DeepSeek Coder 33B Secure (local)",
+          "limit": {
+            "context": 8192,
+            "output": 4096
+          }
         },
         "qwen/qwen3-coder-next": {
-          "name": "Qwen3 Coder Next (local)"
+          "name": "Qwen3 Coder Next (local)",
+          "limit": {
+            "context": 8192,
+            "output": 4096
+          }
         }
       }
     }
