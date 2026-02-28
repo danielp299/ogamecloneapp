@@ -1,3 +1,0 @@
-Compilando...
-/Users/macbook/Documents/GitHub/ogamecloneapp/myapp.csproj : warning NU1603: myapp depende de bunit (>= 1.24.0), pero no se encontró bunit 1.24.0. Se resolvió una mejor coincidencia aproximada de bunit 1.24.10.
-/Users/macbook/Documents/GitHub/ogamecloneapp/myapp.csproj : warning NU1603: myapp depende de bunit (>= 1.24.0), pero no se encontró bunit 1.24.0. Se resolvió una mejor coincidencia aproximada de bunit 1.24.10.
