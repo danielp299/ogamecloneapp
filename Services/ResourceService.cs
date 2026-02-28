@@ -50,8 +50,6 @@ public class ResourceService
             state = await _dbContext.PlanetStates.FirstOrDefaultAsync(ps => ps.Galaxy == g && ps.System == s && ps.Position == p);
             if (state == null)
             {
-                // If it doesn't exist, we might be in a race condition during colonization, 
-                // but usually we should have it.
                 throw new InvalidOperationException($"Planet state for {key} not found");
             }
             _cachedPlanetStates[key] = state;
@@ -59,24 +57,37 @@ public class ResourceService
         return state;
     }
 
-    private PlanetState GetActivePlanetState()
+    private async Task<PlanetState> GetActivePlanetStateAsync()
     {
-        return GetPlanetStateAsync(_playerStateService.ActiveGalaxy, _playerStateService.ActiveSystem, _playerStateService.ActivePosition).Result;
+        return await GetPlanetStateAsync(_playerStateService.ActiveGalaxy, _playerStateService.ActiveSystem, _playerStateService.ActivePosition);
     }
 
-    public long Metal => (long)GetActivePlanetState().Metal;
-    public long Crystal => (long)GetActivePlanetState().Crystal;
-    public long Deuterium => (long)GetActivePlanetState().Deuterium;
-    public long DarkMatter => (long)(GetStateAsync().Result.DarkMatter);
-    public long Energy => GetActivePlanetState().Energy;
+    public async Task<ResourceSnapshot> GetResourceSnapshotAsync()
+    {
+        var state = await GetStateAsync();
+        var planetState = await GetActivePlanetStateAsync();
+        EnsureCurrentResourcesCalculated(planetState);
+
+        return new ResourceSnapshot(
+            (long)planetState.Metal,
+            (long)planetState.Crystal,
+            (long)planetState.Deuterium,
+            planetState.Energy,
+            (long)state.DarkMatter
+        );
+    }
+
+    public async Task<long> GetEnergyAsync()
+    {
+        var state = await GetActivePlanetStateAsync();
+        return state.Energy;
+    }
 
     public double MetalProductionRate { get; set; }
     public double CrystalProductionRate { get; set; }
     public double DeuteriumProductionRate { get; set; }
 
-    // ... updated methods follow ...
-
-private async Task SaveStateAsync()
+    private async Task SaveStateAsync()
     {
         await _dbContext.SaveChangesAsync();
     }
@@ -88,8 +99,6 @@ private async Task SaveStateAsync()
 
         if (elapsedSeconds > 0)
         {
-            // Note: This still uses the SHARED MetalProductionRate. 
-            // We'll need to fix this in BuildingService soon.
             state.Metal += MetalProductionRate * elapsedSeconds;
             state.Crystal += CrystalProductionRate * elapsedSeconds;
             state.Deuterium += DeuteriumProductionRate * elapsedSeconds;
@@ -97,89 +106,88 @@ private async Task SaveStateAsync()
         }
     }
 
-    public bool HasResources(long metal, long crystal, long deuterium)
+    public async Task<bool> HasResourcesAsync(long metal, long crystal, long deuterium)
     {
-        var state = GetActivePlanetState();
+        var state = await GetActivePlanetStateAsync();
         EnsureCurrentResourcesCalculated(state);
         return state.Metal >= metal && state.Crystal >= crystal && state.Deuterium >= deuterium;
     }
 
-    public bool ConsumeResources(long metal, long crystal, long deuterium)
+    public async Task<bool> ConsumeResourcesAsync(long metal, long crystal, long deuterium)
     {
-        if (!HasResources(metal, crystal, deuterium))
+        if (!await HasResourcesAsync(metal, crystal, deuterium))
         {
             return false;
         }
 
-        var state = GetActivePlanetState();
+        var state = await GetActivePlanetStateAsync();
         EnsureCurrentResourcesCalculated(state);
         state.Metal -= metal;
         state.Crystal -= crystal;
         state.Deuterium -= deuterium;
 
-        _dbContext.SaveChanges();
+        await _dbContext.SaveChangesAsync();
         NotifyStateChanged();
         return true;
     }
 
-    public void AddResources(double metal, double crystal, double deuterium)
+    public async Task AddResourcesAsync(double metal, double crystal, double deuterium)
     {
-        var state = GetActivePlanetState();
+        var state = await GetActivePlanetStateAsync();
         EnsureCurrentResourcesCalculated(state);
         state.Metal += metal;
         state.Crystal += crystal;
         state.Deuterium += deuterium;
 
-        _dbContext.SaveChanges();
+        await _dbContext.SaveChangesAsync();
         NotifyStateChanged();
     }
 
-    public void AddResourcesToPlanet(int g, int s, int p, double metal, double crystal, double deuterium)
+    public async Task AddResourcesToPlanetAsync(int g, int s, int p, double metal, double crystal, double deuterium)
     {
-        var state = GetPlanetStateAsync(g, s, p).Result;
+        var state = await GetPlanetStateAsync(g, s, p);
         EnsureCurrentResourcesCalculated(state);
         state.Metal += metal;
         state.Crystal += crystal;
         state.Deuterium += deuterium;
 
-        _dbContext.SaveChanges();
-        // We only notify if it's the active planet
+        await _dbContext.SaveChangesAsync();
         if (_playerStateService.ActiveGalaxy == g && _playerStateService.ActiveSystem == s && _playerStateService.ActivePosition == p)
         {
             NotifyStateChanged();
         }
     }
 
-    public void AddDarkMatter(long amount)
+    public async Task AddDarkMatterAsync(long amount)
     {
-        var state = GetStateAsync().Result;
+        var state = await GetStateAsync();
         state.DarkMatter += amount;
 
-        _dbContext.SaveChanges();
+        await _dbContext.SaveChangesAsync();
         NotifyStateChanged();
     }
 
-    public void RefundResources(long metal, long crystal, long deuterium)
+    public async Task RefundResourcesAsync(long metal, long crystal, long deuterium)
     {
         var percentage = Math.Clamp(CancelRefundPercentage, 0.0, 100.0) / 100.0;
-        AddResources(metal * percentage, crystal * percentage, deuterium * percentage);
+        await AddResourcesAsync(metal * percentage, crystal * percentage, deuterium * percentage);
     }
 
-    public void SetEnergy(long energy)
+    public async Task SetEnergyAsync(long energy)
     {
-        var state = GetActivePlanetState();
+        var state = await GetActivePlanetStateAsync();
         state.Energy = energy;
 
-        _dbContext.SaveChanges();
+        await _dbContext.SaveChangesAsync();
         NotifyStateChanged();
     }
 
-    public void UpdateEnergy(long deltaEnergy)
+    public async Task UpdateEnergyAsync(long deltaEnergy)
     {
-        var state = GetActivePlanetState();
+        var state = await GetActivePlanetStateAsync();
         state.Energy += deltaEnergy;
 
-        _dbContext.SaveChanges();
+        await _dbContext.SaveChangesAsync();
         NotifyStateChanged();
     }
 
@@ -192,3 +200,5 @@ private async Task SaveStateAsync()
         CancelRefundPercentage = 100.0;
     }
 }
+
+public record ResourceSnapshot(long Metal, long Crystal, long Deuterium, long Energy, long DarkMatter);

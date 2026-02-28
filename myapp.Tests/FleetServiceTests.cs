@@ -27,20 +27,18 @@ namespace myapp.Tests.Services
             _dbContext = new GameDbContext(options);
             _dbContext.Database.EnsureCreated();
             
-            // Initialize game state
-            var persistenceService = new GamePersistenceService(_dbContext, 
-                LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<GamePersistenceService>());
-            persistenceService.InitializeGameStateAsync().Wait();
         }
 
         [Fact]
-        public void HandleCombat_Should_Generate_Debris_On_Victory()
+        public async Task HandleCombat_Should_Generate_Debris_On_Victory()
         {
             // Arrange
-            var devModeService = new DevModeService(_dbContext);
-            var messageService = new MessageService(_dbContext);
             var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
             var persistenceService = new GamePersistenceService(_dbContext, loggerFactory.CreateLogger<GamePersistenceService>());
+            await persistenceService.InitializeGameStateAsync();
+
+            var devModeService = new DevModeService(_dbContext);
+            var messageService = new MessageService(_dbContext);
             var galaxyService = new GalaxyService(_dbContext, persistenceService);
             var playerStateService = new PlayerStateService(galaxyService);
             var resourceService = new ResourceService(_dbContext, devModeService, playerStateService);
@@ -51,6 +49,12 @@ namespace myapp.Tests.Services
             var defenseService = new DefenseService(_dbContext, resourceService, buildingService, techService, devModeService, enemyService, playerStateService);
             
             var fleetService = new FleetService(_dbContext, resourceService, buildingService, techService, galaxyService, persistenceService, messageService, defenseService, devModeService, enemyService, playerStateService);
+
+            await buildingService.InitializeAsync();
+            await techService.InitializeAsync();
+            await defenseService.InitializeAsync();
+            await fleetService.InitializeAsync();
+            await messageService.InitializeAsync();
             
             // Create a mock mission that has arrived
             var mission = new FleetMission
@@ -72,7 +76,7 @@ namespace myapp.Tests.Services
             Assert.True(targetPlanet.IsOccupied);
             
             // Act
-            fleetService.SendFleet(new Dictionary<string, int> { { "LF", 10 } }, 1, 1, 2, "Attack");
+            await fleetService.SendFleet(new Dictionary<string, int> { { "LF", 10 } }, 1, 1, 2, "Attack");
             
             // Assert - Fleet should be added to active fleets
             Assert.True(fleetService.ActiveFleets.Count > 0);

@@ -78,12 +78,11 @@ private bool _isInitialized = false;
         _playerStateService = playerStateService;
         
         InitializeBuildings();
-        // NOTA: La carga de datos es lazy via Initialize()
         
         _playerStateService.OnChange += async () => 
         {
             await LoadFromDatabaseAsync();
-            UpdateProduction();
+            await UpdateProductionAsync();
             NotifyStateChanged();
         };
     }
@@ -93,7 +92,7 @@ private bool _isInitialized = false;
         if (_isInitialized) return;
         
         await LoadFromDatabaseAsync();
-        UpdateProduction();
+        await UpdateProductionAsync();
         
         _isInitialized = true;
     }
@@ -157,7 +156,7 @@ private bool _isInitialized = false;
         await _dbContext.SaveChangesAsync();
     }
 
-    public void UpdateProduction()
+    public async Task UpdateProductionAsync()
     {
         // Configuration Multiplier (x1000 speed for testing/fast servers)
         double speedMultiplier = 1000.0;
@@ -198,7 +197,7 @@ private bool _isInitialized = false;
 
         // Update Energy State
         long netEnergy = energyProduction - energyConsumption;
-        _resourceService.SetEnergy(netEnergy);
+        await _resourceService.SetEnergyAsync(netEnergy);
 
         // 2. Calculate Production Factor based on Energy
         ProductionFactor = 1.0;
@@ -486,16 +485,16 @@ private bool _isInitialized = false;
         });
     }
 
-    public void AddToQueue(Building building)
+    public async Task AddToQueueAsync(Building building)
     {
         // Important: Update resources before spending them!
-        UpdateProduction();
+        await UpdateProductionAsync();
 
         if (ConstructionQueue.Count >= MaxQueueSize) return;
         
-        if (_resourceService.HasResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost))
+        if (await _resourceService.HasResourcesAsync(building.MetalCost, building.CrystalCost, building.DeuteriumCost))
         {
-            _resourceService.ConsumeResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
+            await _resourceService.ConsumeResourcesAsync(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
             
             var calculatedDuration = CalculateConstructionDuration(building);
             var duration = _devModeService.GetDuration(calculatedDuration, 1);
@@ -512,12 +511,12 @@ private bool _isInitialized = false;
         }
     }
 
-    public void Cancel(Building building)
+    public async Task CancelAsync(Building building)
     {
         if (ConstructionQueue.Contains(building))
         {
             // Refund resources based on CancelRefundPercentage setting
-            _resourceService.RefundResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
+            await _resourceService.RefundResourcesAsync(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
             
             ConstructionQueue.Remove(building);
             building.IsBuilding = false;
@@ -554,7 +553,7 @@ private bool _isInitialized = false;
 
             // CRITICAL: Update production resources based on OLD levels before upgrading
             // This ensures we don't calculate the past duration with the NEW production rate
-            UpdateProduction();
+            await UpdateProductionAsync();
             
             // Energy update is now handled INSIDE UpdateProduction(), so we don't need manual logic here anymore.
             // Just increment level and recalculate.
@@ -568,7 +567,7 @@ private bool _isInitialized = false;
             ConstructionQueue.RemoveAt(0);
             
             // Recalculate production rates (and energy) with new levels
-            UpdateProduction();
+            await UpdateProductionAsync();
             
             // Notify enemy service that player upgraded a building
             _ = _enemyService.OnPlayerBuildingUpgraded(upgradedBuildingName);

@@ -187,13 +187,6 @@ public class EnemyService
         // NOTA: La inicialización es lazy via Initialize() o GenerateInitialEnemiesAsync()
     }
 
-    public void Initialize()
-    {
-        if (_isInitialized) return;
-        LoadEnemiesAsync().Wait();
-        _isInitialized = true;
-    }
-
     public async Task InitializeAsync()
     {
         if (_isInitialized) return;

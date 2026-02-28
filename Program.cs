@@ -14,13 +14,9 @@ var dbPath = Path.Combine(builder.Environment.ContentRootPath, "game.db");
 builder.Services.AddDbContext<GameDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"), ServiceLifetime.Singleton);
 
-// Register persistence service
+// Register all game services as Singleton (state lives in memory)
 builder.Services.AddSingleton<GamePersistenceService>();
-
-// Register game initialization service
 builder.Services.AddSingleton<GameInitializationService>();
-
-// Register game services
 builder.Services.AddSingleton<PlayerStateService>();
 builder.Services.AddSingleton<ResourceService>();
 builder.Services.AddSingleton<BuildingService>();
@@ -45,9 +41,9 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
-
+ 
 // Initialize game on startup
-// Step 1: First ensure database is created (before any service tries to access it)
+// Step 1: First ensure database is created
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<GameDbContext>();
@@ -55,7 +51,7 @@ using (var scope = app.Services.CreateScope())
     Console.WriteLine("Database migrated/verified");
 }
 
-// Step 2: Now initialize all services (they can safely access the database)
+// Step 2: Now initialize all services
 using (var scope = app.Services.CreateScope())
 {
     var initService = scope.ServiceProvider.GetRequiredService<GameInitializationService>();
@@ -66,6 +62,7 @@ using (var scope = app.Services.CreateScope())
     var technologyService = scope.ServiceProvider.GetRequiredService<TechnologyService>();
     var fleetService = scope.ServiceProvider.GetRequiredService<FleetService>();
     var defenseService = scope.ServiceProvider.GetRequiredService<DefenseService>();
+    var messageService = scope.ServiceProvider.GetRequiredService<MessageService>();
     var playerStateService = scope.ServiceProvider.GetRequiredService<PlayerStateService>();
 
     await initService.InitializeGameAsync(
@@ -76,6 +73,7 @@ using (var scope = app.Services.CreateScope())
         technologyService,
         fleetService,
         defenseService,
+        messageService,
         playerStateService
     );
 }

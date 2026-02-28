@@ -18,6 +18,7 @@ public class GameInitializationService
     private TechnologyService _technologyService;
     private FleetService _fleetService;
     private DefenseService _defenseService;
+    private MessageService _messageService;
 
     public GameInitializationService(
         GameDbContext dbContext,
@@ -35,6 +36,7 @@ public class GameInitializationService
         TechnologyService technologyService,
         FleetService fleetService,
         DefenseService defenseService,
+        MessageService messageService,
         PlayerStateService playerStateService)
     {
         _galaxyService = galaxyService;
@@ -44,6 +46,7 @@ public class GameInitializationService
         _technologyService = technologyService;
         _fleetService = fleetService;
         _defenseService = defenseService;
+        _messageService = messageService;
 
         // 1. Aplicar migraciones de BD
         await _dbContext.Database.MigrateAsync();
@@ -152,7 +155,12 @@ public class GameInitializationService
         await _buildingService.InitializeAsync();
 
         // Inicializar EnemyService (cargará enemigos de BD)
-        _enemyService.Initialize();
+        await _enemyService.InitializeAsync();
+
+        await _technologyService.InitializeAsync();
+        await _defenseService.InitializeAsync();
+        await _fleetService.InitializeAsync();
+        await _messageService.InitializeAsync();
 
         _logger.LogInformation($"Game loaded successfully. Home: {gameState.HomeGalaxy}:{gameState.HomeSystem}:{gameState.HomePosition}");
     }
@@ -215,6 +223,11 @@ public class GameInitializationService
 
         // 8. Inicializar BuildingService (después de que el planeta existe)
         await _buildingService.InitializeAsync();
+
+        await _technologyService.InitializeAsync();
+        await _defenseService.InitializeAsync();
+        await _fleetService.InitializeAsync();
+        await _messageService.InitializeAsync();
 
         // 9. Generar enemigos iniciales
         await _enemyService.GenerateInitialEnemiesAsync(

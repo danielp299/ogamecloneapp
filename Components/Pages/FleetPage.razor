@@ -191,7 +191,7 @@
                         <div><strong>Duration:</strong> @calculatedFlightTime.ToString(@"hh\:mm\:ss")</div>
                         <div><strong>Fuel Cost:</strong> @calculatedFuel.ToString("N0") Deuterium</div>
                     </div>
-                    <button class="ogame-btn ogame-btn-success ogame-btn-lg" @onclick="LaunchFleet">
+                    <button class="ogame-btn ogame-btn-success ogame-btn-lg" @onclick="async () => await LaunchFleet()">
                         🚀 Launch Fleet
                     </button>
                 </div>
@@ -353,7 +353,7 @@
         return $"{timeSpan.Hours:D2}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}";
     }
 
-    private void LaunchFleet()
+    private async Task LaunchFleet()
     {
         // Validate galaxy and system limits
         if (TargetGalaxy < 1 || TargetGalaxy > GalaxyService.MaxGalaxies)
@@ -368,7 +368,7 @@
         }
 
         var ships = GetSelectedShips();
-        var error = FleetService.SendFleet(ships, TargetGalaxy, TargetSystem, TargetPosition, SelectedMission);
+        var error = await FleetService.SendFleet(ships, TargetGalaxy, TargetSystem, TargetPosition, SelectedMission);
 
         if (error != null)
         {

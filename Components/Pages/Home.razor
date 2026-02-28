@@ -446,7 +446,7 @@
         DefenseService.OnChange += RefreshState;
 
         // Force immediate resource calculation when entering home screen
-        BuildingService.UpdateProduction();
+        _ = BuildingService.UpdateProductionAsync();
 
         // Timer to tick every second for smooth countdowns
         _timer = new System.Threading.Timer(async _ =>

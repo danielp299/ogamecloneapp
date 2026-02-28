@@ -1,8 +1,9 @@
-@implements IDisposable
+@using myapp.Services
 @inject myapp.Services.ResourceService ResourceService
 @inject myapp.Services.BuildingService BuildingService
 @inject myapp.Services.PlayerStateService PlayerStateService
 @inject myapp.Services.GalaxyService GalaxyService
+@implements IDisposable
 
 <div class="top-menu">
     <div class="resource-selector" style="margin-right: 20px;">
@@ -20,32 +21,33 @@
 Energy Use: @BuildingService.MetalMineEnergyConsumption
 Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         <label>Metal</label>
-        <span class="resource-value">@ResourceService.Metal.ToString("N0")</span>
+        <span class="resource-value">@_snapshot.Metal.ToString("N0")</span>
     </div>
     <div class="resource" title="Total Production: @BuildingService.CrystalHourlyProduction.ToString("N0")/h
 Energy Use: @BuildingService.CrystalMineEnergyConsumption
 Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         <label>Crystal</label>
-        <span class="resource-value">@ResourceService.Crystal.ToString("N0")</span>
+        <span class="resource-value">@_snapshot.Crystal.ToString("N0")</span>
     </div>
     <div class="resource" title="Total Production: @BuildingService.DeuteriumHourlyProduction.ToString("N0")/h
 Energy Use: @BuildingService.DeuteriumSynthesizerEnergyConsumption
 Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         <label>Deuterium</label>
-        <span class="resource-value">@ResourceService.Deuterium.ToString("N0")</span>
+        <span class="resource-value">@_snapshot.Deuterium.ToString("N0")</span>
     </div>
     <div class="resource">
         <label>Energy</label>
-        <span class="resource-value">@ResourceService.Energy.ToString("N0")</span>
+        <span class="resource-value">@_snapshot.Energy.ToString("N0")</span>
     </div>
     <div class="resource">
         <label>Dark Matter</label>
-        <span class="resource-value">@ResourceService.DarkMatter.ToString("N0")</span>
+        <span class="resource-value">@_snapshot.DarkMatter.ToString("N0")</span>
     </div>
 </div>
 
 @code {
     private System.Threading.Timer? _timer;
+    private ResourceSnapshot _snapshot = new(0, 0, 0, 0, 0);
 
     protected override void OnInitialized()
     {
@@ -53,13 +55,17 @@ Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         _timer = new System.Threading.Timer(Tick, null, 0, 1000);
     }
 
-    private void Tick(object? state)
+    private async void Tick(object? state)
     {
-        // Update production logic to accrue resources based on elapsed time
-        BuildingService.UpdateProduction();
+        // Skip if planet not initialized yet
+        if (PlayerStateService.ActiveGalaxy <= 0 || PlayerStateService.ActiveSystem <= 0 || PlayerStateService.ActivePosition <= 0)
+        {
+            return;
+        }
         
-        // Update the UI
-        InvokeAsync(StateHasChanged);
+        await BuildingService.UpdateProductionAsync();
+        _snapshot = await ResourceService.GetResourceSnapshotAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private bool IsSelected(myapp.Services.GalaxyPlanet planet)

@@ -87,14 +87,14 @@
                         @if (building.Level < 1)
                         {
                             <button class="ogame-btn ogame-btn-primary ogame-btn-block"
-                                    @onclick="() => BuildingService.AddToQueue(building)">
+                                    @onclick="async () => await BuildingService.AddToQueueAsync(building)">
                                 Construct
                             </button>
                         }
                         else
                         {
                             <button class="ogame-btn ogame-btn-primary ogame-btn-block"
-                                    @onclick="() => BuildingService.AddToQueue(building)">
+                                    @onclick="async () => await BuildingService.AddToQueueAsync(building)">
                                 Upgrade to Level @(building.Level + 1)
                             </button>
                         }
@@ -114,7 +114,7 @@
                             <div class="ogame-queue-timer">@building.TimeRemaining.ToString(@"hh\:mm\:ss")</div>
                         </div>
                         <button class="ogame-btn ogame-btn-danger ogame-btn-block"
-                                @onclick="() => BuildingService.Cancel(building)">
+                                @onclick="async () => await BuildingService.CancelAsync(building)">
                             Cancel
                         </button>
                     }
@@ -129,7 +129,7 @@
     {
         ResourceService.OnChange += RefreshState;
         BuildingService.OnChange += RefreshState;
-        BuildingService.UpdateProduction();
+        _ = BuildingService.UpdateProductionAsync();
     }
 
     private async void RefreshState()

@@ -115,7 +115,7 @@
 
                     @if(CanBuild(unit))
                     {
-                        <button class="ogame-btn ogame-btn-primary" style="flex: 1;" @onclick="() => BuildDefense(unit, vm)">
+                        <button class="ogame-btn ogame-btn-primary" style="flex: 1;" @onclick="async () => await BuildDefense(unit, vm)">
                             Build (@vm.QuantityInput)
                         </button>
                     }
@@ -169,9 +169,9 @@
         vm.QuantityInput += amount;
     }
 
-    private void BuildDefense(DefenseUnit unit, DefenseViewModel vm)
+    private async Task BuildDefense(DefenseUnit unit, DefenseViewModel vm)
     {
-        DefenseService.AddToQueue(unit, vm.QuantityInput);
+        await DefenseService.AddToQueueAsync(unit, vm.QuantityInput);
         vm.QuantityInput = 0;
     }
 

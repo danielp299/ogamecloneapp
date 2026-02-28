@@ -31,7 +31,7 @@
                     @TechnologyService.CurrentResearch.TimeRemaining.ToString(@"hh\:mm\:ss")
                 </span>
             </div>
-            <button class="ogame-btn ogame-btn-danger ogame-btn-sm mt-sm" @onclick="CancelResearch">
+            <button class="ogame-btn ogame-btn-danger ogame-btn-sm mt-sm" @onclick="async () => await CancelResearch()">
                 Cancel Research
             </button>
         </div>
@@ -108,7 +108,7 @@
                     @if (TechnologyService.RequirementsMet(tech))
                     {
                         <button class="ogame-btn ogame-btn-primary ogame-btn-block"
-                                @onclick="() => StartResearch(tech)">
+                                @onclick="async () => await StartResearch(tech)">
                             Research Level @(tech.Level + 1)
                         </button>
                     }
@@ -153,14 +153,14 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private void StartResearch(Technology tech)
+    private async Task StartResearch(Technology tech)
     {
-        TechnologyService.StartResearch(tech);
+        await TechnologyService.StartResearchAsync(tech);
     }
 
-    private void CancelResearch()
+    private async Task CancelResearch()
     {
-        TechnologyService.CancelResearch();
+        await TechnologyService.CancelResearchAsync();
     }
 
     public void Dispose()

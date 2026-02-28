@@ -78,6 +78,7 @@ public class TechnologyService
 
     public event Action? OnChange;
     private bool _isProcessingResearch = false;
+    private bool _isInitialized = false;
 
     public TechnologyService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, DevModeService devModeService, EnemyService enemyService, ILogger<TechnologyService> logger)
     {
@@ -88,7 +89,14 @@ public class TechnologyService
         _enemyService = enemyService;
         _logger = logger;
         InitializeTechnologies();
-        LoadFromDatabaseAsync().Wait();
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+
+        await LoadFromDatabaseAsync();
+        _isInitialized = true;
     }
 
     private async Task LoadFromDatabaseAsync()
@@ -414,7 +422,7 @@ public class TechnologyService
         return true;
     }
 
-    public void StartResearch(Technology tech)
+    public async Task StartResearchAsync(Technology tech)
     {
         // Check Requirements
         if (!RequirementsMet(tech)) return;
@@ -423,24 +431,24 @@ public class TechnologyService
         if (CurrentResearch != null) return;
 
         // Ensure resources update before check
-        _buildingService.UpdateProduction();
+        await _buildingService.UpdateProductionAsync();
 
         // Graviton Check (Energy instead of resources)
         if (tech.BaseEnergyCost > 0)
         {
-             if (_resourceService.Energy >= tech.EnergyCost)
+             if (await _resourceService.GetEnergyAsync() >= tech.EnergyCost)
              {
                  // Instant complete
                  tech.Level++;
-                 SaveToDatabaseAsync().Wait();
+                 await SaveToDatabaseAsync();
                  NotifyStateChanged();
              }
              return;
         }
 
-        if (_resourceService.HasResources(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost))
+        if (await _resourceService.HasResourcesAsync(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost))
         {
-            _resourceService.ConsumeResources(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost);
+            await _resourceService.ConsumeResourcesAsync(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost);
 
             CurrentResearch = tech;
             tech.IsResearching = true;
@@ -462,12 +470,12 @@ public class TechnologyService
         }
     }
 
-    public void CancelResearch()
+    public async Task CancelResearchAsync()
     {
         if (CurrentResearch != null)
         {
             // Refund resources based on CancelRefundPercentage setting
-            _resourceService.RefundResources(
+            await _resourceService.RefundResourcesAsync(
                 CurrentResearch.MetalCost, 
                 CurrentResearch.CrystalCost, 
                 CurrentResearch.DeuteriumCost);

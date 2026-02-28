@@ -57,6 +57,7 @@ public class DefenseService
     public List<DefenseQueueItem> ConstructionQueue { get; private set; } = new();
 
     public event Action? OnChange;
+    private bool _isInitialized = false;
 
     public DefenseService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
     {
@@ -69,7 +70,6 @@ public class DefenseService
         _playerStateService = playerStateService;
         
         InitializeDefenses();
-        LoadFromDatabaseAsync().Wait();
 
         _playerStateService.OnChange += async () => 
         {
@@ -79,6 +79,14 @@ public class DefenseService
         
         // Start queue processor
         _ = ProcessQueueLoop();
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+
+        await LoadFromDatabaseAsync();
+        _isInitialized = true;
     }
 
     private async Task LoadFromDatabaseAsync()
@@ -245,7 +253,7 @@ public class DefenseService
         return TimeSpan.FromSeconds(seconds);
     }
 
-    public void AddToQueue(DefenseUnit unit, int quantity)
+    public async Task AddToQueueAsync(DefenseUnit unit, int quantity)
     {
         if (quantity <= 0) return;
 
@@ -266,9 +274,9 @@ public class DefenseService
         long totalCrystal = unit.CrystalCost * quantity;
         long totalDeuterium = unit.DeuteriumCost * quantity;
 
-        if (_resourceService.HasResources(totalMetal, totalCrystal, totalDeuterium))
+        if (await _resourceService.HasResourcesAsync(totalMetal, totalCrystal, totalDeuterium))
         {
-            _resourceService.ConsumeResources(totalMetal, totalCrystal, totalDeuterium);
+            await _resourceService.ConsumeResourcesAsync(totalMetal, totalCrystal, totalDeuterium);
             
             var calculatedDuration = CalculateDefenseConstructionDuration(unit);
             var finalDuration = _devModeService.GetDuration(calculatedDuration, 1);

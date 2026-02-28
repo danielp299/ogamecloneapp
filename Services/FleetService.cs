@@ -110,6 +110,7 @@ public class FleetService
     public event Action? OnChange;
 
     private bool _isProcessingQueue = false;
+    private bool _isInitialized = false;
     
     // Maximum number of planets a player can have (colonization limit)
     public const int MaxPlanets = 4;
@@ -131,7 +132,6 @@ public class FleetService
         _playerStateService = playerStateService;
         
         InitializeShips();
-        LoadFromDatabaseAsync().Wait();
 
         _playerStateService.OnChange += async () => 
         {
@@ -150,6 +150,14 @@ public class FleetService
         // Start loops
         _ = ProcessQueueLoop();
         _ = ProcessFleetLoop();
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+
+        await LoadFromDatabaseAsync();
+        _isInitialized = true;
     }
 
     public void SetCombatDefenseLossPercentage(double percentage)
@@ -433,7 +441,7 @@ public class FleetService
         return TimeSpan.FromSeconds(seconds);
     }
 
-    public string? SendFleet(Dictionary<string, int> shipsToSend, int g, int s, int p, string missionType)
+    public async Task<string?> SendFleet(Dictionary<string, int> shipsToSend, int g, int s, int p, string missionType)
     {
         if (!shipsToSend.Any()) return "No ships selected.";
 
@@ -449,15 +457,15 @@ public class FleetService
 
         // 2. Calculate Fuel & Check Deuterium
         long fuel = CalculateFuelConsumption(shipsToSend, g, s, p);
-        if (!_resourceService.HasResources(0,0, fuel)) return "Not enough Deuterium for fuel.";
+        if (!await _resourceService.HasResourcesAsync(0, 0, fuel)) return "Not enough Deuterium for fuel.";
 
         // 3. Deduct Resources and Ships
-        _resourceService.ConsumeResources(0,0, fuel);
+        await _resourceService.ConsumeResourcesAsync(0, 0, fuel);
         foreach(var kvp in shipsToSend)
         {
             DockedShips[kvp.Key] -= kvp.Value;
         }
-        SaveToDatabaseAsync().Wait();
+        await SaveToDatabaseAsync();
 
         // 4. Create Mission
         var flightTime = CalculateFlightTime(shipsToSend, g, s, p);
@@ -563,7 +571,7 @@ public class FleetService
                         }
 
                         // Arrived!
-                        ProcessMissionArrival(mission);
+                        await ProcessMissionArrival(mission);
                         
                         // Turn around
                         mission.Status = FleetStatus.Return;
@@ -588,7 +596,7 @@ public class FleetService
                             long m = mission.Cargo.ContainsKey("Metal") ? mission.Cargo["Metal"] : 0;
                             long c = mission.Cargo.ContainsKey("Crystal") ? mission.Cargo["Crystal"] : 0;
                             long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
-                            _resourceService.AddResourcesToPlanet(og, os, op, m, c, d);
+                            await _resourceService.AddResourcesToPlanetAsync(og, os, op, m, c, d);
                         }
                         
                         // We also need to reload active view if we are on that planet
@@ -617,7 +625,7 @@ public class FleetService
         }
     }
 
-    private void ProcessMissionArrival(FleetMission mission)
+    private async Task ProcessMissionArrival(FleetMission mission)
     {
         // Parse coords
         var parts = mission.TargetCoordinates.Split(':');
@@ -639,19 +647,19 @@ public class FleetService
                 HandleCombat(mission, planet);
                 break;
             case "Transport":
-                HandleTransport(mission, planet);
+                await HandleTransport(mission, planet);
                 break;
             case "Deploy":
-                HandleDeploy(mission, planet);
+                await HandleDeploy(mission, planet);
                 break;
             case "Colonize":
-                HandleColonization(mission, planet);
+                await HandleColonization(mission, planet);
                 break;
             case "Recycle":
                 HandleRecycle(mission, planet);
                 break;
             case "Expedition":
-                HandleExpedition(mission);
+                await HandleExpedition(mission);
                 break;
             default:
                  _messageService.AddMessage("Fleet Reached Destination", 
@@ -660,7 +668,7 @@ public class FleetService
         }
     }
 
-    private void HandleExpedition(FleetMission mission)
+    private async Task HandleExpedition(FleetMission mission)
     {
         var random = new Random();
         
@@ -820,7 +828,7 @@ public class FleetService
         else // 10% Dark Matter
         {
             int dm = random.Next(100, 1000) * (1 + astroLevel/5);
-            _resourceService.AddDarkMatter(dm);
+            await _resourceService.AddDarkMatterAsync(dm);
             
             _messageService.AddMessage("Expedition Result", 
                 $"We found a pocket of Dark Matter! Obtained {dm} Dark Matter.", "Expedition");
@@ -1258,7 +1266,7 @@ public class FleetService
         _messageService.AddMessage("Planet Under Attack", $"Enemy attack reached {mission.TargetCoordinates}.", "Combat");
     }
 
-    private void HandleTransport(FleetMission mission, GalaxyPlanet? planet)
+    private async Task HandleTransport(FleetMission mission, GalaxyPlanet? planet)
     {
         if (planet == null || !planet.IsOccupied)
         {
@@ -1272,12 +1280,10 @@ public class FleetService
 
         if (planet.IsMyPlanet)
         {
-            _resourceService.AddResourcesToPlanet(planet.Galaxy, planet.System, planet.Position, m, c, d);
+            await _resourceService.AddResourcesToPlanetAsync(planet.Galaxy, planet.System, planet.Position, m, c, d);
         }
         else
         {
-            // If it's an enemy, it's basically a gift? In OGame you can transport to anyone.
-            // For now let's just handle player planets.
             _messageService.AddMessage("Transport", "Resources delivered to target.", "General");
         }
 
@@ -1285,7 +1291,7 @@ public class FleetService
         _messageService.AddMessage("Transport Successful", $"Resources delivered to {mission.TargetCoordinates}.", "General");
     }
 
-    private void HandleDeploy(FleetMission mission, GalaxyPlanet? planet)
+    private async Task HandleDeploy(FleetMission mission, GalaxyPlanet? planet)
     {
         if (planet == null || !planet.IsMyPlanet)
         {
@@ -1297,16 +1303,16 @@ public class FleetService
         long m = mission.Cargo.ContainsKey("Metal") ? mission.Cargo["Metal"] : 0;
         long c = mission.Cargo.ContainsKey("Crystal") ? mission.Cargo["Crystal"] : 0;
         long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
-        _resourceService.AddResourcesToPlanet(planet.Galaxy, planet.System, planet.Position, m, c, d);
+        await _resourceService.AddResourcesToPlanetAsync(planet.Galaxy, planet.System, planet.Position, m, c, d);
         mission.Cargo.Clear();
 
         // Transfer ships to the planet's docked ships
-        SaveShipsToPlanetAsync(planet.Galaxy, planet.System, planet.Position, mission.Ships).Wait();
+        await SaveShipsToPlanetAsync(planet.Galaxy, planet.System, planet.Position, mission.Ships);
         
         // If we are on that planet, reload
         if (_playerStateService.ActiveGalaxy == planet.Galaxy && _playerStateService.ActiveSystem == planet.System && _playerStateService.ActivePosition == planet.Position)
         {
-            LoadFromDatabaseAsync().Wait();
+            await LoadFromDatabaseAsync();
         }
 
         _messageService.AddMessage("Deployment successful", $"Fleet deployed to {mission.TargetCoordinates}.", "General");
@@ -1316,7 +1322,7 @@ public class FleetService
         // Logic to add them to target planet's inventory needed here.
     }
 
-    private void HandleColonization(FleetMission mission, GalaxyPlanet? planet)
+    private async Task HandleColonization(FleetMission mission, GalaxyPlanet? planet)
     {
         if (planet == null || planet.IsOccupied)
         {
@@ -1364,8 +1370,8 @@ public class FleetService
         _galaxyService.RegisterPlanet(planet);
 
         // Initialize new planet state (Resources, Buildings, etc.)
-        _persistenceService.InitializePlanetAsync(planet.Galaxy, planet.System, planet.Position, true).Wait();
-        _persistenceService.AddOrUpdatePlayerPlanetAsync(planet.Galaxy, planet.System, planet.Position, planet.Name, planet.Image, false).Wait();
+        await _persistenceService.InitializePlanetAsync(planet.Galaxy, planet.System, planet.Position, true);
+        await _persistenceService.AddOrUpdatePlayerPlanetAsync(planet.Galaxy, planet.System, planet.Position, planet.Name, planet.Image, false);
 
         _messageService.AddMessage("Colonization Successful", 
             $"You have successfully colonized position {mission.TargetCoordinates}!", "General");
@@ -1434,7 +1440,7 @@ public class FleetService
         return TimeSpan.FromSeconds(seconds);
     }
 
-    public void AddToQueue(Ship ship, int quantity)
+    public async Task AddToQueueAsync(Ship ship, int quantity)
     {
         if (quantity <= 0) return;
 
@@ -1442,9 +1448,9 @@ public class FleetService
         long totalCrystal = ship.CrystalCost * quantity;
         long totalDeuterium = ship.DeuteriumCost * quantity;
 
-        if (_resourceService.HasResources(totalMetal, totalCrystal, totalDeuterium))
+        if (await _resourceService.HasResourcesAsync(totalMetal, totalCrystal, totalDeuterium))
         {
-            _resourceService.ConsumeResources(totalMetal, totalCrystal, totalDeuterium);
+            await _resourceService.ConsumeResourcesAsync(totalMetal, totalCrystal, totalDeuterium);
             
             var calculatedDuration = CalculateShipConstructionDuration(ship);
             var finalDuration = _devModeService.GetDuration(calculatedDuration, 1);

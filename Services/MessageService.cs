@@ -20,11 +20,19 @@ public class MessageService
     public List<GameMessage> Messages { get; private set; } = new();
     
     public event Action? OnChange;
+    private bool _isInitialized = false;
 
     public MessageService(GameDbContext dbContext)
     {
         _dbContext = dbContext;
-        LoadFromDatabaseAsync().Wait();
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+
+        await LoadFromDatabaseAsync();
+        _isInitialized = true;
     }
 
     private async Task LoadFromDatabaseAsync()
