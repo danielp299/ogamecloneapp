@@ -9,3 +9,4 @@ myapp.Tests/obj/
 *.db-shm
 *.db-wal
 nul
+artifacts/obj
