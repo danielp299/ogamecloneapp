@@ -23,7 +23,7 @@
             <h3>Current Production</h3>
             @foreach (var item in FleetService.ConstructionQueue)
             {
-                <div class="ogame-queue-item">
+                <div class="ogame-queue-item" @key="item">
                     <div>
                         <strong>@item.Ship.Name</strong> - @item.Quantity units remaining
                         <div class="text-muted" style="font-size: 0.9em;">
@@ -32,6 +32,10 @@
                     </div>
                     <span class="ogame-queue-timer">@item.TimeRemaining.ToString(@"hh\:mm\:ss")</span>
                 </div>
+                <button class="ogame-btn ogame-btn-danger ogame-btn-sm mt-sm"
+                        @onclick="async () => await CancelQueueItem(item)">
+                    Cancel
+                </button>
             }
         </div>
     }
@@ -177,8 +181,15 @@
         vm.QuantityInput = 0;
     }
 
+    private async Task CancelQueueItem(ShipyardItem item)
+    {
+        await FleetService.CancelQueueItemAsync(item);
+    }
+
     private bool CanBuild(Ship ship)
     {
         return RequirementService.IsUnlocked(ship.Requirements);
     }
 }
+
+

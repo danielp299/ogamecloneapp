@@ -23,11 +23,15 @@
             <h3>Construction Queue</h3>
             @foreach (var item in BuildingService.ConstructionQueue)
             {
-                <div class="ogame-queue-item">
+                <div class="ogame-queue-item" @key="item">
                     <div>
                         <strong>@item.Title</strong> - Level @(item.Level + 1)
                         <div class="text-muted" style="font-size: 0.9em;">Duration: @item.ConstructionDuration.ToString(@"hh\:mm\:ss")</div>
                     </div>
+                    <button class="ogame-btn ogame-btn-danger ogame-btn-sm"
+                            @onclick="async () => await BuildingService.CancelAsync(item)">
+                        Cancel
+                    </button>
                     @if (item.IsBuilding)
                     {
                         <span class="ogame-queue-timer">@item.TimeRemaining.ToString(@"hh\:mm\:ss")</span>
@@ -143,3 +147,5 @@
         BuildingService.OnChange -= RefreshState;
     }
 }
+
+

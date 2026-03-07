@@ -296,6 +296,19 @@ public class DefenseService
         }
     }
     
+
+    public async Task CancelQueueItemAsync(DefenseQueueItem item)
+    {
+        if (!ConstructionQueue.Contains(item)) return;
+
+        long refundMetal = item.Unit.MetalCost * item.Quantity;
+        long refundCrystal = item.Unit.CrystalCost * item.Quantity;
+        long refundDeuterium = item.Unit.DeuteriumCost * item.Quantity;
+
+        await _resourceService.RefundResourcesAsync(refundMetal, refundCrystal, refundDeuterium);
+        ConstructionQueue.Remove(item);
+        NotifyStateChanged();
+    }
     private async Task ProcessQueueLoop()
     {
         while (true)
@@ -345,3 +358,4 @@ public class DefenseService
         InitializeDefenses();
     }
 }
+
