@@ -487,9 +487,6 @@ private bool _isInitialized = false;
 
     public async Task AddToQueueAsync(Building building)
     {
-        // Important: Update resources before spending them!
-        await UpdateProductionAsync();
-
         if (ConstructionQueue.Count >= MaxQueueSize) return;
         
         if (await _resourceService.HasResourcesAsync(building.MetalCost, building.CrystalCost, building.DeuteriumCost))
@@ -551,9 +548,8 @@ private bool _isInitialized = false;
             // Upgrade Logic
             currentBuilding.IsBuilding = false;
 
-            // CRITICAL: Update production resources based on OLD levels before upgrading
-            // This ensures we don't calculate the past duration with the NEW production rate
-            await UpdateProductionAsync();
+            // Settle produced resources with OLD production rates before level changes.
+            await _resourceService.SettleActivePlanetResourcesAsync();
             
             // Energy update is now handled INSIDE UpdateProduction(), so we don't need manual logic here anymore.
             // Just increment level and recalculate.
@@ -586,3 +582,6 @@ private bool _isInitialized = false;
         return building?.Level ?? 0;
     }
 }
+
+
+

@@ -66,15 +66,7 @@ public class ResourceService
     {
         var state = await GetStateAsync();
         var planetState = await GetActivePlanetStateAsync();
-        EnsureCurrentResourcesCalculated(planetState);
-
-        return new ResourceSnapshot(
-            (long)planetState.Metal,
-            (long)planetState.Crystal,
-            (long)planetState.Deuterium,
-            planetState.Energy,
-            (long)state.DarkMatter
-        );
+        return BuildPreviewSnapshot(state, planetState, DateTime.UtcNow);
     }
 
     public async Task<long> GetEnergyAsync()
@@ -92,25 +84,53 @@ public class ResourceService
         await _dbContext.SaveChangesAsync();
     }
 
-    private void EnsureCurrentResourcesCalculated(PlanetState state)
+    private ResourceSnapshot BuildPreviewSnapshot(GameState gameState, PlanetState planetState, DateTime now)
     {
-        var now = DateTime.UtcNow;
-        var elapsedSeconds = (now - state.LastResourceUpdate).TotalSeconds;
+        var elapsedSeconds = (now - planetState.LastResourceUpdate).TotalSeconds;
+        if (elapsedSeconds < 0) elapsedSeconds = 0;
 
-        if (elapsedSeconds > 0)
+        var metal = planetState.Metal + (MetalProductionRate * elapsedSeconds);
+        var crystal = planetState.Crystal + (CrystalProductionRate * elapsedSeconds);
+        var deuterium = planetState.Deuterium + (DeuteriumProductionRate * elapsedSeconds);
+
+        return new ResourceSnapshot(
+            (long)metal,
+            (long)crystal,
+            (long)deuterium,
+            planetState.Energy,
+            (long)gameState.DarkMatter
+        );
+    }
+
+    private void SettlePlanetResourcesToNow(PlanetState planetState, DateTime now)
+    {
+        var elapsedSeconds = (now - planetState.LastResourceUpdate).TotalSeconds;
+        if (elapsedSeconds < 0) elapsedSeconds = 0;
+
+        planetState.Metal += MetalProductionRate * elapsedSeconds;
+        planetState.Crystal += CrystalProductionRate * elapsedSeconds;
+        planetState.Deuterium += DeuteriumProductionRate * elapsedSeconds;
+        planetState.LastResourceUpdate = now;
+    }
+
+    public async Task SettleActivePlanetResourcesAsync(bool notifyStateChanged = false)
+    {
+        var state = await GetActivePlanetStateAsync();
+        SettlePlanetResourcesToNow(state, DateTime.UtcNow);
+        await _dbContext.SaveChangesAsync();
+
+        if (notifyStateChanged)
         {
-            state.Metal += MetalProductionRate * elapsedSeconds;
-            state.Crystal += CrystalProductionRate * elapsedSeconds;
-            state.Deuterium += DeuteriumProductionRate * elapsedSeconds;
-            state.LastResourceUpdate = now;
+            NotifyStateChanged();
         }
     }
 
     public async Task<bool> HasResourcesAsync(long metal, long crystal, long deuterium)
     {
-        var state = await GetActivePlanetStateAsync();
-        EnsureCurrentResourcesCalculated(state);
-        return state.Metal >= metal && state.Crystal >= crystal && state.Deuterium >= deuterium;
+        var gameState = await GetStateAsync();
+        var planetState = await GetActivePlanetStateAsync();
+        var snapshot = BuildPreviewSnapshot(gameState, planetState, DateTime.UtcNow);
+        return snapshot.Metal >= metal && snapshot.Crystal >= crystal && snapshot.Deuterium >= deuterium;
     }
 
     public async Task<bool> ConsumeResourcesAsync(long metal, long crystal, long deuterium)
@@ -121,7 +141,7 @@ public class ResourceService
         }
 
         var state = await GetActivePlanetStateAsync();
-        EnsureCurrentResourcesCalculated(state);
+        SettlePlanetResourcesToNow(state, DateTime.UtcNow);
         state.Metal -= metal;
         state.Crystal -= crystal;
         state.Deuterium -= deuterium;
@@ -134,7 +154,7 @@ public class ResourceService
     public async Task AddResourcesAsync(double metal, double crystal, double deuterium)
     {
         var state = await GetActivePlanetStateAsync();
-        EnsureCurrentResourcesCalculated(state);
+        SettlePlanetResourcesToNow(state, DateTime.UtcNow);
         state.Metal += metal;
         state.Crystal += crystal;
         state.Deuterium += deuterium;
@@ -146,7 +166,7 @@ public class ResourceService
     public async Task AddResourcesToPlanetAsync(int g, int s, int p, double metal, double crystal, double deuterium)
     {
         var state = await GetPlanetStateAsync(g, s, p);
-        EnsureCurrentResourcesCalculated(state);
+        SettlePlanetResourcesToNow(state, DateTime.UtcNow);
         state.Metal += metal;
         state.Crystal += crystal;
         state.Deuterium += deuterium;
@@ -202,3 +222,6 @@ public class ResourceService
 }
 
 public record ResourceSnapshot(long Metal, long Crystal, long Deuterium, long Energy, long DarkMatter);
+
+
+

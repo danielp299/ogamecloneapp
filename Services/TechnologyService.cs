@@ -430,8 +430,8 @@ public class TechnologyService
         // Only one research at a time per user (simplified)
         if (CurrentResearch != null) return;
 
-        // Ensure resources update before check
-        await _buildingService.UpdateProductionAsync();
+        // Settle accumulated resources once at action time.
+        await _resourceService.SettleActivePlanetResourcesAsync();
 
         // Graviton Check (Energy instead of resources)
         if (tech.BaseEnergyCost > 0)
@@ -584,3 +584,6 @@ public class TechnologyService
         InitializeTechnologies();
     }
 }
+
+
+

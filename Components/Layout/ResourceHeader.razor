@@ -51,6 +51,8 @@ Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
 
     protected override void OnInitialized()
     {
+        _ = BuildingService.UpdateProductionAsync();
+
         // Initialize timer to tick every second
         _timer = new System.Threading.Timer(Tick, null, 0, 1000);
     }
@@ -62,8 +64,7 @@ Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         {
             return;
         }
-        
-        await BuildingService.UpdateProductionAsync();
+
         _snapshot = await ResourceService.GetResourceSnapshotAsync();
         await InvokeAsync(StateHasChanged);
     }
