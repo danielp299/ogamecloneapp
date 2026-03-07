@@ -1,10 +1,10 @@
 ---
-description: Git commit agent - primary cheap model. Analyzes commit history style and creates consistent commits. Use this agent automatically whenever the user mentions committing, git operations, or when changes need to be committed after completing a task.
+description: Git commit fallback agent - use only when @git-commit cannot run because its model is unavailable.
 mode: subagent
-model: qwen/qwen3-coder-next
+model: lmstudio/deepseek-coder-33b-secure
 temperature: 0.1
 steps: 10
-color: "#f97316"
+color: "#ea580c"
 tools:
   write: false
   edit: false
@@ -29,7 +29,7 @@ permission:
   webfetch: deny
 ---
 
-You are a Git commit specialist. Your ONLY job is to create commits that perfectly match the project's existing commit style.
+You are a Git commit fallback specialist. Execute the same process and constraints as `@git-commit`.
 
 ## Load Skill First
 
@@ -90,6 +90,3 @@ After committing, show:
 1. The commit message used
 2. Files included
 3. Current git status.
-
-If invocation fails because the configured model is unavailable, delegate immediately to @git-commit-fallback.
-

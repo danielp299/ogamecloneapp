@@ -47,7 +47,7 @@ wwwroot/assets/               # Static images (buildings, ships, technologies, d
 
 ## Workflow Rules
 
-- **Git operations MUST be delegated to the `@git-commit` subagent.** Whenever you detect that a commit is needed, the user mentions committing, or any git operation is required (status, diff, log, add, commit), automatically invoke `@git-commit` via the Task tool to handle it. Do NOT run git commands directly — always delegate to the subagent.
+- **Git operations MUST be delegated to the `@git-commit` subagent.** Whenever you detect that a commit is needed, the user mentions committing, or any git operation is required (status, diff, log, add, commit), automatically invoke `@git-commit` via the Task tool to handle it. If `@git-commit` fails because its model is unavailable, immediately retry with `@git-commit-fallback`. Do NOT run git commands directly - always delegate to a commit subagent.
 - Always use absolute paths when referencing files.
 - Verify file existence before reading or editing.
 
@@ -189,3 +189,5 @@ public string SendFleet(...) {
 - Cost scaling formula: `BaseCost * Math.Pow(Scaling, Level)` (default scaling = 2.0).
 - The game runs at 1000x speed multiplier for development.
 - Use `RequirementService` to validate building/technology dependencies before allowing construction.
+
+
