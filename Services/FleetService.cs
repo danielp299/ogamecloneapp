@@ -932,38 +932,35 @@ public class FleetService
             _messageService.AddMessage("Combat Report", "Planet is uninhabited. No combat occurred.", "Combat");
             return;
         }
-        
+
         if (planet.IsMyPlanet)
         {
              _messageService.AddMessage("Combat Report", "You cannot attack your own planet.", "Combat");
              return;
         }
 
-        // 1. Attacker Power
         long attackerAttack = 0;
         long attackerStructure = 0;
         long attackerShield = 0;
 
-        foreach(var shipEntry in mission.Ships)
+        foreach (var shipEntry in mission.Ships)
         {
              var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key);
-             if(def != null) 
+             if (def != null)
              {
                  attackerAttack += def.Attack * shipEntry.Value;
                  attackerStructure += def.Structure * shipEntry.Value;
                  attackerShield += def.Shield * shipEntry.Value;
              }
         }
-        
-        // 2. Defender Power (Actual data from EnemyService)
+
         var (resources, defenses, ships, spyTech, buildings, techs) = GetPlanetActualState(planet);
-        
+
         long defenderAttack = 0;
         long defenderStructure = 0;
         long defenderShield = 0;
-        
-        // Add Defenses
-        foreach(var d in defenses)
+
+        foreach (var d in defenses)
         {
             var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Name == d.Key);
             if (defUnit != null)
@@ -973,12 +970,11 @@ public class FleetService
                  defenderShield += defUnit.Shield * d.Value;
             }
         }
-        
-        // Add Ships to Defender
-        foreach(var shipEntry in ships)
+
+        foreach (var shipEntry in ships)
         {
              var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key || x.Name == shipEntry.Key);
-             if(def != null) 
+             if (def != null)
              {
                  defenderAttack += def.Attack * shipEntry.Value;
                  defenderStructure += def.Structure * shipEntry.Value;
@@ -986,34 +982,44 @@ public class FleetService
              }
         }
 
-        // 3. Battle Resolution (Simplified)
         long attackerHealth = attackerStructure + attackerShield;
         long defenderHealth = defenderStructure + defenderShield;
-        
-        if(attackerHealth <= 0) attackerHealth = 1;
-        if(defenderHealth <= 0) defenderHealth = 1;
+
+        if (attackerHealth <= 0) attackerHealth = 1;
+        if (defenderHealth <= 0) defenderHealth = 1;
 
         double attackerScore = (double)attackerAttack / defenderHealth;
         double defenderScore = (double)defenderAttack / attackerHealth;
-        
-        string result = "";
-        
-        if (attackerScore > defenderScore)
+
+        var initialAttackerShips = mission.Ships.ToDictionary(x => x.Key, x => x.Value);
+        var initialDefenses = defenses.ToDictionary(x => x.Key, x => x.Value);
+        var initialDefenderShips = ships.ToDictionary(x => x.Key, x => x.Value);
+
+        var attackerLosses = new Dictionary<string, int>();
+        var defenderDefenseLosses = new Dictionary<string, int>();
+        var defenderShipLosses = new Dictionary<string, int>();
+
+        long debrisM = 0;
+        long debrisC = 0;
+        bool attackerWon = attackerScore > defenderScore;
+
+        string result;
+
+        if (attackerWon)
         {
-            // WIN
-            long lootM = Math.Min(resources["Metal"] / 2, mission.Cargo.ContainsKey("Metal") ? 0 : 1000000); // 50% loot
+            long lootM = Math.Min(resources["Metal"] / 2, mission.Cargo.ContainsKey("Metal") ? 0 : 1000000);
             long lootC = Math.Min(resources["Crystal"] / 2, 1000000);
             long lootD = Math.Min(resources["Deuterium"] / 2, 1000000);
-            
-            // Cap by capacity
+
             long totalCapacity = 0;
-            foreach(var shipEntry in mission.Ships) {
+            foreach (var shipEntry in mission.Ships)
+            {
                  var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key);
-                 if(def!=null) totalCapacity += def.Capacity * shipEntry.Value;
+                 if (def != null) totalCapacity += def.Capacity * shipEntry.Value;
             }
-            
+
             long totalLoot = lootM + lootC + lootD;
-            if(totalLoot > totalCapacity)
+            if (totalLoot > totalCapacity)
             {
                 double ratio = (double)totalCapacity / totalLoot;
                 lootM = (long)(lootM * ratio);
@@ -1021,23 +1027,19 @@ public class FleetService
                 lootD = (long)(lootD * ratio);
             }
 
-            // Add to Cargo
             if (!mission.Cargo.ContainsKey("Metal")) mission.Cargo["Metal"] = 0;
             mission.Cargo["Metal"] += lootM;
 
             if (!mission.Cargo.ContainsKey("Crystal")) mission.Cargo["Crystal"] = 0;
             mission.Cargo["Crystal"] += lootC;
-            
+
             if (!mission.Cargo.ContainsKey("Deuterium")) mission.Cargo["Deuterium"] = 0;
             mission.Cargo["Deuterium"] += lootD;
 
-            // Generate Debris from destroyed Defenses (30% of cost)
-            long debrisM = 0;
-            long debrisC = 0;
-            foreach(var d in defenses)
+            foreach (var d in defenses)
             {
                 var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Name == d.Key);
-                
+
                 long unitMetal = 0;
                 long unitCrystal = 0;
 
@@ -1048,97 +1050,150 @@ public class FleetService
                 }
                 else
                 {
-                     if(d.Key.Contains("Rocket")) { unitMetal = 2000; }
-                     else if(d.Key.Contains("Laser")) { unitMetal = 1500; unitCrystal = 500; }
+                     if (d.Key.Contains("Rocket")) { unitMetal = 2000; }
+                     else if (d.Key.Contains("Laser")) { unitMetal = 1500; unitCrystal = 500; }
                      else { unitMetal = 1000; }
                 }
 
                 debrisM += (long)(unitMetal * d.Value * 0.3);
                 debrisC += (long)(unitCrystal * d.Value * 0.3);
             }
-            
-            // Also debris from destroyed Defender Ships (30%)
-            foreach(var shipEntry in ships)
+
+            foreach (var shipEntry in ships)
             {
                  var def = ShipDefinitions.FirstOrDefault(x => x.Name == shipEntry.Key);
                  if (def != null)
                  {
                      debrisM += (long)(def.MetalCost * shipEntry.Value * 0.3);
                      debrisC += (long)(def.CrystalCost * shipEntry.Value * 0.3);
+                     defenderShipLosses[shipEntry.Key] = shipEntry.Value;
                  }
             }
-            
+
             if (debrisM > 0 || debrisC > 0)
             {
                 planet.DebrisMetal += debrisM;
                 planet.DebrisCrystal += debrisC;
                 planet.HasDebris = true;
             }
-            
-            result = $"<span style='color:green'>VICTORY!</span><br/>" +
+
+            ApplyDefenseCombatLosses(defenses);
+
+            foreach (var defense in initialDefenses)
+            {
+                int remaining = defenses.GetValueOrDefault(defense.Key, 0);
+                int lost = Math.Max(0, defense.Value - remaining);
+                if (lost > 0) defenderDefenseLosses[defense.Key] = lost;
+            }
+
+            result = $"<span style='color:green'>VICTORY</span><br/>" +
+                     $"Battle at [{mission.TargetCoordinates}]<br/><br/>" +
+                     $"Your Attack Fleet:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
+                     $"Enemy Defenses (before):<br/>{FormatUnitDictionary(initialDefenses)}<br/><br/>" +
+                     $"Enemy Fleet (before):<br/>{FormatUnitDictionary(initialDefenderShips)}<br/><br/>" +
+                     $"Power Comparison:<br/>" +
                      $"Your Fleet: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                     $"Enemy Def: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                     $"Loot captured: <br/>" +
+                     $"Enemy Forces: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
+                     $"Your Losses:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
+                     $"Enemy Losses (Defenses):<br/>{FormatUnitDictionary(defenderDefenseLosses)}<br/><br/>" +
+                     $"Enemy Losses (Ships - estimated by combat resolution):<br/>{FormatUnitDictionary(defenderShipLosses)}<br/><br/>" +
+                     $"Loot Captured:<br/>" +
                      $"Metal: {lootM:N0}<br/>" +
                      $"Crystal: {lootC:N0}<br/>" +
                      $"Deuterium: {lootD:N0}<br/><br/>" +
-                     $"Debris Field Created:<br/>" +
-                     $"Metal: {debrisM:N0}, Crystal: {debrisC:N0}";
+                     $"Debris Field:<br/>" +
+                     $"Metal: {debrisM:N0}<br/>" +
+                     $"Crystal: {debrisC:N0}<br/>" +
+                     $"Status: {(debrisM > 0 || debrisC > 0 ? "Created" : "No debris")}";
         }
         else
         {
-            // DEFEAT
-             
-             // Destroy 50% of ships
-             long debrisM = 0;
-             long debrisC = 0;
-             
-             foreach(var key in mission.Ships.Keys.ToList())
-             {
+            foreach (var key in mission.Ships.Keys.ToList())
+            {
                  int original = mission.Ships[key];
-                 int lost = original / 2; // Lose half
-                 mission.Ships[key] -= lost; // Update fleet
-                 
+                 int lost = original / 2;
+                 mission.Ships[key] -= lost;
+                 if (lost > 0) attackerLosses[key] = lost;
+
                  var ship = ShipDefinitions.FirstOrDefault(s => s.Id == key);
                  if (ship != null)
                  {
                      debrisM += (long)(ship.MetalCost * lost * 0.3);
                      debrisC += (long)(ship.CrystalCost * lost * 0.3);
                  }
-             }
+            }
 
-             if (debrisM > 0 || debrisC > 0)
-             {
+            if (debrisM > 0 || debrisC > 0)
+            {
                 planet.DebrisMetal += debrisM;
                 planet.DebrisCrystal += debrisC;
                 planet.HasDebris = true;
-             }
+            }
 
-             result = $"<span style='color:red'>DEFEAT!</span><br/>" +
+            ApplyDefenseCombatLosses(defenses);
+
+            foreach (var defense in initialDefenses)
+            {
+                int remaining = defenses.GetValueOrDefault(defense.Key, 0);
+                int lost = Math.Max(0, defense.Value - remaining);
+                if (lost > 0) defenderDefenseLosses[defense.Key] = lost;
+            }
+
+            result = $"<span style='color:red'>DEFEAT</span><br/>" +
+                     $"Battle at [{mission.TargetCoordinates}]<br/><br/>" +
+                     $"Your Attack Fleet:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
+                     $"Enemy Defenses (before):<br/>{FormatUnitDictionary(initialDefenses)}<br/><br/>" +
+                     $"Enemy Fleet (before):<br/>{FormatUnitDictionary(initialDefenderShips)}<br/><br/>" +
+                     $"Power Comparison:<br/>" +
                      $"Your Fleet: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                     $"Enemy Def: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                     $"Your fleet was forced to retreat with heavy losses.<br/><br/>" +
-                      $"Debris Field Created:<br/>" +
-                      $"Metal: {debrisM:N0}, Crystal: {debrisC:N0}";
+                     $"Enemy Forces: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
+                     $"Your Losses:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
+                     $"Enemy Losses (Defenses):<br/>{FormatUnitDictionary(defenderDefenseLosses)}<br/><br/>" +
+                     $"Enemy Losses (Ships):<br/>{FormatUnitDictionary(defenderShipLosses)}<br/><br/>" +
+                     $"Debris Field:<br/>" +
+                     $"Metal: {debrisM:N0}<br/>" +
+                     $"Crystal: {debrisC:N0}<br/>" +
+                     $"Status: {(debrisM > 0 || debrisC > 0 ? "Created" : "No debris")}";
         }
 
-        ApplyDefenseCombatLosses(defenses);
-        
         _messageService.AddMessage($"Combat Report [{mission.TargetCoordinates}]", result, "Combat");
-        
-        // Notify enemy service about the attack
+
         var parts = mission.TargetCoordinates.Split(':');
-        if (parts.Length == 3 && 
-            int.TryParse(parts[0], out int g) && 
-            int.TryParse(parts[1], out int s) && 
+        if (parts.Length == 3 &&
+            int.TryParse(parts[0], out int g) &&
+            int.TryParse(parts[1], out int s) &&
             int.TryParse(parts[2], out int p))
         {
-            bool wasVictory = attackerScore > defenderScore;
-            _ = _enemyService.OnPlayerAttack(g, s, p, wasVictory);
+            _ = _enemyService.OnPlayerAttack(g, s, p, attackerWon);
         }
-
     }
 
+    private string FormatShipDictionary(Dictionary<string, int> ships)
+    {
+        var rows = new List<string>();
+
+        foreach (var item in ships.Where(x => x.Value > 0))
+        {
+            var shipDefinition = ShipDefinitions.FirstOrDefault(s => s.Id == item.Key);
+            string label = shipDefinition?.Name ?? item.Key;
+            rows.Add($"{label}: {item.Value:N0}");
+        }
+
+        if (!rows.Any()) return "None";
+        return string.Join("<br/>", rows);
+    }
+
+    private string FormatUnitDictionary(Dictionary<string, int> units)
+    {
+        var rows = new List<string>();
+        foreach (var item in units.Where(x => x.Value > 0))
+        {
+            rows.Add($"{item.Key}: {item.Value:N0}");
+        }
+
+        if (!rows.Any()) return "None";
+        return string.Join("<br/>", rows);
+    }
     // Helper to get real state for a planet
     private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses, Dictionary<string, int> Ships, int SpyTech, Dictionary<string, int> Buildings, Dictionary<string, int> Techs) GetPlanetActualState(GalaxyPlanet planet)
     {
@@ -1263,7 +1318,186 @@ public class FleetService
 
     private void HandleIncomingAttack(FleetMission mission)
     {
-        _messageService.AddMessage("Planet Under Attack", $"Enemy attack reached {mission.TargetCoordinates}.", "Combat");
+        if (!TryParseCoordinates(mission.TargetCoordinates, out int tg, out int ts, out int tp))
+        {
+            _messageService.AddMessage("Planet Under Attack", $"Enemy attack reached {mission.TargetCoordinates}.", "Combat");
+            return;
+        }
+
+        var planet = _galaxyService.GetPlanet(tg, ts, tp);
+        if (planet == null || !planet.IsMyPlanet)
+        {
+            _messageService.AddMessage("Planet Under Attack", $"Enemy attack reached {mission.TargetCoordinates}.", "Combat");
+            return;
+        }
+
+        var playerPlanetState = GetPlayerPlanetCombatState(tg, ts, tp);
+
+        long attackerAttack = 0;
+        long attackerStructure = 0;
+        long attackerShield = 0;
+        foreach (var shipEntry in mission.Ships)
+        {
+            var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key || x.Name == shipEntry.Key);
+            if (def == null) continue;
+
+            attackerAttack += def.Attack * shipEntry.Value;
+            attackerStructure += def.Structure * shipEntry.Value;
+            attackerShield += def.Shield * shipEntry.Value;
+        }
+
+        long defenderAttack = 0;
+        long defenderStructure = 0;
+        long defenderShield = 0;
+
+        foreach (var d in playerPlanetState.Defenses)
+        {
+            var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Id == d.Key);
+            if (defUnit == null) continue;
+
+            defenderAttack += defUnit.Attack * d.Value;
+            defenderStructure += defUnit.Structure * d.Value;
+            defenderShield += defUnit.Shield * d.Value;
+        }
+
+        foreach (var shipEntry in playerPlanetState.Ships)
+        {
+            var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key || x.Name == shipEntry.Key);
+            if (def == null) continue;
+
+            defenderAttack += def.Attack * shipEntry.Value;
+            defenderStructure += def.Structure * shipEntry.Value;
+            defenderShield += def.Shield * shipEntry.Value;
+        }
+
+        long attackerHealth = attackerStructure + attackerShield;
+        long defenderHealth = defenderStructure + defenderShield;
+        if (attackerHealth <= 0) attackerHealth = 1;
+        if (defenderHealth <= 0) defenderHealth = 1;
+
+        double attackerScore = (double)attackerAttack / defenderHealth;
+        double defenderScore = (double)defenderAttack / attackerHealth;
+        bool attackerWon = attackerScore > defenderScore;
+
+        var initialAttackerShips = mission.Ships.ToDictionary(x => x.Key, x => x.Value);
+        var initialDefenderDefenses = playerPlanetState.Defenses.ToDictionary(x => x.Key, x => x.Value);
+        var initialDefenderShips = playerPlanetState.Ships.ToDictionary(x => x.Key, x => x.Value);
+
+        var attackerLosses = new Dictionary<string, int>();
+        var defenderLossesDefenses = new Dictionary<string, int>();
+        var defenderLossesShips = new Dictionary<string, int>();
+
+        long debrisM = 0;
+        long debrisC = 0;
+
+        if (attackerWon)
+        {
+            foreach (var defense in initialDefenderDefenses)
+            {
+                int lost = (int)Math.Floor(defense.Value * CombatDefenseLossMaxPercentage);
+                if (lost <= 0) continue;
+                defenderLossesDefenses[MapDefenseIdToName(defense.Key)] = lost;
+
+                var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Id == defense.Key);
+                if (defUnit != null)
+                {
+                    debrisM += (long)(defUnit.MetalCost * lost * 0.3);
+                    debrisC += (long)(defUnit.CrystalCost * lost * 0.3);
+                }
+            }
+
+            foreach (var ship in initialDefenderShips)
+            {
+                int lost = ship.Value / 2;
+                if (lost <= 0) continue;
+                defenderLossesShips[MapShipIdToName(ship.Key)] = lost;
+
+                var shipDef = ShipDefinitions.FirstOrDefault(s => s.Id == ship.Key || s.Name == ship.Key);
+                if (shipDef != null)
+                {
+                    debrisM += (long)(shipDef.MetalCost * lost * 0.3);
+                    debrisC += (long)(shipDef.CrystalCost * lost * 0.3);
+                }
+            }
+        }
+        else
+        {
+            foreach (var ship in initialAttackerShips)
+            {
+                int lost = ship.Value / 2;
+                if (lost <= 0) continue;
+                attackerLosses[MapShipIdToName(ship.Key)] = lost;
+
+                var shipDef = ShipDefinitions.FirstOrDefault(s => s.Id == ship.Key || s.Name == ship.Key);
+                if (shipDef != null)
+                {
+                    debrisM += (long)(shipDef.MetalCost * lost * 0.3);
+                    debrisC += (long)(shipDef.CrystalCost * lost * 0.3);
+                }
+            }
+        }
+
+        if (debrisM > 0 || debrisC > 0)
+        {
+            planet.DebrisMetal += debrisM;
+            planet.DebrisCrystal += debrisC;
+            planet.HasDebris = true;
+        }
+
+        string result = $"<span style='color:{(attackerWon ? "red" : "green")}'>{(attackerWon ? "DEFEAT" : "VICTORY")}</span><br/>" +
+                        $"Battle at [{mission.TargetCoordinates}]<br/><br/>" +
+                        $"Enemy Attack Fleet:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
+                        $"Your Defenses (before):<br/>{FormatUnitDictionary(initialDefenderDefenses.ToDictionary(x => MapDefenseIdToName(x.Key), x => x.Value))}<br/><br/>" +
+                        $"Your Fleet (before):<br/>{FormatShipDictionary(initialDefenderShips)}<br/><br/>" +
+                        $"Power Comparison:<br/>" +
+                        $"Enemy Fleet: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
+                        $"Your Forces: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
+                        $"Enemy Losses:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
+                        $"Your Losses (Defenses):<br/>{FormatUnitDictionary(defenderLossesDefenses)}<br/><br/>" +
+                        $"Your Losses (Ships):<br/>{FormatUnitDictionary(defenderLossesShips)}<br/><br/>" +
+                        $"Enemy Loot (estimated):<br/>" +
+                        $"Metal: {(attackerWon ? playerPlanetState.Resources["Metal"] / 2 : 0):N0}<br/>" +
+                        $"Crystal: {(attackerWon ? playerPlanetState.Resources["Crystal"] / 2 : 0):N0}<br/>" +
+                        $"Deuterium: {(attackerWon ? playerPlanetState.Resources["Deuterium"] / 2 : 0):N0}<br/><br/>" +
+                        $"Debris Field:<br/>" +
+                        $"Metal: {debrisM:N0}<br/>" +
+                        $"Crystal: {debrisC:N0}<br/>" +
+                        $"Status: {(debrisM > 0 || debrisC > 0 ? "Created" : "No debris")}";
+
+        _messageService.AddMessage($"Combat Report [{mission.TargetCoordinates}]", result, "Combat");
+    }
+
+    private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses, Dictionary<string, int> Ships) GetPlayerPlanetCombatState(int g, int s, int p)
+    {
+        var planetState = _dbContext.PlanetStates.FirstOrDefault(x => x.Galaxy == g && x.System == s && x.Position == p);
+        var resources = new Dictionary<string, long>
+        {
+            { "Metal", (long)(planetState?.Metal ?? 0) },
+            { "Crystal", (long)(planetState?.Crystal ?? 0) },
+            { "Deuterium", (long)(planetState?.Deuterium ?? 0) }
+        };
+
+        var defenses = _dbContext.Defenses
+            .Where(d => d.Galaxy == g && d.System == s && d.Position == p)
+            .ToDictionary(d => d.DefenseType, d => d.Quantity);
+
+        var ships = _dbContext.Ships
+            .Where(sh => sh.Galaxy == g && sh.System == s && sh.Position == p)
+            .ToDictionary(sh => sh.ShipType, sh => sh.Quantity);
+
+        return (resources, defenses, ships);
+    }
+
+    private string MapDefenseIdToName(string defenseId)
+    {
+        var def = _defenseService.DefenseDefinitions.FirstOrDefault(x => x.Id == defenseId);
+        return def?.Name ?? defenseId;
+    }
+
+    private string MapShipIdToName(string shipId)
+    {
+        var ship = ShipDefinitions.FirstOrDefault(x => x.Id == shipId);
+        return ship?.Name ?? shipId;
     }
 
     private async Task HandleTransport(FleetMission mission, GalaxyPlanet? planet)
@@ -1536,4 +1770,7 @@ public class FleetService
         InitializeShips();
     }
 }
+
+
+
 

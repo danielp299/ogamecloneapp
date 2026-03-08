@@ -1,37 +1,34 @@
-# Módulo: Combat (Combate)
+# Modulo: Combat (Combate)
 
-## Descripción General
-El combate en OGame es un sistema automático que resuelve batallas entre flotas atacantes y defensoras (incluyendo defensas planetarias). Se basa en rounds secuenciales donde naves y defensas causan daño, considerando shields, armor y rapid fire. No es en tiempo real; se calcula instantáneamente al llegar la flota.
+## Descripcion General
+El combate en este proyecto se resuelve automaticamente cuando una mision de ataque llega al planeta objetivo.
+La logica vive en `FleetService.HandleCombat` y genera un mensaje tipo `Combat` en el sistema de mensajes.
 
-## Características Principales
-- **Tipos de Combate**:
-  - **Ataque Planetario**: Flota atacante vs. flota defensora + defensas fijas.
-  - **Ataque a Flota**: Destrucción de flotas estacionadas (sin defensas).
-  - **ACS (Ataque Coordinado)**: Múltiples jugadores atacan juntos.
-  - **Espionaje y Misiles**: No combate directo, pero interplanetarios pueden dañar defensas.
+## Reporte de Combate (Implementado)
+Cuando ocurre un combate, el reporte incluye:
+- Flota atacante enviada (con nombres de naves y cantidades).
+- Defensas enemigas detectadas antes del combate.
+- Flota enemiga detectada antes del combate.
+- Resultado final: `VICTORY` o `DEFEAT`.
+- Comparacion de poder (ataque y vida total de ambos bandos).
+- Perdidas propias (naves perdidas del atacante).
+- Perdidas del enemigo en defensas (segun `ApplyDefenseCombatLosses`).
+- Perdidas de flota enemiga estimadas en victoria (segun la resolucion simplificada actual).
+- Campo de escombros generado (metal/cristal) y estado (`Created` o `No debris`).
+- Botin capturado (metal/cristal/deuterio) cuando el atacante gana.
 
-- **Mecánicas de Resolución**:
-  - **Rounds**: Máximo 6 rounds; termina si un lado pierde todo.
-  - **Daño**: Cada unidad ataca aleatoriamente; daño = Ataque - Defensa (shields absorben primero).
-  - **Shields**: Absorben daño inicial; se regeneran parcialmente por round.
-  - **Armor**: Reduce daño recibido.
-  - **Rapid Fire**: Probabilidad de disparar extra contra ciertos tipos (ej. Cazadores ligeros vs. Cargueros pequeños).
-  - **Orden de Ataque**: Defensas disparan primero, luego flotas.
+## Reglas actuales relevantes
+- Resolucion simplificada por score:
+  - `attackerScore = attackerAttack / defenderHealth`
+  - `defenderScore = defenderAttack / attackerHealth`
+- Si gana el atacante:
+  - Captura botin limitado por capacidad de carga.
+  - Se genera escombro por destruccion aplicada en la resolucion actual.
+- Si pierde el atacante:
+  - Pierde 50% de cada tipo de nave enviada.
+  - Se genera escombro por sus perdidas.
+- Las defensas del defensor se reducen con porcentaje configurable (`CombatDefenseLossMinPercentage`/`MaxPercentage`).
 
-- **Resultados**:
-  - **Ganador**: Toma recursos del perdedor (si ataca).
-  - **Debris Field**: Generado por naves destruidas (70% metal/cristal reciclable).
-  - **Pérdidas**: Naves destruidas no se recuperan automáticamente (excepto defensas al 70%).
-
-- **Factores Adicionales**:
-  - **Tecnologías**: Aumentan ataque/defensa (Weapons, Shielding, Armor Tech).
-  - **Formas de Vida**: Bonos específicos (ej. Mejora combate).
-  - **Estadísticas de Unidades**: Ataque, Shields, Armor, Rapid Fire por nave/defensa.
-
-## Estrategias Recomendadas
-- Balancea flota: Mezcla cazadores para rapid fire y acorazados para daño.
-- Usa espía para evaluar defensas.
-- Evita ataques innecesarios; calcula pérdidas vs. ganancias.
-- Defiende con mix de torretas y escudos.
-
-Este módulo es clave para PvP y saqueo, haciendo OGame competitivo.
+## Estado de documentacion
+Esta estructura detallada del reporte de combate no estaba documentada de forma explicita en la wiki.
+Queda documentada en este archivo.

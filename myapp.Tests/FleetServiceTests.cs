@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -16,17 +18,15 @@ namespace myapp.Tests.Services
 
         public FleetServiceTests()
         {
-            // Create in-memory SQLite database for tests
             _connection = new SqliteConnection("DataSource=:memory:");
             _connection.Open();
-            
+
             var options = new DbContextOptionsBuilder<GameDbContext>()
                 .UseSqlite(_connection)
                 .Options;
-            
+
             _dbContext = new GameDbContext(options);
             _dbContext.Database.EnsureCreated();
-            
         }
 
         [Fact]
@@ -47,7 +47,7 @@ namespace myapp.Tests.Services
             var techLogger = loggerFactory.CreateLogger<TechnologyService>();
             var techService = new TechnologyService(_dbContext, resourceService, buildingService, devModeService, enemyService, techLogger);
             var defenseService = new DefenseService(_dbContext, resourceService, buildingService, techService, devModeService, enemyService, playerStateService);
-            
+
             var fleetService = new FleetService(_dbContext, resourceService, buildingService, techService, galaxyService, persistenceService, messageService, defenseService, devModeService, enemyService, playerStateService);
 
             await buildingService.InitializeAsync();
@@ -55,31 +55,21 @@ namespace myapp.Tests.Services
             await defenseService.InitializeAsync();
             await fleetService.InitializeAsync();
             await messageService.InitializeAsync();
-            
-            // Create a mock mission that has arrived
-            var mission = new FleetMission
-            {
-                Id = Guid.NewGuid(),
-                MissionType = "Attack",
-                TargetCoordinates = "1:1:2",
-                Ships = new Dictionary<string, int> { { "LF", 10 } },
-                StartTime = DateTime.Now.AddMinutes(-10),
-                ArrivalTime = DateTime.Now.AddSeconds(-1),
-                ReturnTime = DateTime.Now.AddMinutes(10),
-                Status = FleetStatus.Flight,
-                FuelConsumed = 100
-            };
-            
-            // Get target planet info
+
             var targetPlanet = galaxyService.GetPlanet(1, 1, 2);
             Assert.NotNull(targetPlanet);
             Assert.True(targetPlanet.IsOccupied);
-            
+
             // Act
             await fleetService.SendFleet(new Dictionary<string, int> { { "LF", 10 } }, 1, 1, 2, "Attack");
-            
-            // Assert - Fleet should be added to active fleets
-            Assert.True(fleetService.ActiveFleets.Count > 0);
+            await Task.Delay(300);
+
+            // Assert
+            var combatMessage = messageService.Messages.FirstOrDefault(m => m.Type == "Combat" && m.Subject.Contains("Combat Report"));
+            Assert.NotNull(combatMessage);
+            Assert.Contains("Your Attack Fleet", combatMessage.Body);
+            Assert.Contains("Your Losses", combatMessage.Body);
+            Assert.Contains("Debris Field", combatMessage.Body);
         }
 
         public void Dispose()
