@@ -9,3 +9,8 @@ script = ""
 name = "Ejecutar"
 icon = "run"
 command = "dotnet run"
+
+[[actions]]
+name = "Interrumpir App"
+icon = "tool"
+command = "Get-Process | Where-Object { $_.ProcessName -like 'myapp*' -or $_.ProcessName -like 'dotnet*' } | Stop-Process -Force"
