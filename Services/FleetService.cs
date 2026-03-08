@@ -1088,16 +1088,16 @@ public class FleetService
 
             result = $"<span style='color:green'>VICTORY</span><br/>" +
                      $"Battle at [{mission.TargetCoordinates}]<br/><br/>" +
-                     $"Your Attack Fleet:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
-                     $"Enemy Defenses (before):<br/>{FormatUnitDictionary(initialDefenses)}<br/><br/>" +
-                     $"Enemy Fleet (before):<br/>{FormatUnitDictionary(initialDefenderShips)}<br/><br/>" +
+                     $"Flota Atacante:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
+                     $"Defensas del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenses)}<br/><br/>" +
+                     $"Flota del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenderShips)}<br/><br/>" +
                      $"Power Comparison:<br/>" +
-                     $"Your Fleet: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                     $"Enemy Forces: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                     $"Your Losses:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
-                     $"Enemy Losses (Defenses):<br/>{FormatUnitDictionary(defenderDefenseLosses)}<br/><br/>" +
-                     $"Enemy Losses (Ships - estimated by combat resolution):<br/>{FormatUnitDictionary(defenderShipLosses)}<br/><br/>" +
-                     $"Loot Captured:<br/>" +
+                     $"Atacante: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
+                     $"Defenzor: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
+                     $"Perdidas del Atacante:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
+                     $"Perdidas del Defenzor (Defensas):<br/>{FormatUnitDictionary(defenderDefenseLosses)}<br/><br/>" +
+                     $"Perdidas del Defenzor (Naves - estimadas):<br/>{FormatUnitDictionary(defenderShipLosses)}<br/><br/>" +
+                     $"Botin Capturado por el Atacante:<br/>" +
                      $"Metal: {lootM:N0}<br/>" +
                      $"Crystal: {lootC:N0}<br/>" +
                      $"Deuterium: {lootD:N0}<br/><br/>" +
@@ -1141,15 +1141,15 @@ public class FleetService
 
             result = $"<span style='color:red'>DEFEAT</span><br/>" +
                      $"Battle at [{mission.TargetCoordinates}]<br/><br/>" +
-                     $"Your Attack Fleet:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
-                     $"Enemy Defenses (before):<br/>{FormatUnitDictionary(initialDefenses)}<br/><br/>" +
-                     $"Enemy Fleet (before):<br/>{FormatUnitDictionary(initialDefenderShips)}<br/><br/>" +
+                     $"Flota Atacante:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
+                     $"Defensas del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenses)}<br/><br/>" +
+                     $"Flota del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenderShips)}<br/><br/>" +
                      $"Power Comparison:<br/>" +
-                     $"Your Fleet: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                     $"Enemy Forces: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                     $"Your Losses:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
-                     $"Enemy Losses (Defenses):<br/>{FormatUnitDictionary(defenderDefenseLosses)}<br/><br/>" +
-                     $"Enemy Losses (Ships):<br/>{FormatUnitDictionary(defenderShipLosses)}<br/><br/>" +
+                     $"Atacante: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
+                     $"Defenzor: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
+                     $"Perdidas del Atacante:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
+                     $"Perdidas del Defenzor (Defensas):<br/>{FormatUnitDictionary(defenderDefenseLosses)}<br/><br/>" +
+                     $"Perdidas del Defenzor (Naves):<br/>{FormatUnitDictionary(defenderShipLosses)}<br/><br/>" +
                      $"Debris Field:<br/>" +
                      $"Metal: {debrisM:N0}<br/>" +
                      $"Crystal: {debrisC:N0}<br/>" +
@@ -1446,16 +1446,16 @@ public class FleetService
 
         string result = $"<span style='color:{(attackerWon ? "red" : "green")}'>{(attackerWon ? "DEFEAT" : "VICTORY")}</span><br/>" +
                         $"Battle at [{mission.TargetCoordinates}]<br/><br/>" +
-                        $"Enemy Attack Fleet:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
-                        $"Your Defenses (before):<br/>{FormatUnitDictionary(initialDefenderDefenses.ToDictionary(x => MapDefenseIdToName(x.Key), x => x.Value))}<br/><br/>" +
-                        $"Your Fleet (before):<br/>{FormatShipDictionary(initialDefenderShips)}<br/><br/>" +
+                        $"Flota Atacante:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
+                        $"Defensas del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenderDefenses.ToDictionary(x => MapDefenseIdToName(x.Key), x => x.Value))}<br/><br/>" +
+                        $"Flota del Defenzor (antes):<br/>{FormatShipDictionary(initialDefenderShips)}<br/><br/>" +
                         $"Power Comparison:<br/>" +
-                        $"Enemy Fleet: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                        $"Your Forces: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                        $"Enemy Losses:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
-                        $"Your Losses (Defenses):<br/>{FormatUnitDictionary(defenderLossesDefenses)}<br/><br/>" +
-                        $"Your Losses (Ships):<br/>{FormatUnitDictionary(defenderLossesShips)}<br/><br/>" +
-                        $"Enemy Loot (estimated):<br/>" +
+                        $"Atacante: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
+                        $"Defenzor: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
+                        $"Perdidas del Atacante:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
+                        $"Perdidas del Defenzor (Defensas):<br/>{FormatUnitDictionary(defenderLossesDefenses)}<br/><br/>" +
+                        $"Perdidas del Defenzor (Naves):<br/>{FormatUnitDictionary(defenderLossesShips)}<br/><br/>" +
+                        $"Botin Capturado por el Atacante (estimado):<br/>" +
                         $"Metal: {(attackerWon ? playerPlanetState.Resources["Metal"] / 2 : 0):N0}<br/>" +
                         $"Crystal: {(attackerWon ? playerPlanetState.Resources["Crystal"] / 2 : 0):N0}<br/>" +
                         $"Deuterium: {(attackerWon ? playerPlanetState.Resources["Deuterium"] / 2 : 0):N0}<br/><br/>" +
@@ -1770,6 +1770,7 @@ public class FleetService
         InitializeShips();
     }
 }
+
 
 
 
