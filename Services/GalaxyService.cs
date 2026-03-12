@@ -242,6 +242,37 @@ public class GalaxyService
         // and handle fleets associated with this planet.
     }
 
+    public async Task<string?> RenamePlanetAsync(GalaxyPlanet planet, string newName)
+    {
+        var trimmedName = newName.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedName)) return "Planet name cannot be empty.";
+
+        planet.Name = trimmedName;
+
+        var registeredPlanet = PlayerPlanets.FirstOrDefault(p =>
+            p.Galaxy == planet.Galaxy && p.System == planet.System && p.Position == planet.Position);
+        if (registeredPlanet != null)
+        {
+            registeredPlanet.Name = trimmedName;
+        }
+
+        var systemPlanet = GetPlanet(planet.Galaxy, planet.System, planet.Position);
+        if (systemPlanet != null)
+        {
+            systemPlanet.Name = trimmedName;
+        }
+
+        await _persistenceService.AddOrUpdatePlayerPlanetAsync(
+            planet.Galaxy,
+            planet.System,
+            planet.Position,
+            trimmedName,
+            planet.Image,
+            planet.IsHomeworld);
+
+        NotifyStateChanged();
+        return null;
+    }
     private string GetRandomPlanetImage(int position)
     {
         // Simple logic: hotter planets closer to star (1-3), colder further away (13-15)
@@ -259,3 +290,4 @@ public class GalaxyService
         return systemPlanets.FirstOrDefault(p => p.Position == position);
     }
 }
+

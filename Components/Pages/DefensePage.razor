@@ -57,6 +57,10 @@
                 <!-- Unit Info -->
                 <h3>@unit.Name</h3>
                 <p class="text-muted">@unit.Description</p>
+                @if (IsSingleInstanceDefense(unit))
+                {
+                    <p class="text-muted" style="font-size: 0.85em;">Max 1 per planet</p>
+                }
 
                 <!-- Stats & Costs -->
                 <div class="ogame-cost-section">
@@ -106,15 +110,15 @@
 
                 <!-- Quantity Selector -->
                 <div style="display: flex; justify-content: space-around; width: 100%; margin: 10px 0; gap: 5px;">
-                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(vm, 1)">+1</button>
-                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(vm, 10)">+10</button>
-                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(vm, 50)">+50</button>
-                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(vm, 100)">+100</button>
+                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 1)">+1</button>
+                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 10)">+10</button>
+                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 50)">+50</button>
+                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 100)">+100</button>
                 </div>
 
                 <!-- Input & Build Button -->
                 <div style="display: flex; width: 100%; gap: 10px; align-items: center;">
-                    <input type="number" @bind="vm.QuantityInput" min="0" max="9999"
+                    <input type="number" @bind="vm.QuantityInput" min="0" max="@(IsSingleInstanceDefense(unit) ? 1 : 9999)"
                            style="flex: 1; padding: 8px; text-align: center; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 5px;" />
 
                     @if(CanBuild(unit))
@@ -168,13 +172,23 @@
 
     private DefenseViewModel GetViewModel(string id) => viewModels.First(v => v.UnitId == id);
 
-    private void AddToQuantity(DefenseViewModel vm, int amount)
+    private void AddToQuantity(DefenseUnit unit, DefenseViewModel vm, int amount)
     {
         vm.QuantityInput += amount;
+
+        if (IsSingleInstanceDefense(unit) && vm.QuantityInput > 1)
+        {
+            vm.QuantityInput = 1;
+        }
     }
 
     private async Task BuildDefense(DefenseUnit unit, DefenseViewModel vm)
     {
+        if (IsSingleInstanceDefense(unit) && vm.QuantityInput > 1)
+        {
+            vm.QuantityInput = 1;
+        }
+
         await DefenseService.AddToQueueAsync(unit, vm.QuantityInput);
         vm.QuantityInput = 0;
     }
@@ -188,6 +202,15 @@
     {
         return RequirementService.IsUnlocked(unit.Requirements);
     }
+
+    private bool IsSingleInstanceDefense(DefenseUnit unit)
+    {
+        return unit.Id == "SSD" || unit.Id == "LSD";
+    }
 }
+
+
+
+
 
 

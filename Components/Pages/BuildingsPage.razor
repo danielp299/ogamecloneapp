@@ -77,7 +77,7 @@
                 </div>
 
                 <!-- Action Buttons -->
-                @if (!BuildingService.ConstructionQueue.Contains(building))
+                @if (!BuildingService.IsQueued(building.Title))
                 {
                     // Convert List<string> to Dictionary for compatibility
                     var requirements = new Dictionary<string, int>();
@@ -112,13 +112,14 @@
                 }
                 else
                 {
-                    @if(building.IsBuilding)
+                    var queuedBuilding = BuildingService.GetQueuedBuilding(building.Title);
+                    @if(queuedBuilding != null)
                     {
                         <div class="text-center mb-sm">
-                            <div class="ogame-queue-timer">@building.TimeRemaining.ToString(@"hh\:mm\:ss")</div>
+                            <div class="ogame-queue-timer">@queuedBuilding.TimeRemaining.ToString(@"hh\:mm\:ss")</div>
                         </div>
                         <button class="ogame-btn ogame-btn-danger ogame-btn-block"
-                                @onclick="async () => await BuildingService.CancelAsync(building)">
+                                @onclick="async () => await BuildingService.CancelAsync(queuedBuilding)">
                             Cancel
                         </button>
                     }
@@ -147,5 +148,6 @@
         BuildingService.OnChange -= RefreshState;
     }
 }
+
 
 

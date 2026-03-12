@@ -35,6 +35,19 @@ public class Building
     public TimeSpan Duration { get; set; }
 }
 
+public class QueuedBuildingState
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Title { get; set; } = "";
+    public int LevelBeforeUpgrade { get; set; }
+    public TimeSpan ConstructionDuration { get; set; }
+    public TimeSpan TimeRemaining { get; set; }
+    public bool IsBuilding { get; set; }
+    public int Galaxy { get; set; }
+    public int System { get; set; }
+    public int Position { get; set; }
+}
+
 public class BuildingService
 {
     private readonly GameDbContext _dbContext;
@@ -44,6 +57,7 @@ public class BuildingService
     private readonly PlayerStateService _playerStateService;
     public List<Building> Buildings { get; private set; } = new();
     public List<Building> ConstructionQueue { get; private set; } = new();
+    private List<QueuedBuildingState> _allConstructionQueue = new();
     
     public event Action? OnChange;
 
@@ -78,11 +92,14 @@ private bool _isInitialized = false;
         _playerStateService = playerStateService;
         
         InitializeBuildings();
+        _ = ProcessQueueLoop();
         
         _playerStateService.OnChange += async () => 
         {
             await LoadFromDatabaseAsync();
+            await LoadQueueFromDatabaseAsync();
             await UpdateProductionAsync();
+            SyncVisibleConstructionQueue();
             NotifyStateChanged();
         };
     }
@@ -92,7 +109,9 @@ private bool _isInitialized = false;
         if (_isInitialized) return;
         
         await LoadFromDatabaseAsync();
+        await LoadQueueFromDatabaseAsync();
         await UpdateProductionAsync();
+        SyncVisibleConstructionQueue();
         
         _isInitialized = true;
     }
@@ -101,6 +120,7 @@ private bool _isInitialized = false;
     {
         Buildings.Clear();
         ConstructionQueue.Clear();
+        _allConstructionQueue.Clear();
         MetalHourlyProduction = 0;
         CrystalHourlyProduction = 0;
         DeuteriumHourlyProduction = 0;
@@ -111,6 +131,7 @@ private bool _isInitialized = false;
         _isInitialized = false;
         _isProcessingQueue = false;
         InitializeBuildings();
+        SyncVisibleConstructionQueue();
     }
 
     private async Task LoadFromDatabaseAsync()
@@ -134,7 +155,41 @@ private bool _isInitialized = false;
             {
                 building.Level = 0;
             }
+
+            building.IsBuilding = false;
+            building.TimeRemaining = TimeSpan.Zero;
+            building.ConstructionDuration = TimeSpan.Zero;
         }
+
+        SyncVisibleConstructionQueue();
+    }
+
+    private async Task LoadQueueFromDatabaseAsync()
+    {
+        var dbQueue = await _dbContext.BuildingQueue
+            .OrderBy(q => q.Galaxy)
+            .ThenBy(q => q.System)
+            .ThenBy(q => q.Position)
+            .ThenBy(q => q.QueuePosition)
+            .ThenBy(q => q.StartTime)
+            .ToListAsync();
+
+        _allConstructionQueue = dbQueue
+            .Select(q => new QueuedBuildingState
+            {
+                Id = q.Id,
+                Title = q.BuildingType,
+                LevelBeforeUpgrade = q.TargetLevel,
+                ConstructionDuration = q.Duration,
+                TimeRemaining = q.IsCompleted ? TimeSpan.Zero : q.TimeRemaining,
+                IsBuilding = q.IsProcessing,
+                Galaxy = q.Galaxy,
+                System = q.System,
+                Position = q.Position
+            })
+            .ToList();
+
+        SyncVisibleConstructionQueue();
     }
 
     private async Task SaveToDatabaseAsync()
@@ -487,91 +542,229 @@ private bool _isInitialized = false;
 
     public async Task AddToQueueAsync(Building building)
     {
-        if (ConstructionQueue.Count >= MaxQueueSize) return;
-        
-        if (await _resourceService.HasResourcesAsync(building.MetalCost, building.CrystalCost, building.DeuteriumCost))
-        {
-            await _resourceService.ConsumeResourcesAsync(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
-            
-            var calculatedDuration = CalculateConstructionDuration(building);
-            var duration = _devModeService.GetDuration(calculatedDuration, 1);
-            building.ConstructionDuration = duration;
-            building.TimeRemaining = duration;
-            
-            ConstructionQueue.Add(building);
-            NotifyStateChanged();
+        if (GetCurrentPlanetQueue().Count >= MaxQueueSize) return;
 
-            if (!_isProcessingQueue)
+        int queuedSameBuilding = GetCurrentPlanetQueue().Count(q => q.Title == building.Title);
+        var queueBuilding = CreateQueueDisplayBuilding(building.Title, building.Level + queuedSameBuilding);
+        if (queueBuilding == null) return;
+
+        if (await _resourceService.HasResourcesAsync(queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost))
+        {
+            await _resourceService.ConsumeResourcesAsync(queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost);
+
+            var calculatedDuration = CalculateConstructionDuration(queueBuilding);
+            var duration = _devModeService.GetDuration(calculatedDuration, 1);
+            int g = _playerStateService.ActiveGalaxy;
+            int s = _playerStateService.ActiveSystem;
+            int p = _playerStateService.ActivePosition;
+
+            _allConstructionQueue.Add(new QueuedBuildingState
             {
-                _ = ProcessQueue();
-            }
+                Title = building.Title,
+                LevelBeforeUpgrade = queueBuilding.Level,
+                ConstructionDuration = duration,
+                TimeRemaining = duration,
+                Galaxy = g,
+                System = s,
+                Position = p
+            });
+
+            await PersistQueueForPlanetAsync(g, s, p);
+            SyncVisibleConstructionQueue();
+            NotifyStateChanged();
         }
     }
 
     public async Task CancelAsync(Building building)
     {
-        if (ConstructionQueue.Contains(building))
+        var queuedItem = GetCurrentPlanetQueue().FirstOrDefault(q => q.Title == building.Title && q.LevelBeforeUpgrade == building.Level);
+        if (queuedItem == null) return;
+
+        var queueBuilding = CreateQueueDisplayBuilding(queuedItem.Title, queuedItem.LevelBeforeUpgrade);
+        if (queueBuilding == null) return;
+
+        await _resourceService.RefundResourcesAsync(queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost);
+        _allConstructionQueue.Remove(queuedItem);
+        await PersistQueueForPlanetAsync(queuedItem.Galaxy, queuedItem.System, queuedItem.Position);
+        SyncVisibleConstructionQueue();
+        NotifyStateChanged();
+    }
+
+    private async Task ProcessQueueLoop()
+    {
+        while (true)
         {
-            // Refund resources based on CancelRefundPercentage setting
-            await _resourceService.RefundResourcesAsync(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
-            
-            ConstructionQueue.Remove(building);
-            building.IsBuilding = false;
-            building.TimeRemaining = TimeSpan.Zero;
+            foreach (var queueGroup in _allConstructionQueue.GroupBy(q => $"{q.Galaxy}:{q.System}:{q.Position}").ToList())
+            {
+                var currentItem = queueGroup.FirstOrDefault();
+                if (currentItem == null) continue;
+
+                currentItem.IsBuilding = true;
+                currentItem.TimeRemaining = currentItem.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
+
+                if (currentItem.TimeRemaining <= TimeSpan.Zero)
+                {
+                    currentItem.IsBuilding = false;
+                    await IncrementBuildingLevelForPlanetAsync(currentItem.Title, currentItem.Galaxy, currentItem.System, currentItem.Position);
+                    _allConstructionQueue.Remove(currentItem);
+                    await PersistQueueForPlanetAsync(currentItem.Galaxy, currentItem.System, currentItem.Position);
+
+                    if (IsCurrentPlanet(currentItem.Galaxy, currentItem.System, currentItem.Position))
+                    {
+                        await _resourceService.SettleActivePlanetResourcesAsync();
+                        await LoadFromDatabaseAsync();
+                        await UpdateProductionAsync();
+                    }
+
+                    _ = _enemyService.OnPlayerBuildingUpgraded(currentItem.Title);
+                }
+            }
+
+            SyncVisibleConstructionQueue();
             NotifyStateChanged();
+            await Task.Delay(1000);
         }
     }
 
-    private async Task ProcessQueue()
+    private void SyncVisibleConstructionQueue()
     {
-        _isProcessingQueue = true;
-
-        while (ConstructionQueue.Count > 0)
-        {
-            var currentBuilding = ConstructionQueue[0];
-            currentBuilding.IsBuilding = true;
-            NotifyStateChanged();
-
-            while (currentBuilding.TimeRemaining > TimeSpan.Zero)
+        ConstructionQueue = GetCurrentPlanetQueue()
+            .Select(q =>
             {
-                // Check if building was cancelled
-                if(!ConstructionQueue.Contains(currentBuilding)) break;
+                var queueBuilding = CreateQueueDisplayBuilding(q.Title, q.LevelBeforeUpgrade);
+                if (queueBuilding == null) return null;
 
-                await Task.Delay(1000);
-                currentBuilding.TimeRemaining = currentBuilding.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
-                NotifyStateChanged();
-            }
+                queueBuilding.ConstructionDuration = q.ConstructionDuration;
+                queueBuilding.TimeRemaining = q.TimeRemaining;
+                queueBuilding.IsBuilding = q.IsBuilding;
+                return queueBuilding;
+            })
+            .Where(q => q != null)
+            .Cast<Building>()
+            .ToList();
+    }
 
-            // Check again if cancelled
-            if(!ConstructionQueue.Contains(currentBuilding)) continue;
+    private List<QueuedBuildingState> GetCurrentPlanetQueue()
+    {
+        return _allConstructionQueue
+            .Where(q => IsCurrentPlanet(q.Galaxy, q.System, q.Position))
+            .OrderBy(q => q.Id)
+            .ToList();
+    }
 
-            // Upgrade Logic
-            currentBuilding.IsBuilding = false;
+    private bool IsCurrentPlanet(int galaxy, int system, int position)
+    {
+        return galaxy == _playerStateService.ActiveGalaxy &&
+               system == _playerStateService.ActiveSystem &&
+               position == _playerStateService.ActivePosition;
+    }
 
-            // Settle produced resources with OLD production rates before level changes.
-            await _resourceService.SettleActivePlanetResourcesAsync();
-            
-            // Energy update is now handled INSIDE UpdateProduction(), so we don't need manual logic here anymore.
-            // Just increment level and recalculate.
+    private Building? CreateQueueDisplayBuilding(string title, int level)
+    {
+        var source = Buildings.FirstOrDefault(b => b.Title == title);
+        if (source == null) return null;
 
-            string upgradedBuildingName = currentBuilding.Title;
-            currentBuilding.Level++;
-            
-            // Save to database
-            await SaveToDatabaseAsync();
-            
-            ConstructionQueue.RemoveAt(0);
-            
-            // Recalculate production rates (and energy) with new levels
-            await UpdateProductionAsync();
-            
-            // Notify enemy service that player upgraded a building
-            _ = _enemyService.OnPlayerBuildingUpgraded(upgradedBuildingName);
-            
-            NotifyStateChanged();
+        return new Building
+        {
+            Title = source.Title,
+            Description = source.Description,
+            Image = source.Image,
+            BaseMetalCost = source.BaseMetalCost,
+            BaseCrystalCost = source.BaseCrystalCost,
+            BaseDeuteriumCost = source.BaseDeuteriumCost,
+            BaseDuration = source.BaseDuration,
+            EnergyConsumption = source.EnergyConsumption,
+            Scaling = source.Scaling,
+            Dependencies = new(source.Dependencies),
+            Level = level
+        };
+    }
+
+    public bool IsQueued(string buildingTitle)
+    {
+        return GetCurrentPlanetQueue().Any(q => q.Title == buildingTitle);
+    }
+
+    public Building? GetQueuedBuilding(string buildingTitle)
+    {
+        var queuedItem = GetCurrentPlanetQueue().FirstOrDefault(q => q.Title == buildingTitle);
+        if (queuedItem == null) return null;
+
+        var queueBuilding = CreateQueueDisplayBuilding(queuedItem.Title, queuedItem.LevelBeforeUpgrade);
+        if (queueBuilding == null) return null;
+
+        queueBuilding.ConstructionDuration = queuedItem.ConstructionDuration;
+        queueBuilding.TimeRemaining = queuedItem.TimeRemaining;
+        queueBuilding.IsBuilding = queuedItem.IsBuilding;
+        return queueBuilding;
+    }
+
+    private async Task IncrementBuildingLevelForPlanetAsync(string buildingTitle, int g, int s, int p)
+    {
+        var dbBuilding = await _dbContext.Buildings.FirstOrDefaultAsync(b =>
+            b.BuildingType == buildingTitle && b.Galaxy == g && b.System == s && b.Position == p);
+        if (dbBuilding == null) return;
+
+        dbBuilding.Level++;
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task PersistQueueForPlanetAsync(int g, int s, int p)
+    {
+        var planetQueue = _allConstructionQueue
+            .Where(q => q.Galaxy == g && q.System == s && q.Position == p)
+            .OrderBy(q => q.Id)
+            .ToList();
+
+        var existing = await _dbContext.BuildingQueue
+            .Where(q => q.Galaxy == g && q.System == s && q.Position == p)
+            .ToListAsync();
+
+        if (existing.Any())
+        {
+            _dbContext.BuildingQueue.RemoveRange(existing);
+            await _dbContext.SaveChangesAsync();
         }
 
-        _isProcessingQueue = false;
+        if (!planetQueue.Any()) return;
+
+        DateTime nextStart = DateTime.UtcNow;
+        var entities = new List<BuildingQueueEntity>();
+
+        for (int i = 0; i < planetQueue.Count; i++)
+        {
+            var item = planetQueue[i];
+            item.IsBuilding = i == 0;
+            item.TimeRemaining = i == 0 ? GetRemainingDuration(item.TimeRemaining, item.ConstructionDuration) : item.ConstructionDuration;
+
+            DateTime startTime = nextStart;
+            DateTime endTime = startTime.Add(item.TimeRemaining);
+            nextStart = endTime;
+
+            entities.Add(new BuildingQueueEntity
+            {
+                Id = item.Id,
+                BuildingType = item.Title,
+                TargetLevel = item.LevelBeforeUpgrade,
+                Galaxy = g,
+                System = s,
+                Position = p,
+                StartTime = startTime,
+                EndTime = endTime,
+                IsProcessing = item.IsBuilding,
+                QueuePosition = i
+            });
+        }
+
+        await _dbContext.BuildingQueue.AddRangeAsync(entities);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private static TimeSpan GetRemainingDuration(TimeSpan remaining, TimeSpan fallback)
+    {
+        if (remaining <= TimeSpan.Zero) return fallback;
+        if (remaining > fallback) return fallback;
+        return remaining;
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();

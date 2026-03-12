@@ -47,7 +47,7 @@ wwwroot/assets/               # Static images (buildings, ships, technologies, d
 
 ## Workflow Rules
 
-- **Git operations MUST be delegated to the `@git-commit` subagent.** Whenever you detect that a commit is needed, the user mentions committing, or any git operation is required (status, diff, log, add, commit), automatically invoke `@git-commit` via the Task tool to handle it. If `@git-commit` fails because its model is unavailable, immediately retry with `@git-commit-fallback`. Do NOT run git commands directly - always delegate to a commit subagent.
+- **Git operations MUST be delegated to the `@git-commit` subagent, except in Codex Desktop sessions where the Task tool is unavailable.** In normal agent sessions, whenever you detect that a commit is needed, the user mentions committing, or any git operation is required (status, diff, log, add, commit), automatically invoke `@git-commit` via the Task tool to handle it. If `@git-commit` fails because its model is unavailable, immediately retry with `@git-commit-fallback`. In Codex Desktop sessions without Task support, direct non-interactive git commands are allowed as a fallback.
 - Use `engram` as the shared project memory system. At the start of a task, prefer `engram context ogamecloneapp` or a targeted `engram search` to recover prior decisions. After finishing meaningful work, save a short memory with the decision, fix, or outcome so future sessions and subagents can reuse it.
 - If `engram` needs access outside the workspace, request the required permission instead of skipping it silently.
 - Always use absolute paths when referencing files.

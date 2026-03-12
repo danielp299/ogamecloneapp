@@ -8,6 +8,7 @@
 @inject FleetService FleetService
 @inject TechnologyService TechnologyService
 @inject DefenseService DefenseService
+@inject PlayerStateService PlayerStateService
 @implements IDisposable
 
 <PageTitle>Home</PageTitle>
@@ -199,6 +200,23 @@
         background-color: #555;
     }
     
+    .planet-actions {
+        display: flex;
+        gap: 5px;
+        width: 100%;
+    }
+
+    .btn-rename {
+        background-color: #2f5d8a;
+        color: #fff;
+        border: none;
+        padding: 5px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.8em;
+        width: 100%;
+    }
+
     .btn-abandon {
         background-color: #800;
         color: #fff;
@@ -269,10 +287,9 @@
                             var isReturn = mission.Status == FleetStatus.Return;
                             <div class="event-item">
                                 <div class="event-item-details">
-                                    <span class="event-type">@mission.MissionType @(isReturn ? "(Returning)" : "")</span>
-                                    <span class="event-coords">
-                                        Target: @mission.TargetCoordinates
-                                    </span>
+                                    <span class="event-type">@GetMissionTitle(mission, isReturn)</span>
+                                    <span class="event-coords">Origin: @GetPlanetLabel(mission.OriginCoordinates)</span>
+                                    <span class="event-coords">Destination: @GetPlanetLabel(mission.TargetCoordinates)</span>
                                 </div>
                                 <div class="queue-item-timer">
                                     @timeStr
@@ -392,15 +409,39 @@
                         <div><strong>@planet.Name</strong></div>
                         <div style="font-size:0.9em; color:#aaa;">[@planet.Galaxy:@planet.System:@planet.Position]</div>
                     </div>
-                    @if (!planet.IsHomeworld)
-                    {
-                        <button class="btn-abandon" @onclick="() => ConfirmAbandon(planet)">Abandon</button>
-                    }
+                    <div class="planet-actions">
+                        <button class="btn-rename" @onclick="() => OpenRenameModal(planet)">Rename</button>
+                        @if (!planet.IsHomeworld)
+                        {
+                            <button class="btn-abandon" @onclick="() => ConfirmAbandon(planet)">Abandon</button>
+                        }
+                    </div>
                 </div>
             }
         </div>
     </div>
 
+
+    <!-- Rename Planet Modal -->
+    @if (ShowRenameModal)
+    {
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <h3>Rename Planet</h3>
+                <p>Choose a new name for <strong>@PlanetToRename?.Name</strong>.</p>
+                <input type="text" @bind="RenamePlanetName" maxlength="24"
+                       style="width: 100%; padding: 10px; margin-top: 10px; box-sizing: border-box; background-color: #111; color: white; border: 1px solid #555; border-radius: 5px;" />
+                @if (!string.IsNullOrEmpty(RenamePlanetError))
+                {
+                    <p class="warning-text">@RenamePlanetError</p>
+                }
+                <div class="modal-actions">
+                    <button class="btn-cancel" @onclick="CancelRename">Cancel</button>
+                    <button class="btn-confirm" @onclick="ExecuteRename">Save</button>
+                </div>
+            </div>
+        </div>
+    }
     <!-- Abandon Confirmation Modal -->
     @if (ShowAbandonConfirmation)
     {
@@ -438,17 +479,14 @@
 
     protected override void OnInitialized()
     {
-        // Subscribe to all services to get updates when queues change state
         ResourceService.OnChange += RefreshState;
         BuildingService.OnChange += RefreshState;
         TechnologyService.OnChange += RefreshState;
         FleetService.OnChange += RefreshState;
         DefenseService.OnChange += RefreshState;
 
-        // Force immediate resource calculation when entering home screen
         _ = BuildingService.UpdateProductionAsync();
 
-        // Timer to tick every second for smooth countdowns
         _timer = new System.Threading.Timer(async _ =>
         {
             await InvokeAsync(StateHasChanged);
@@ -465,10 +503,8 @@
         _timer?.Dispose();
     }
 
-    // Helper to sort missions by immediate relevant time
     private IEnumerable<FleetMission> GetSortedMissions()
     {
-        // Snapshot to avoid modification errors
         var list = FleetService.ActiveFleets.ToList(); 
         
         return list.OrderBy(m => 
@@ -486,18 +522,81 @@
         return diff.ToString(@"hh\:mm\:ss");
     }
 
-    // Planet Navigation
-    private void NavigateToPlanet(GalaxyPlanet planet)
+    private string GetMissionTitle(FleetMission mission, bool isReturn)
     {
-        // Logic to switch active planet (if we had multi-planet context switching)
-        // For now, just maybe show a toast or stay on page
-        // In a real app, this would set the 'CurrentPlanetId' in a session service
+        if (mission.IsIncomingAttack) return "Under Attack";
+        return $"{mission.MissionType}{(isReturn ? " (Returning)" : "")}";
     }
 
-    // Abandon Logic
+
+    private string GetPlanetLabel(string coordinates)
+    {
+        var planetName = GetPlanetName(coordinates);
+        return $"{planetName} [{coordinates}]";
+    }
+
+    private string GetPlanetName(string coordinates)
+    {
+        var parts = coordinates.Split(':');
+        if (parts.Length == 3 &&
+            int.TryParse(parts[0], out int g) &&
+            int.TryParse(parts[1], out int s) &&
+            int.TryParse(parts[2], out int p))
+        {
+            var planet = GalaxyService.GetPlanet(g, s, p);
+            if (planet != null && !string.IsNullOrWhiteSpace(planet.Name))
+            {
+                return planet.Name.Length > 8 ? planet.Name.Substring(0, 8) : planet.Name;
+            }
+        }
+
+        return "Planet";
+    }
+
+    private void NavigateToPlanet(GalaxyPlanet planet)
+    {
+        PlayerStateService.SetActivePlanet(planet.Galaxy, planet.System, planet.Position);
+    }
+
+    private bool ShowRenameModal = false;
+    private GalaxyPlanet? PlanetToRename;
+    private string RenamePlanetName = "";
+    private string RenamePlanetError = "";
     private bool ShowAbandonConfirmation = false;
     private GalaxyPlanet? PlanetToAbandon;
 
+
+    private void OpenRenameModal(GalaxyPlanet planet)
+    {
+        PlanetToRename = planet;
+        RenamePlanetName = planet.Name;
+        RenamePlanetError = "";
+        ShowRenameModal = true;
+    }
+
+    private void CancelRename()
+    {
+        ShowRenameModal = false;
+        PlanetToRename = null;
+        RenamePlanetName = "";
+        RenamePlanetError = "";
+    }
+
+    private async Task ExecuteRename()
+    {
+        if (PlanetToRename == null) return;
+
+        var error = await GalaxyService.RenamePlanetAsync(PlanetToRename, RenamePlanetName);
+        if (error != null)
+        {
+            RenamePlanetError = error;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        CancelRename();
+        await InvokeAsync(StateHasChanged);
+    }
     private void ConfirmAbandon(GalaxyPlanet planet)
     {
         PlanetToAbandon = planet;
@@ -520,7 +619,6 @@
         StateHasChanged();
     }
 
-    // Navigation Helpers
     private void NavigateToBuildings() => Navigation.NavigateTo("/buildings");
     private void NavigateToTechnology() => Navigation.NavigateTo("/technologies");
     private void NavigateToFleet() => Navigation.NavigateTo("/fleet");
@@ -528,3 +626,5 @@
     private void NavigateToFactory() => Navigation.NavigateTo("/factory");
     private void NavigateToConstellation() => Navigation.NavigateTo("/constellation");
 }
+
+

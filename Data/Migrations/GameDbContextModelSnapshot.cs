@@ -60,7 +60,13 @@ namespace myapp.Data.Migrations
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Galaxy")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsProcessing")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Position")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("QueuePosition")
@@ -68,6 +74,9 @@ namespace myapp.Data.Migrations
 
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("System")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("TargetLevel")
                         .HasColumnType("INTEGER");
@@ -120,7 +129,13 @@ namespace myapp.Data.Migrations
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Galaxy")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsProcessing")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Position")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Quantity")
@@ -131,6 +146,9 @@ namespace myapp.Data.Migrations
 
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("System")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -504,7 +522,13 @@ namespace myapp.Data.Migrations
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Galaxy")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsProcessing")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Position")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Quantity")
@@ -519,6 +543,9 @@ namespace myapp.Data.Migrations
 
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("System")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 

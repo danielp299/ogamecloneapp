@@ -63,16 +63,13 @@
                                 </div>
                             </div>
                             <div class="text-muted" style="font-size: 0.9em;">
-                                <div>Target: [@mission.TargetCoordinates]</div>
-                                @if (mission.IsIncomingAttack)
-                                {
-                                    <div>Origin: [@mission.OriginCoordinates]</div>
-                                }
+                                <div>Origin: @GetPlanetLabel(mission.OriginCoordinates)</div>
+                                <div>Destination: @GetPlanetLabel(mission.TargetCoordinates)</div>
                                 <div style="margin-top: 5px;">
                                     Ships:
                                     @foreach(var s in mission.Ships)
                                     {
-                                        <span style="margin-right: 10px;">@s.Key: @s.Value</span>
+                                        <span style="margin-right: 10px;">@GetShipDisplayName(s.Key): @s.Value</span>
                                     }
                                 </div>
                                 @if(mission.Cargo.Count > 0)
@@ -294,6 +291,31 @@
 
     private FleetInputModel GetInputModel(string id) => inputs.First(i => i.ShipId == id);
 
+    private string GetShipDisplayName(string shipId)
+    {
+        var ship = FleetService.ShipDefinitions.FirstOrDefault(s => s.Id == shipId || s.Name == shipId);
+        return ship?.Name ?? shipId;
+    }
+
+    private string GetPlanetLabel(string coordinates)
+    {
+        var parts = coordinates.Split(':' );
+        if (parts.Length == 3 &&
+            int.TryParse(parts[0], out int g) &&
+            int.TryParse(parts[1], out int s) &&
+            int.TryParse(parts[2], out int p))
+        {
+            var planet = GalaxyService.GetPlanet(g, s, p);
+            if (planet != null && !string.IsNullOrWhiteSpace(planet.Name))
+            {
+                var shortName = planet.Name.Length > 8 ? planet.Name.Substring(0, 8) : planet.Name;
+                return $"{shortName} [{coordinates}]";
+            }
+        }
+
+        return $"Planet [{coordinates}]";
+    }
+
     private async void RefreshState()
     {
         await InvokeAsync(StateHasChanged);
@@ -386,6 +408,11 @@
         ResourceService.OnChange -= RefreshState;
     }
 }
+
+
+
+
+
 
 
 

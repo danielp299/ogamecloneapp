@@ -74,10 +74,15 @@ public class FleetMission
 
 public class ShipyardItem
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public Ship Ship { get; set; } = null!;
     public int Quantity { get; set; }
+    public int QuantityCompleted { get; set; }
     public TimeSpan DurationPerUnit { get; set; }
     public TimeSpan TimeRemaining { get; set; } // For the current unit being built
+    public int Galaxy { get; set; }
+    public int System { get; set; }
+    public int Position { get; set; }
 }
 
 // Refer to wiki/business-rules/Fleet.md for business rules documentation (includes combat logic)
@@ -102,7 +107,10 @@ public class FleetService
     public Dictionary<string, int> DockedShips { get; private set; } = new();
     
     // Shipyard Queue
-    public List<ShipyardItem> ConstructionQueue { get; private set; } = new();
+    private List<ShipyardItem> _allConstructionQueue = new();
+    public List<ShipyardItem> ConstructionQueue => _allConstructionQueue
+        .Where(i => i.Galaxy == _playerStateService.ActiveGalaxy && i.System == _playerStateService.ActiveSystem && i.Position == _playerStateService.ActivePosition)
+        .ToList();
 
     // Active Fleets (Missions)
     public List<FleetMission> ActiveFleets { get; private set; } = new();
@@ -136,6 +144,7 @@ public class FleetService
         _playerStateService.OnChange += async () => 
         {
             await LoadFromDatabaseAsync();
+            await LoadConstructionQueueAsync();
             NotifyStateChanged();
         };
 
@@ -157,6 +166,7 @@ public class FleetService
         if (_isInitialized) return;
 
         await LoadFromDatabaseAsync();
+        await LoadConstructionQueueAsync();
         _isInitialized = true;
     }
 
@@ -208,6 +218,49 @@ public class FleetService
         {
             DockedShips[dbShip.ShipType] = dbShip.Quantity;
         }
+    }
+
+    private async Task LoadConstructionQueueAsync()
+    {
+        var dbQueue = await _dbContext.ShipyardQueue
+            .OrderBy(q => q.Galaxy)
+            .ThenBy(q => q.System)
+            .ThenBy(q => q.Position)
+            .ThenBy(q => q.StartTime)
+            .ThenBy(q => q.Id)
+            .ToListAsync();
+
+        _allConstructionQueue = dbQueue
+            .Select(q =>
+            {
+                var ship = ShipDefinitions.FirstOrDefault(s => s.Id == q.ShipType);
+                if (ship == null) return null;
+
+                int remainingQuantity = q.Quantity - q.QuantityCompleted;
+                if (remainingQuantity <= 0) return null;
+
+                var durationPerUnit = q.EndTime - q.StartTime;
+                if (durationPerUnit <= TimeSpan.Zero)
+                {
+                    durationPerUnit = _devModeService.GetDuration(CalculateShipConstructionDuration(ship), 1);
+                }
+
+                return new ShipyardItem
+                {
+                    Id = q.Id,
+                    Ship = ship,
+                    Quantity = remainingQuantity,
+                    QuantityCompleted = q.QuantityCompleted,
+                    DurationPerUnit = durationPerUnit,
+                    TimeRemaining = q.IsProcessing && !q.IsCompleted ? q.TimeRemaining : durationPerUnit,
+                    Galaxy = q.Galaxy,
+                    System = q.System,
+                    Position = q.Position
+                };
+            })
+            .Where(q => q != null)
+            .Cast<ShipyardItem>()
+            .ToList();
     }
 
     private async Task SaveToDatabaseAsync()
@@ -1113,7 +1166,7 @@ public class FleetService
                  int original = mission.Ships[key];
                  int lost = original / 2;
                  mission.Ships[key] -= lost;
-                 if (lost > 0) attackerLosses[key] = lost;
+                 if (lost > 0) attackerLosses[MapShipIdToName(key)] = lost;
 
                  var ship = ShipDefinitions.FirstOrDefault(s => s.Id == key);
                  if (ship != null)
@@ -1689,14 +1742,24 @@ public class FleetService
             var calculatedDuration = CalculateShipConstructionDuration(ship);
             var finalDuration = _devModeService.GetDuration(calculatedDuration, 1);
 
-            ConstructionQueue.Add(new ShipyardItem
+            int g = _playerStateService.ActiveGalaxy;
+            int s = _playerStateService.ActiveSystem;
+            int p = _playerStateService.ActivePosition;
+
+            _allConstructionQueue.Add(new ShipyardItem
             {
                 Ship = ship,
                 Quantity = quantity,
+                QuantityCompleted = 0,
                 DurationPerUnit = finalDuration,
-                TimeRemaining = finalDuration
+                TimeRemaining = finalDuration,
+                Galaxy = g,
+                System = s,
+                Position = p
             });
             
+            await PersistQueueForPlanetAsync(g, s, p);
+
             // Notify enemy service that player is building ships
             _ = _enemyService.OnPlayerShipBuilt(ship.Id, quantity);
             
@@ -1707,56 +1770,141 @@ public class FleetService
 
     public async Task CancelQueueItemAsync(ShipyardItem item)
     {
-        if (!ConstructionQueue.Contains(item)) return;
+        if (!_allConstructionQueue.Contains(item)) return;
 
         long refundMetal = item.Ship.MetalCost * item.Quantity;
         long refundCrystal = item.Ship.CrystalCost * item.Quantity;
         long refundDeuterium = item.Ship.DeuteriumCost * item.Quantity;
 
         await _resourceService.RefundResourcesAsync(refundMetal, refundCrystal, refundDeuterium);
-        ConstructionQueue.Remove(item);
+        _allConstructionQueue.Remove(item);
+        await PersistQueueForPlanetAsync(item.Galaxy, item.System, item.Position);
         NotifyStateChanged();
     }
     private async Task ProcessQueueLoop()
     {
         while (true)
         {
-            if (ConstructionQueue.Any())
+            foreach (var queueGroup in _allConstructionQueue.GroupBy(i => $"{i.Galaxy}:{i.System}:{i.Position}").ToList())
             {
-                var currentItem = ConstructionQueue.First();
-                
-                // Process current unit
+                var currentItem = queueGroup.FirstOrDefault();
+                if (currentItem == null) continue;
+
                 currentItem.TimeRemaining = currentItem.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
 
                 if (currentItem.TimeRemaining <= TimeSpan.Zero)
                 {
-                    // Unit complete
-                    if (!DockedShips.ContainsKey(currentItem.Ship.Id))
-                        DockedShips[currentItem.Ship.Id] = 0;
-                    
-                    DockedShips[currentItem.Ship.Id]++;
-                    
+                    await AddBuiltShipToPlanetAsync(currentItem.Ship.Id, currentItem.Galaxy, currentItem.System, currentItem.Position);
+
                     currentItem.Quantity--;
-                    
+                    currentItem.QuantityCompleted++;
+
                     if (currentItem.Quantity > 0)
                     {
-                        // Reset timer for next unit
                         currentItem.TimeRemaining = currentItem.DurationPerUnit;
                     }
                     else
                     {
-                        // Batch complete
-                        ConstructionQueue.RemoveAt(0);
+                        _allConstructionQueue.Remove(currentItem);
                     }
-                    
-                    await SaveToDatabaseAsync();
+
+                    await PersistQueueForPlanetAsync(currentItem.Galaxy, currentItem.System, currentItem.Position);
+
+                    if (currentItem.Galaxy == _playerStateService.ActiveGalaxy && currentItem.System == _playerStateService.ActiveSystem && currentItem.Position == _playerStateService.ActivePosition)
+                    {
+                        await LoadFromDatabaseAsync();
+                    }
+
                     NotifyStateChanged();
                 }
-                NotifyStateChanged(); // Update timer UI
             }
             
-            await Task.Delay(1000); // 1 second tick
+            NotifyStateChanged();
+            await Task.Delay(1000);
         }
+    }
+
+
+    private async Task AddBuiltShipToPlanetAsync(string shipId, int g, int s, int p)
+    {
+        var dbShip = await _dbContext.Ships.FirstOrDefaultAsync(sh =>
+            sh.ShipType == shipId && sh.Galaxy == g && sh.System == s && sh.Position == p);
+
+        if (dbShip != null)
+        {
+            dbShip.Quantity++;
+        }
+        else
+        {
+            _dbContext.Ships.Add(new ShipEntity
+            {
+                ShipType = shipId,
+                Quantity = 1,
+                Galaxy = g,
+                System = s,
+                Position = p
+            });
+        }
+
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task PersistQueueForPlanetAsync(int g, int s, int p)
+    {
+        var planetQueue = _allConstructionQueue
+            .Where(i => i.Galaxy == g && i.System == s && i.Position == p)
+            .OrderBy(i => i.Id)
+            .ToList();
+
+        var existing = await _dbContext.ShipyardQueue
+            .Where(i => i.Galaxy == g && i.System == s && i.Position == p)
+            .ToListAsync();
+
+        if (existing.Any())
+        {
+            _dbContext.ShipyardQueue.RemoveRange(existing);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        if (!planetQueue.Any()) return;
+
+        DateTime nextJobStart = DateTime.UtcNow;
+        var entities = new List<ShipyardQueueEntity>();
+
+        for (int i = 0; i < planetQueue.Count; i++)
+        {
+            var item = planetQueue[i];
+            item.TimeRemaining = i == 0 ? GetRemainingDuration(item.TimeRemaining, item.DurationPerUnit) : item.DurationPerUnit;
+
+            DateTime currentUnitStart = nextJobStart;
+            DateTime currentUnitEnd = currentUnitStart.Add(item.TimeRemaining);
+            TimeSpan totalRemainingDuration = item.TimeRemaining + TimeSpan.FromTicks(item.DurationPerUnit.Ticks * Math.Max(0, item.Quantity - 1));
+            nextJobStart = currentUnitStart.Add(totalRemainingDuration);
+
+            entities.Add(new ShipyardQueueEntity
+            {
+                Id = item.Id,
+                ShipType = item.Ship.Id,
+                Quantity = item.Quantity + item.QuantityCompleted,
+                QuantityCompleted = item.QuantityCompleted,
+                Galaxy = g,
+                System = s,
+                Position = p,
+                StartTime = currentUnitStart,
+                EndTime = currentUnitEnd,
+                IsProcessing = i == 0
+            });
+        }
+
+        await _dbContext.ShipyardQueue.AddRangeAsync(entities);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private static TimeSpan GetRemainingDuration(TimeSpan remaining, TimeSpan fallback)
+    {
+        if (remaining <= TimeSpan.Zero) return fallback;
+        if (remaining > fallback) return fallback;
+        return remaining;
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
@@ -1764,12 +1912,13 @@ public class FleetService
     public void ResetState()
     {
         DockedShips.Clear();
-        ConstructionQueue.Clear();
+        _allConstructionQueue.Clear();
         ActiveFleets.Clear();
         _isProcessingQueue = false;
         InitializeShips();
     }
 }
+
 
 
 

@@ -32,10 +32,15 @@ public class DefenseUnit
 
 public class DefenseQueueItem
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public DefenseUnit Unit { get; set; } = null!;
     public int Quantity { get; set; }
+    public int QuantityCompleted { get; set; }
     public TimeSpan DurationPerUnit { get; set; }
     public TimeSpan TimeRemaining { get; set; }
+    public int Galaxy { get; set; }
+    public int System { get; set; }
+    public int Position { get; set; }
 }
 
 public class DefenseService
@@ -54,7 +59,10 @@ public class DefenseService
     public Dictionary<string, int> BuiltDefenses { get; private set; } = new();
     
     // Queue
-    public List<DefenseQueueItem> ConstructionQueue { get; private set; } = new();
+    private List<DefenseQueueItem> _allConstructionQueue = new();
+    public List<DefenseQueueItem> ConstructionQueue => _allConstructionQueue
+        .Where(i => i.Galaxy == _playerStateService.ActiveGalaxy && i.System == _playerStateService.ActiveSystem && i.Position == _playerStateService.ActivePosition)
+        .ToList();
 
     public event Action? OnChange;
     private bool _isInitialized = false;
@@ -74,6 +82,7 @@ public class DefenseService
         _playerStateService.OnChange += async () => 
         {
             await LoadFromDatabaseAsync();
+            await LoadConstructionQueueAsync();
             NotifyStateChanged();
         };
         
@@ -86,6 +95,7 @@ public class DefenseService
         if (_isInitialized) return;
 
         await LoadFromDatabaseAsync();
+        await LoadConstructionQueueAsync();
         _isInitialized = true;
     }
 
@@ -106,6 +116,49 @@ public class DefenseService
         {
             BuiltDefenses[dbDefense.DefenseType] = dbDefense.Quantity;
         }
+    }
+
+    private async Task LoadConstructionQueueAsync()
+    {
+        var dbQueue = await _dbContext.DefenseQueue
+            .OrderBy(q => q.Galaxy)
+            .ThenBy(q => q.System)
+            .ThenBy(q => q.Position)
+            .ThenBy(q => q.StartTime)
+            .ThenBy(q => q.Id)
+            .ToListAsync();
+
+        _allConstructionQueue = dbQueue
+            .Select(q =>
+            {
+                var unit = DefenseDefinitions.FirstOrDefault(d => d.Id == q.DefenseType);
+                if (unit == null) return null;
+
+                int remainingQuantity = q.Quantity - q.QuantityCompleted;
+                if (remainingQuantity <= 0) return null;
+
+                var durationPerUnit = q.EndTime - q.StartTime;
+                if (durationPerUnit <= TimeSpan.Zero)
+                {
+                    durationPerUnit = _devModeService.GetDuration(CalculateDefenseConstructionDuration(unit), 1);
+                }
+
+                return new DefenseQueueItem
+                {
+                    Id = q.Id,
+                    Unit = unit,
+                    Quantity = remainingQuantity,
+                    QuantityCompleted = q.QuantityCompleted,
+                    DurationPerUnit = durationPerUnit,
+                    TimeRemaining = q.IsProcessing && !q.IsCompleted ? q.TimeRemaining : durationPerUnit,
+                    Galaxy = q.Galaxy,
+                    System = q.System,
+                    Position = q.Position
+                };
+            })
+            .Where(q => q != null)
+            .Cast<DefenseQueueItem>()
+            .ToList();
     }
 
     private async Task SaveToDatabaseAsync()
@@ -281,14 +334,24 @@ public class DefenseService
             var calculatedDuration = CalculateDefenseConstructionDuration(unit);
             var finalDuration = _devModeService.GetDuration(calculatedDuration, 1);
 
-            ConstructionQueue.Add(new DefenseQueueItem
+            int g = _playerStateService.ActiveGalaxy;
+            int s = _playerStateService.ActiveSystem;
+            int p = _playerStateService.ActivePosition;
+
+            _allConstructionQueue.Add(new DefenseQueueItem
             {
                 Unit = unit,
                 Quantity = quantity,
+                QuantityCompleted = 0,
                 DurationPerUnit = finalDuration,
-                TimeRemaining = finalDuration
+                TimeRemaining = finalDuration,
+                Galaxy = g,
+                System = s,
+                Position = p
             });
             
+            await PersistQueueForPlanetAsync(g, s, p);
+
             // Notify enemy service that player is building defenses
             _ = _enemyService.OnPlayerDefenseBuilt(unit.Name, quantity);
             
@@ -299,53 +362,141 @@ public class DefenseService
 
     public async Task CancelQueueItemAsync(DefenseQueueItem item)
     {
-        if (!ConstructionQueue.Contains(item)) return;
+        if (!_allConstructionQueue.Contains(item)) return;
 
         long refundMetal = item.Unit.MetalCost * item.Quantity;
         long refundCrystal = item.Unit.CrystalCost * item.Quantity;
         long refundDeuterium = item.Unit.DeuteriumCost * item.Quantity;
 
         await _resourceService.RefundResourcesAsync(refundMetal, refundCrystal, refundDeuterium);
-        ConstructionQueue.Remove(item);
+        _allConstructionQueue.Remove(item);
+        await PersistQueueForPlanetAsync(item.Galaxy, item.System, item.Position);
         NotifyStateChanged();
     }
     private async Task ProcessQueueLoop()
     {
         while (true)
         {
-            if (ConstructionQueue.Any())
+            foreach (var queueGroup in _allConstructionQueue.GroupBy(i => $"{i.Galaxy}:{i.System}:{i.Position}").ToList())
             {
-                var currentItem = ConstructionQueue.First();
-                
+                var currentItem = queueGroup.FirstOrDefault();
+                if (currentItem == null) continue;
+
                 currentItem.TimeRemaining = currentItem.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
 
                 if (currentItem.TimeRemaining <= TimeSpan.Zero)
                 {
-                    // Unit complete
-                    if (!BuiltDefenses.ContainsKey(currentItem.Unit.Id))
-                        BuiltDefenses[currentItem.Unit.Id] = 0;
-                    
-                    BuiltDefenses[currentItem.Unit.Id]++;
-                    
+                    await AddBuiltDefenseToPlanetAsync(currentItem.Unit.Id, currentItem.Galaxy, currentItem.System, currentItem.Position);
+
                     currentItem.Quantity--;
-                    
+                    currentItem.QuantityCompleted++;
+
                     if (currentItem.Quantity > 0)
                     {
                         currentItem.TimeRemaining = currentItem.DurationPerUnit;
                     }
                     else
                     {
-                        ConstructionQueue.RemoveAt(0);
+                        _allConstructionQueue.Remove(currentItem);
                     }
-                    
-                    await SaveToDatabaseAsync();
+
+                    await PersistQueueForPlanetAsync(currentItem.Galaxy, currentItem.System, currentItem.Position);
+
+                    if (currentItem.Galaxy == _playerStateService.ActiveGalaxy && currentItem.System == _playerStateService.ActiveSystem && currentItem.Position == _playerStateService.ActivePosition)
+                    {
+                        await LoadFromDatabaseAsync();
+                    }
+
                     NotifyStateChanged();
                 }
-                NotifyStateChanged();
             }
             
+            NotifyStateChanged();
             await Task.Delay(1000);
         }
+    }
+
+
+    private async Task AddBuiltDefenseToPlanetAsync(string defenseId, int g, int s, int p)
+    {
+        var dbDefense = await _dbContext.Defenses.FirstOrDefaultAsync(d =>
+            d.DefenseType == defenseId && d.Galaxy == g && d.System == s && d.Position == p);
+
+        if (dbDefense != null)
+        {
+            dbDefense.Quantity++;
+        }
+        else
+        {
+            _dbContext.Defenses.Add(new DefenseEntity
+            {
+                DefenseType = defenseId,
+                Quantity = 1,
+                Galaxy = g,
+                System = s,
+                Position = p
+            });
+        }
+
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task PersistQueueForPlanetAsync(int g, int s, int p)
+    {
+        var planetQueue = _allConstructionQueue
+            .Where(i => i.Galaxy == g && i.System == s && i.Position == p)
+            .OrderBy(i => i.Id)
+            .ToList();
+
+        var existing = await _dbContext.DefenseQueue
+            .Where(i => i.Galaxy == g && i.System == s && i.Position == p)
+            .ToListAsync();
+
+        if (existing.Any())
+        {
+            _dbContext.DefenseQueue.RemoveRange(existing);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        if (!planetQueue.Any()) return;
+
+        DateTime nextJobStart = DateTime.UtcNow;
+        var entities = new List<DefenseQueueEntity>();
+
+        for (int i = 0; i < planetQueue.Count; i++)
+        {
+            var item = planetQueue[i];
+            item.TimeRemaining = i == 0 ? GetRemainingDuration(item.TimeRemaining, item.DurationPerUnit) : item.DurationPerUnit;
+
+            DateTime currentUnitStart = nextJobStart;
+            DateTime currentUnitEnd = currentUnitStart.Add(item.TimeRemaining);
+            TimeSpan totalRemainingDuration = item.TimeRemaining + TimeSpan.FromTicks(item.DurationPerUnit.Ticks * Math.Max(0, item.Quantity - 1));
+            nextJobStart = currentUnitStart.Add(totalRemainingDuration);
+
+            entities.Add(new DefenseQueueEntity
+            {
+                Id = item.Id,
+                DefenseType = item.Unit.Id,
+                Quantity = item.Quantity + item.QuantityCompleted,
+                QuantityCompleted = item.QuantityCompleted,
+                Galaxy = g,
+                System = s,
+                Position = p,
+                StartTime = currentUnitStart,
+                EndTime = currentUnitEnd,
+                IsProcessing = i == 0
+            });
+        }
+
+        await _dbContext.DefenseQueue.AddRangeAsync(entities);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private static TimeSpan GetRemainingDuration(TimeSpan remaining, TimeSpan fallback)
+    {
+        if (remaining <= TimeSpan.Zero) return fallback;
+        if (remaining > fallback) return fallback;
+        return remaining;
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
@@ -354,7 +505,7 @@ public class DefenseService
     {
         DefenseDefinitions.Clear();
         BuiltDefenses.Clear();
-        ConstructionQueue.Clear();
+        _allConstructionQueue.Clear();
         InitializeDefenses();
     }
 }
