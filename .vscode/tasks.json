@@ -2,9 +2,19 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "stop process",
+            "type": "shell",
+            "command": "Stop-Process -Name 'myapp' -Force -ErrorAction SilentlyContinue; exit 0",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent"
+            }
+        },
+        {
             "label": "build",
             "command": "dotnet",
             "type": "process",
+            "dependsOn": "stop process",
             "args": [
                 "build",
                 "${workspaceFolder}/myapp.csproj",
