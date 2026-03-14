@@ -8,6 +8,9 @@ namespace myapp.Services;
 
 public class ResourceService
 {
+    private const string MetalStorageBuilding = "Metal Storage";
+    private const string CrystalStorageBuilding = "Crystal Storage";
+    private const string DeuteriumStorageBuilding = "Deuterium Tank";
     private readonly GameDbContext _dbContext;
     private readonly DevModeService _devModeService;
     private readonly PlayerStateService _playerStateService;
@@ -66,7 +69,17 @@ public class ResourceService
     {
         var state = await GetStateAsync();
         var planetState = await GetActivePlanetStateAsync();
-        return BuildPreviewSnapshot(state, planetState, DateTime.UtcNow);
+        var storageCapacities = await GetActivePlanetStorageCapacitiesAsync();
+        return BuildPreviewSnapshot(state, planetState, storageCapacities, DateTime.UtcNow);
+    }
+
+    public async Task<ResourceDisplayState> GetResourceDisplayStateAsync()
+    {
+        var state = await GetStateAsync();
+        var planetState = await GetActivePlanetStateAsync();
+        var storageCapacities = await GetActivePlanetStorageCapacitiesAsync();
+        var snapshot = BuildPreviewSnapshot(state, planetState, storageCapacities, DateTime.UtcNow);
+        return new ResourceDisplayState(snapshot, storageCapacities);
     }
 
     public async Task<long> GetEnergyAsync()
@@ -84,14 +97,14 @@ public class ResourceService
         await _dbContext.SaveChangesAsync();
     }
 
-    private ResourceSnapshot BuildPreviewSnapshot(GameState gameState, PlanetState planetState, DateTime now)
+    private ResourceSnapshot BuildPreviewSnapshot(GameState gameState, PlanetState planetState, ResourceStorageCapacities storageCapacities, DateTime now)
     {
         var elapsedSeconds = (now - planetState.LastResourceUpdate).TotalSeconds;
         if (elapsedSeconds < 0) elapsedSeconds = 0;
 
-        var metal = planetState.Metal + (MetalProductionRate * elapsedSeconds);
-        var crystal = planetState.Crystal + (CrystalProductionRate * elapsedSeconds);
-        var deuterium = planetState.Deuterium + (DeuteriumProductionRate * elapsedSeconds);
+        var metal = ResourceStorageRules.ApplyProductionLimit(planetState.Metal, MetalProductionRate, elapsedSeconds, storageCapacities.Metal);
+        var crystal = ResourceStorageRules.ApplyProductionLimit(planetState.Crystal, CrystalProductionRate, elapsedSeconds, storageCapacities.Crystal);
+        var deuterium = ResourceStorageRules.ApplyProductionLimit(planetState.Deuterium, DeuteriumProductionRate, elapsedSeconds, storageCapacities.Deuterium);
 
         return new ResourceSnapshot(
             (long)metal,
@@ -102,21 +115,22 @@ public class ResourceService
         );
     }
 
-    private void SettlePlanetResourcesToNow(PlanetState planetState, DateTime now)
+    private void SettlePlanetResourcesToNow(PlanetState planetState, ResourceStorageCapacities storageCapacities, DateTime now)
     {
         var elapsedSeconds = (now - planetState.LastResourceUpdate).TotalSeconds;
         if (elapsedSeconds < 0) elapsedSeconds = 0;
 
-        planetState.Metal += MetalProductionRate * elapsedSeconds;
-        planetState.Crystal += CrystalProductionRate * elapsedSeconds;
-        planetState.Deuterium += DeuteriumProductionRate * elapsedSeconds;
+        planetState.Metal = ResourceStorageRules.ApplyProductionLimit(planetState.Metal, MetalProductionRate, elapsedSeconds, storageCapacities.Metal);
+        planetState.Crystal = ResourceStorageRules.ApplyProductionLimit(planetState.Crystal, CrystalProductionRate, elapsedSeconds, storageCapacities.Crystal);
+        planetState.Deuterium = ResourceStorageRules.ApplyProductionLimit(planetState.Deuterium, DeuteriumProductionRate, elapsedSeconds, storageCapacities.Deuterium);
         planetState.LastResourceUpdate = now;
     }
 
     public async Task SettleActivePlanetResourcesAsync(bool notifyStateChanged = false)
     {
         var state = await GetActivePlanetStateAsync();
-        SettlePlanetResourcesToNow(state, DateTime.UtcNow);
+        var storageCapacities = await GetActivePlanetStorageCapacitiesAsync();
+        SettlePlanetResourcesToNow(state, storageCapacities, DateTime.UtcNow);
         await _dbContext.SaveChangesAsync();
 
         if (notifyStateChanged)
@@ -129,7 +143,8 @@ public class ResourceService
     {
         var gameState = await GetStateAsync();
         var planetState = await GetActivePlanetStateAsync();
-        var snapshot = BuildPreviewSnapshot(gameState, planetState, DateTime.UtcNow);
+        var storageCapacities = await GetActivePlanetStorageCapacitiesAsync();
+        var snapshot = BuildPreviewSnapshot(gameState, planetState, storageCapacities, DateTime.UtcNow);
         return snapshot.Metal >= metal && snapshot.Crystal >= crystal && snapshot.Deuterium >= deuterium;
     }
 
@@ -141,7 +156,8 @@ public class ResourceService
         }
 
         var state = await GetActivePlanetStateAsync();
-        SettlePlanetResourcesToNow(state, DateTime.UtcNow);
+        var storageCapacities = await GetActivePlanetStorageCapacitiesAsync();
+        SettlePlanetResourcesToNow(state, storageCapacities, DateTime.UtcNow);
         state.Metal -= metal;
         state.Crystal -= crystal;
         state.Deuterium -= deuterium;
@@ -154,7 +170,8 @@ public class ResourceService
     public async Task AddResourcesAsync(double metal, double crystal, double deuterium)
     {
         var state = await GetActivePlanetStateAsync();
-        SettlePlanetResourcesToNow(state, DateTime.UtcNow);
+        var storageCapacities = await GetActivePlanetStorageCapacitiesAsync();
+        SettlePlanetResourcesToNow(state, storageCapacities, DateTime.UtcNow);
         state.Metal += metal;
         state.Crystal += crystal;
         state.Deuterium += deuterium;
@@ -166,7 +183,8 @@ public class ResourceService
     public async Task AddResourcesToPlanetAsync(int g, int s, int p, double metal, double crystal, double deuterium)
     {
         var state = await GetPlanetStateAsync(g, s, p);
-        SettlePlanetResourcesToNow(state, DateTime.UtcNow);
+        var storageCapacities = await GetPlanetStorageCapacitiesAsync(g, s, p);
+        SettlePlanetResourcesToNow(state, storageCapacities, DateTime.UtcNow);
         state.Metal += metal;
         state.Crystal += crystal;
         state.Deuterium += deuterium;
@@ -211,6 +229,25 @@ public class ResourceService
         NotifyStateChanged();
     }
 
+    private async Task<ResourceStorageCapacities> GetActivePlanetStorageCapacitiesAsync()
+    {
+        return await GetPlanetStorageCapacitiesAsync(_playerStateService.ActiveGalaxy, _playerStateService.ActiveSystem, _playerStateService.ActivePosition);
+    }
+
+    private async Task<ResourceStorageCapacities> GetPlanetStorageCapacitiesAsync(int g, int s, int p)
+    {
+        var storageLevels = await _dbContext.Buildings
+            .Where(b => b.Galaxy == g && b.System == s && b.Position == p)
+            .Where(b => b.BuildingType == MetalStorageBuilding || b.BuildingType == CrystalStorageBuilding || b.BuildingType == DeuteriumStorageBuilding)
+            .ToDictionaryAsync(b => b.BuildingType, b => b.Level);
+
+        return new ResourceStorageCapacities(
+            ResourceStorageRules.CalculateCapacity(storageLevels.GetValueOrDefault(MetalStorageBuilding, 0)),
+            ResourceStorageRules.CalculateCapacity(storageLevels.GetValueOrDefault(CrystalStorageBuilding, 0)),
+            ResourceStorageRules.CalculateCapacity(storageLevels.GetValueOrDefault(DeuteriumStorageBuilding, 0))
+        );
+    }
+
     private void NotifyStateChanged() => OnChange?.Invoke();
 
     public void ResetState()
@@ -222,6 +259,36 @@ public class ResourceService
 }
 
 public record ResourceSnapshot(long Metal, long Crystal, long Deuterium, long Energy, long DarkMatter);
+public record ResourceStorageCapacities(long Metal, long Crystal, long Deuterium);
+public record ResourceDisplayState(ResourceSnapshot Snapshot, ResourceStorageCapacities StorageCapacities);
 
+public static class ResourceStorageRules
+{
+    private const long BaseCapacity = 1_000_000;
+    private const double GrowthFactor = 1.68;
 
+    public static long CalculateCapacity(int level)
+    {
+        level = Math.Max(0, level);
+        double rawCapacity = BaseCapacity * Math.Pow(GrowthFactor, level);
+        return RoundDownToThreeSignificantDigits(rawCapacity);
+    }
 
+    public static double ApplyProductionLimit(double currentAmount, double productionRate, double elapsedSeconds, long storageCapacity)
+    {
+        if (elapsedSeconds <= 0 || productionRate <= 0) return currentAmount;
+        if (currentAmount >= storageCapacity) return currentAmount;
+
+        return Math.Min(currentAmount + (productionRate * elapsedSeconds), storageCapacity);
+    }
+
+    private static long RoundDownToThreeSignificantDigits(double value)
+    {
+        if (value <= 0) return 0;
+
+        int digits = (int)Math.Floor(Math.Log10(value)) + 1;
+        int shift = Math.Max(0, digits - 3);
+        double factor = Math.Pow(10, shift);
+        return (long)(Math.Floor(value / factor) * factor);
+    }
+}

@@ -21,62 +21,93 @@
 Energy Use: @BuildingService.MetalMineEnergyConsumption
 Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         <label>Metal</label>
-        <span class="resource-value">@_snapshot.Metal.ToString("N0")</span>
+        <span class="resource-value">@_displaySnapshot.Metal.ToString("N0")</span>
     </div>
     <div class="resource" title="Total Production: @BuildingService.CrystalHourlyProduction.ToString("N0")/h
 Energy Use: @BuildingService.CrystalMineEnergyConsumption
 Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         <label>Crystal</label>
-        <span class="resource-value">@_snapshot.Crystal.ToString("N0")</span>
+        <span class="resource-value">@_displaySnapshot.Crystal.ToString("N0")</span>
     </div>
     <div class="resource" title="Total Production: @BuildingService.DeuteriumHourlyProduction.ToString("N0")/h
 Energy Use: @BuildingService.DeuteriumSynthesizerEnergyConsumption
 Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
         <label>Deuterium</label>
-        <span class="resource-value">@_snapshot.Deuterium.ToString("N0")</span>
+        <span class="resource-value">@_displaySnapshot.Deuterium.ToString("N0")</span>
     </div>
     <div class="resource">
         <label>Energy</label>
-        <span class="resource-value">@_snapshot.Energy.ToString("N0")</span>
+        <span class="resource-value">@_displaySnapshot.Energy.ToString("N0")</span>
     </div>
     <div class="resource">
         <label>Dark Matter</label>
-        <span class="resource-value">@_snapshot.DarkMatter.ToString("N0")</span>
+        <span class="resource-value">@_displaySnapshot.DarkMatter.ToString("N0")</span>
     </div>
 </div>
 
 @code {
     private System.Threading.Timer? _timer;
-    private ResourceSnapshot _snapshot = new(0, 0, 0, 0, 0);
+    private ResourceSnapshot _baseSnapshot = new(0, 0, 0, 0, 0);
+    private ResourceSnapshot _displaySnapshot = new(0, 0, 0, 0, 0);
+    private ResourceStorageCapacities _storageCapacities = new(0, 0, 0);
+    private DateTime _snapshotCapturedAtUtc = DateTime.UtcNow;
 
     protected override void OnInitialized()
     {
+        ResourceService.OnChange += RefreshResources;
+        GalaxyService.OnChange += RefreshView;
         _ = BuildingService.UpdateProductionAsync();
+        _ = LoadResourceDisplayStateAsync();
 
-        // Initialize timer to tick every second
-        _timer = new System.Threading.Timer(Tick, null, 0, 1000);
+        _timer = new System.Threading.Timer(_ => InvokeAsync(UpdateDisplaySnapshot), null, 0, 1000);
     }
 
-    private async void Tick(object? state)
+    private async void RefreshResources()
     {
-        // Skip if planet not initialized yet
+        await LoadResourceDisplayStateAsync();
+    }
+
+    private async void RefreshView()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadResourceDisplayStateAsync()
+    {
         if (PlayerStateService.ActiveGalaxy <= 0 || PlayerStateService.ActiveSystem <= 0 || PlayerStateService.ActivePosition <= 0)
         {
             return;
         }
 
-        _snapshot = await ResourceService.GetResourceSnapshotAsync();
+        var displayState = await ResourceService.GetResourceDisplayStateAsync();
+        _baseSnapshot = displayState.Snapshot;
+        _displaySnapshot = displayState.Snapshot;
+        _storageCapacities = displayState.StorageCapacities;
+        _snapshotCapturedAtUtc = DateTime.UtcNow;
         await InvokeAsync(StateHasChanged);
     }
 
-    private bool IsSelected(myapp.Services.GalaxyPlanet planet)
+    private void UpdateDisplaySnapshot()
     {
-        return planet.Galaxy == PlayerStateService.ActiveGalaxy && 
-               planet.System == PlayerStateService.ActiveSystem && 
-               planet.Position == PlayerStateService.ActivePosition;
+        _displaySnapshot = BuildDisplaySnapshot(DateTime.UtcNow);
+        StateHasChanged();
     }
 
-    private void OnPlanetChanged(ChangeEventArgs e)
+    private ResourceSnapshot BuildDisplaySnapshot(DateTime now)
+    {
+        var elapsedSeconds = (now - _snapshotCapturedAtUtc).TotalSeconds;
+        if (elapsedSeconds < 0) elapsedSeconds = 0;
+
+        return new ResourceSnapshot(
+            (long)ResourceStorageRules.ApplyProductionLimit(_baseSnapshot.Metal, ResourceService.MetalProductionRate, elapsedSeconds, _storageCapacities.Metal),
+            (long)ResourceStorageRules.ApplyProductionLimit(_baseSnapshot.Crystal, ResourceService.CrystalProductionRate, elapsedSeconds, _storageCapacities.Crystal),
+            (long)ResourceStorageRules.ApplyProductionLimit(_baseSnapshot.Deuterium, ResourceService.DeuteriumProductionRate, elapsedSeconds, _storageCapacities.Deuterium),
+            _baseSnapshot.Energy,
+            _baseSnapshot.DarkMatter
+        );
+    }
+
+    private async Task OnPlanetChanged(ChangeEventArgs e)
     {
         var val = e.Value?.ToString();
         if (string.IsNullOrEmpty(val)) return;
@@ -88,11 +119,21 @@ Production Factor: @((BuildingService.ProductionFactor * 100).ToString("0"))%">
             int.TryParse(parts[2], out int p))
         {
             PlayerStateService.SetActivePlanet(g, s, p);
+            await LoadResourceDisplayStateAsync();
         }
+    }
+
+    private bool IsSelected(myapp.Services.GalaxyPlanet planet)
+    {
+        return planet.Galaxy == PlayerStateService.ActiveGalaxy && 
+               planet.System == PlayerStateService.ActiveSystem && 
+               planet.Position == PlayerStateService.ActivePosition;
     }
 
     public void Dispose()
     {
+        ResourceService.OnChange -= RefreshResources;
+        GalaxyService.OnChange -= RefreshView;
         _timer?.Dispose();
     }
 }

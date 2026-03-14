@@ -129,7 +129,7 @@ public class GameInitializationService
             storedPlanets = await _dbContext.PlayerPlanets.ToListAsync();
         }
 
-        foreach (var planet in storedPlanets.Where(p => !p.IsHomeworld))
+        foreach (var planet in storedPlanets)
         {
             _galaxyService.RegisterPlanet(new GalaxyPlanet
             {
@@ -141,7 +141,7 @@ public class GameInitializationService
                 Image = planet.Image,
                 IsOccupied = true,
                 IsMyPlanet = true,
-                IsHomeworld = false
+                IsHomeworld = planet.IsHomeworld
             });
         }
 

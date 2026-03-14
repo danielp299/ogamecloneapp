@@ -464,18 +464,13 @@ public class EnemyService
         if (seconds > 0)
         {
             // Update resources based on production rates
-            enemy.Metal += (long)(enemy.MetalProductionRate * seconds);
-            enemy.Crystal += (long)(enemy.CrystalProductionRate * seconds);
-            enemy.Deuterium += (long)(enemy.DeuteriumProductionRate * seconds);
-            
-            // Cap resources at storage limits
             long metalStorage = GetStorageCapacity(enemy, "Metal Storage");
             long crystalStorage = GetStorageCapacity(enemy, "Crystal Storage");
             long deuteriumStorage = GetStorageCapacity(enemy, "Deuterium Tank");
-            
-            if (enemy.Metal > metalStorage) enemy.Metal = metalStorage;
-            if (enemy.Crystal > crystalStorage) enemy.Crystal = crystalStorage;
-            if (enemy.Deuterium > deuteriumStorage) enemy.Deuterium = deuteriumStorage;
+
+            enemy.Metal = (long)ResourceStorageRules.ApplyProductionLimit(enemy.Metal, enemy.MetalProductionRate, seconds, metalStorage);
+            enemy.Crystal = (long)ResourceStorageRules.ApplyProductionLimit(enemy.Crystal, enemy.CrystalProductionRate, seconds, crystalStorage);
+            enemy.Deuterium = (long)ResourceStorageRules.ApplyProductionLimit(enemy.Deuterium, enemy.DeuteriumProductionRate, seconds, deuteriumStorage);
             
             enemy.LastResourceUpdate = now;
         }
@@ -484,10 +479,7 @@ public class EnemyService
     private long GetStorageCapacity(Enemy enemy, string storageType)
     {
         int level = enemy.Buildings.GetValueOrDefault(storageType, 0);
-        if (level == 0) return 10000; // Base storage without storage building
-        
-        // OGame storage formula
-        return (long)(10000 * Math.Pow(1.6, level));
+        return ResourceStorageRules.CalculateCapacity(level);
     }
 
     private List<Enemy> GetEmpirePlanets(Enemy enemy)

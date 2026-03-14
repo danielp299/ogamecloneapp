@@ -185,12 +185,13 @@ public class GalaxyService
             // 1. Check if it's the Player's Home
             if (galaxy == HomeGalaxy && system == HomeSystem && i == HomePosition)
             {
+                var storedHomeworld = PlayerPlanets.FirstOrDefault(p => p.Galaxy == galaxy && p.System == system && p.Position == i);
                 planet.IsOccupied = true;
                 planet.IsMyPlanet = true;
                 planet.IsHomeworld = true;
-                planet.Name = "Homeworld";
+                planet.Name = storedHomeworld?.Name ?? "Homeworld";
                 planet.PlayerName = "Commander";
-                planet.Image = "assets/planets/planet_home.jpg";
+                planet.Image = storedHomeworld?.Image ?? "assets/planets/planet_home.jpg";
             }
             // 2. Check if it's a Player's Colony
             else if (PlayerPlanets.Any(p => p.Galaxy == galaxy && p.System == system && p.Position == i))
