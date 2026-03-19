@@ -75,7 +75,9 @@ public class EnemyService
     public event Action<string, string, Dictionary<string, int>>? OnEnemyAttackLaunched;
     
     private const int MAX_ENEMIES = 100;
-    private const double BUILDING_UPGRADE_CHANCE = 0.70; // 70%
+    // Fraction of enemy empires eligible to react per player-action event.
+    private const double ACTIVATION_RATE = 0.50;
+    private const double BUILDING_UPGRADE_CHANCE = 0.70; // 70% (of activated empires)
     private const double RESEARCH_CHANCE = 0.80; // 80%
     private const double DEFENSE_BUILD_CHANCE = 0.60; // 60%
     private const double SHIP_BUILD_CHANCE = 0.50; // 50%
@@ -911,6 +913,59 @@ public class EnemyService
         return available;
     }
     
+    private async Task SaveModifiedEnemiesAsync(ICollection<Enemy> modified)
+    {
+        if (!modified.Any()) return;
+        try
+        {
+            await EnsureEnemyMemoryColumnsAsync();
+            var ids = modified.Select(e => e.Id).ToHashSet();
+            var existingEnemies = await _dbContext.Enemies.Where(e => ids.Contains(e.Id)).ToListAsync();
+            foreach (var enemy in modified)
+            {
+                var dbEnemy = existingEnemies.FirstOrDefault(e => e.Id == enemy.Id);
+                if (dbEnemy == null)
+                {
+                    dbEnemy = new EnemyEntity
+                    {
+                        Id = enemy.Id, Name = enemy.Name,
+                        Galaxy = enemy.Galaxy, System = enemy.System, Position = enemy.Position,
+                        EmpireId = enemy.EmpireId, IsHomeworld = enemy.IsHomeworld,
+                        Metal = enemy.Metal, Crystal = enemy.Crystal,
+                        Deuterium = enemy.Deuterium, Energy = enemy.Energy,
+                        LastResourceUpdate = enemy.LastResourceUpdate,
+                        LastActivity = enemy.LastActivity,
+                        IsBot = enemy.IsBot, ColonyCount = enemy.ColonyCount
+                    };
+                    _dbContext.Enemies.Add(dbEnemy);
+                }
+                else
+                {
+                    dbEnemy.Metal = enemy.Metal; dbEnemy.Crystal = enemy.Crystal;
+                    dbEnemy.Deuterium = enemy.Deuterium; dbEnemy.Energy = enemy.Energy;
+                    dbEnemy.LastResourceUpdate = enemy.LastResourceUpdate;
+                    dbEnemy.LastActivity = enemy.LastActivity;
+                    dbEnemy.ColonyCount = enemy.ColonyCount;
+                    dbEnemy.EmpireId = enemy.EmpireId; dbEnemy.IsHomeworld = enemy.IsHomeworld;
+                    dbEnemy.Name = enemy.Name;
+                }
+                dbEnemy.BuildingsJson    = System.Text.Json.JsonSerializer.Serialize(enemy.Buildings);
+                dbEnemy.TechnologiesJson = System.Text.Json.JsonSerializer.Serialize(enemy.Technologies);
+                dbEnemy.DefensesJson     = System.Text.Json.JsonSerializer.Serialize(enemy.Defenses);
+                dbEnemy.ShipsJson        = System.Text.Json.JsonSerializer.Serialize(enemy.Ships);
+                dbEnemy.ExploredGalaxiesJson      = System.Text.Json.JsonSerializer.Serialize(enemy.ExploredGalaxies);
+                dbEnemy.KnownEnemyCoordinatesJson = System.Text.Json.JsonSerializer.Serialize(enemy.KnownEnemyCoordinates);
+                dbEnemy.SpiedEnemyPowerJson       = System.Text.Json.JsonSerializer.Serialize(enemy.SpiedEnemyPower);
+            }
+            await _dbContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving enemies: {ex.Message}");
+        }
+    }
+
+    // Full save kept for initial generation and resets.
     private async Task SaveEnemiesAsync()
     {
         try
@@ -1019,7 +1074,7 @@ public class EnemyService
         _enemyMemoryColumnsReady = true;
     }
     
-    // Triggered when player upgrades a building - 70% of enemies upgrade buildings
+    // Triggered when player upgrades a building - 70% of activated enemies upgrade buildings
     public async Task OnPlayerBuildingUpgraded(string buildingName)
     {
         List<IGrouping<Guid, Enemy>> enemyEmpires;
@@ -1028,26 +1083,26 @@ public class EnemyService
             enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
         }
 
-        foreach (var empire in enemyEmpires)
+        var modified = new List<Enemy>();
+        foreach (var empire in enemyEmpires.Where(_ => _random.NextDouble() < ACTIVATION_RATE))
         {
             bool empireActs = _random.NextDouble() < BUILDING_UPGRADE_CHANCE;
             foreach (var enemy in empire)
             {
                 UpdateEnemyResources(enemy);
-                if (empireActs)
-                {
-                    ExecuteEmpireAction(enemy, buildingName, null, null, null);
-                }
+                if (empireActs) ExecuteEmpireAction(enemy, buildingName, null, null, null);
+                modified.Add(enemy);
             }
 
             if (_random.NextDouble() < 0.05)
             {
                 var homeworld = empire.FirstOrDefault(e => e.IsHomeworld) ?? empire.First();
                 await TryEnemyColonize(homeworld);
+                foreach (var e in empire) if (!modified.Contains(e)) modified.Add(e);
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified);
         NotifyStateChanged();
     }
 
@@ -1140,20 +1195,19 @@ public class EnemyService
             enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
         }
 
-        foreach (var empire in enemyEmpires)
+        var modified = new List<Enemy>();
+        foreach (var empire in enemyEmpires.Where(_ => _random.NextDouble() < ACTIVATION_RATE))
         {
             bool empireActs = _random.NextDouble() < RESEARCH_CHANCE;
             foreach (var enemy in empire)
             {
                 UpdateEnemyResources(enemy);
-                if (empireActs)
-                {
-                    ExecuteEmpireAction(enemy, null, techName, null, null);
-                }
+                if (empireActs) ExecuteEmpireAction(enemy, null, techName, null, null);
+                modified.Add(enemy);
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified);
         NotifyStateChanged();
     }
     
@@ -1166,48 +1220,50 @@ public class EnemyService
             enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
         }
 
-        foreach (var empire in enemyEmpires)
+        var modified = new List<Enemy>();
+        foreach (var empire in enemyEmpires.Where(_ => _random.NextDouble() < ACTIVATION_RATE))
         {
             foreach (var enemy in empire)
             {
                 UpdateEnemyResources(enemy);
                 ExecuteEmpireAction(enemy, null, null, shipType, null);
+                modified.Add(enemy);
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified);
         NotifyStateChanged();
     }
     
-    // Triggered when player attacks - enemies build defenses or spend resources
+    // Triggered when player attacks - the attacked empire always reacts; others may react
     public async Task OnPlayerAttack(int targetGalaxy, int targetSystem, int targetPosition, bool wasVictory)
     {
         var key = $"{targetGalaxy}:{targetSystem}:{targetPosition}";
-        
+        var modified = new List<Enemy>();
+
         lock (_lockObject)
         {
-            // Find the target enemy
             if (_enemies.TryGetValue(key, out var targetEnemy))
             {
-                var empirePlanets = GetEmpirePlanets(targetEnemy);
-                foreach (var planet in empirePlanets)
+                foreach (var planet in GetEmpirePlanets(targetEnemy))
                 {
                     ExecuteAttackReaction(planet);
+                    modified.Add(planet);
                 }
             }
-            
-            // Other enemies may also react to the attack (fear factor)
+
+            // Fear factor: ACTIVATION_RATE of other enemies react
             foreach (var enemy in _enemies.Values)
             {
-                if (enemy.Coordinates != key && _random.NextDouble() < 0.3) // 30% of other enemies react
+                if (enemy.Coordinates != key && _random.NextDouble() < ACTIVATION_RATE)
                 {
-                    // First update their resources
                     ExecuteAttackReaction(enemy);
+                    modified.Add(enemy);
                 }
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified.Distinct().ToList());
         NotifyStateChanged();
     }
     
@@ -1220,20 +1276,19 @@ public class EnemyService
             enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
         }
 
-        foreach (var empire in enemyEmpires)
+        var modified = new List<Enemy>();
+        foreach (var empire in enemyEmpires.Where(_ => _random.NextDouble() < ACTIVATION_RATE))
         {
             bool empireActs = _random.NextDouble() < DEFENSE_BUILD_CHANCE;
             foreach (var enemy in empire)
             {
                 UpdateEnemyResources(enemy);
-                if (empireActs)
-                {
-                    ExecuteEmpireAction(enemy, null, null, null, defenseType);
-                }
+                if (empireActs) ExecuteEmpireAction(enemy, null, null, null, defenseType);
+                modified.Add(enemy);
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified);
         NotifyStateChanged();
     }
 
