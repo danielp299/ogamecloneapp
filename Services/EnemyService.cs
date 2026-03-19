@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using myapp.Data;
 using myapp.Data.Entities;
 
@@ -6,8 +6,11 @@ namespace myapp.Services;
 
 public enum BotPersonality
 {
-    Default, // Balanced random behaviour
-    Bunker   // Prioritizes defenses and production; avoids aggressive ship builds and attacks
+    Default,     // Balanced: buildings first, then even mix of all actions
+    Economist,   // Production focus: mines and storage, cargo ships, avoids combat
+    Militarist,  // Aggression focus: ships and attacks, still upgrades buildings first
+    Researcher,  // Tech focus: research lab and technologies, explores aggressively
+    Bunker       // Defense focus: defense structures and buildings, never ships or attacks
 }
 
 public class Enemy
@@ -401,25 +404,19 @@ public class EnemyService
                 enemy.Ships["SC"] = _random.Next(0, 3);
                 enemy.Ships["LF"] = _random.Next(0, 3);
                 
-                // 20% of bots are Bunker specialists; the rest use Default balanced AI
-                enemy.Personality = _random.NextDouble() < 0.20
-                    ? BotPersonality.Bunker
-                    : BotPersonality.Default;
+                // Assign personality: Economist 25%, Militarist 20%, Researcher 15%, Bunker 20%, Default 20%
+                double personalityRoll = _random.NextDouble();
+                enemy.Personality = personalityRoll switch
+                {
+                    < 0.25 => BotPersonality.Economist,
+                    < 0.45 => BotPersonality.Militarist,
+                    < 0.60 => BotPersonality.Researcher,
+                    < 0.80 => BotPersonality.Bunker,
+                    _      => BotPersonality.Default
+                };
 
                 // Update production rates
                 UpdateEnemyProductionRates(enemy);
-
-                // Seed player coordinates for bots that share the player's galaxy —
-                // guarantees some bots will eventually discover and attack the player
-                // without relying entirely on random exploration.
-                string playerCoords = $"{playerGalaxy}:{playerSystem}:{playerPosition}";
-                if (galaxy == playerGalaxy)
-                {
-                    AddKnownEnemyCoordinate(enemy, playerCoords);
-                    // Treat the player as a weak target initially so nearby bots
-                    // will consider attacking once they have enough ships.
-                    enemy.SpiedEnemyPower[playerCoords] = 500;
-                }
 
                 _enemies[key] = enemy;
                 enemiesCreated++;
@@ -1688,33 +1685,55 @@ public class EnemyService
     }
     
     /// <summary>
-    /// Picks an action from the available list, weighting by personality.
-    /// Bunker bots: defense × 3, building × 2, no ship/attack weights.
-    /// Default bots: uniform random.
+    /// <summary>
+    /// Picks an action from the available list using personality-based weights.
+    /// Universal rule: buildings always score 6 (highest) for every personality --
+    /// infrastructure must be developed before ships or defenses.
     /// </summary>
     private string PickAction(List<string> available, BotPersonality personality)
     {
-        if (personality == BotPersonality.Default)
-            return available[_random.Next(available.Count)];
+        int Weight(string action) => (personality, action) switch
+        {
+            (_, "building")                          => 6,
+            (BotPersonality.Economist, "research")   => 2,
+            (BotPersonality.Economist, "explore")    => 3,
+            (BotPersonality.Economist, "spy")        => 2,
+            (BotPersonality.Economist, "ship")       => 2,
+            (BotPersonality.Economist, "defense")    => 1,
+            (BotPersonality.Economist, "attack")     => 0,
+            (BotPersonality.Militarist, "ship")      => 4,
+            (BotPersonality.Militarist, "attack")    => 3,
+            (BotPersonality.Militarist, "spy")       => 3,
+            (BotPersonality.Militarist, "explore")   => 2,
+            (BotPersonality.Militarist, "research")  => 2,
+            (BotPersonality.Militarist, "defense")   => 1,
+            (BotPersonality.Researcher, "research")  => 5,
+            (BotPersonality.Researcher, "explore")   => 4,
+            (BotPersonality.Researcher, "spy")       => 3,
+            (BotPersonality.Researcher, "defense")   => 1,
+            (BotPersonality.Researcher, "ship")      => 1,
+            (BotPersonality.Researcher, "attack")    => 0,
+            (BotPersonality.Bunker, "defense")       => 5,
+            (BotPersonality.Bunker, "research")      => 2,
+            (BotPersonality.Bunker, "explore")       => 1,
+            (BotPersonality.Bunker, "spy")           => 1,
+            (BotPersonality.Bunker, "ship")          => 0,
+            (BotPersonality.Bunker, "attack")        => 0,
+            (BotPersonality.Default, "ship")         => 2,
+            (BotPersonality.Default, "defense")      => 2,
+            (BotPersonality.Default, "research")     => 2,
+            (BotPersonality.Default, "explore")      => 2,
+            (BotPersonality.Default, "spy")          => 2,
+            (BotPersonality.Default, "attack")       => 1,
+            _                                        => 1
+        };
 
-        // Bunker: weighted pool
         var weighted = new List<string>();
         foreach (var a in available)
         {
-            int weight = a switch
-            {
-                "defense"   => 4,
-                "building"  => 3,
-                "research"  => 2,
-                "explore"   => 1,
-                "spy"       => 1,
-                "ship"      => 0, // Bunkers don't invest in ships
-                "attack"    => 0, // Bunkers don't attack
-                _           => 1
-            };
-            for (int i = 0; i < weight; i++) weighted.Add(a);
+            int w = Weight(a);
+            for (int i = 0; i < w; i++) weighted.Add(a);
         }
-        // Fall back to uniform if all weights are 0 (e.g., only ship/attack available)
         if (!weighted.Any()) return available[_random.Next(available.Count)];
         return weighted[_random.Next(weighted.Count)];
     }
