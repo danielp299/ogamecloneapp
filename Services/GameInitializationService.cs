@@ -145,6 +145,9 @@ public class GameInitializationService
             });
         }
 
+        // Ensure DB columns exist before GalaxyService queries the Enemies table
+        await _enemyService.EnsureEnemyMemoryColumnsAsync();
+
         _galaxyService.Initialize();
         _galaxyService.RefreshSystems();
 
@@ -201,6 +204,7 @@ public class GameInitializationService
         await _dbContext.SaveChangesAsync();
 
         // 5. Configurar GalaxyService
+        await _enemyService.EnsureEnemyMemoryColumnsAsync();
         _galaxyService.SetHomeCoordinates(homeGalaxy, homeSystem, homePosition);
         _galaxyService.Initialize();
 

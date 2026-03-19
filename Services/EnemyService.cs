@@ -1077,7 +1077,7 @@ public class EnemyService
         }
     }
 
-    private async Task EnsureEnemyMemoryColumnsAsync()
+    public async Task EnsureEnemyMemoryColumnsAsync()
     {
         if (_enemyMemoryColumnsReady) return;
         if (!_dbContext.Database.IsSqlite()) return;
