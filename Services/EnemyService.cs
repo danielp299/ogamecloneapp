@@ -62,6 +62,7 @@ public class EnemyService
 {
     private readonly GameDbContext _dbContext;
     private readonly GalaxyService _galaxyService;
+    private readonly RankingService _rankingService;
     private readonly Random _random = new Random();
     private readonly object _lockObject = new object();
     
@@ -180,10 +181,11 @@ public class EnemyService
     private bool _isInitialized = false;
     private bool _enemyMemoryColumnsReady = false;
 
-    public EnemyService(GameDbContext dbContext, GalaxyService galaxyService)
+    public EnemyService(GameDbContext dbContext, GalaxyService galaxyService, RankingService? rankingService = null)
     {
         _dbContext = dbContext;
         _galaxyService = galaxyService;
+        _rankingService = rankingService;
         // NOTA: La inicialización es lazy via Initialize() o GenerateInitialEnemiesAsync()
     }
 
@@ -1297,6 +1299,14 @@ public class EnemyService
 
         string targetCoordinates = viableTargets[_random.Next(viableTargets.Count)];
         OnEnemyAttackLaunched?.Invoke(enemy.Coordinates, targetCoordinates, attackShips);
+
+        // Deduct ships committed to the attack
+        foreach (var ship in attackShips)
+        {
+            enemy.Ships[ship.Key] -= ship.Value;
+            if (enemy.Ships[ship.Key] <= 0) enemy.Ships.Remove(ship.Key);
+        }
+
         enemy.LastActivity = DateTime.Now;
         return true;
     }
@@ -1376,15 +1386,16 @@ public class EnemyService
             enemy.Metal -= metalCost;
             enemy.Crystal -= crystalCost;
             enemy.Deuterium -= deuteriumCost;
-            
+
             // Upgrade building
             enemy.Buildings[buildingName] = currentLevel + 1;
+            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
-        
+
         return false;
     }
-    
+
     private bool TryResearchTechnology(Enemy enemy, string techName)
     {
         // First check if enemy meets requirements for this technology
@@ -1412,15 +1423,16 @@ public class EnemyService
             enemy.Metal -= metalCost;
             enemy.Crystal -= crystalCost;
             enemy.Deuterium -= deuteriumCost;
-            
+
             // Research technology
             enemy.Technologies[techName] = currentLevel + 1;
+            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
-        
+
         return false;
     }
-    
+
     private bool TryBuildDefense(Enemy enemy, string defenseType)
     {
         // First check if enemy meets requirements for this defense
@@ -1437,17 +1449,18 @@ public class EnemyService
             enemy.Metal -= metalCost;
             enemy.Crystal -= crystalCost;
             enemy.Deuterium -= deuteriumCost;
-            
+
             // Build defense
             if (!enemy.Defenses.ContainsKey(defenseType))
                 enemy.Defenses[defenseType] = 0;
             enemy.Defenses[defenseType]++;
+            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
-        
+
         return false;
     }
-    
+
     private bool TryBuildShip(Enemy enemy, string shipType)
     {
         // First check if enemy meets requirements for this ship
@@ -1464,14 +1477,15 @@ public class EnemyService
             enemy.Metal -= metalCost;
             enemy.Crystal -= crystalCost;
             enemy.Deuterium -= deuteriumCost;
-            
+
             // Build ship
             if (!enemy.Ships.ContainsKey(shipType))
                 enemy.Ships[shipType] = 0;
             enemy.Ships[shipType]++;
+            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
-        
+
         return false;
     }
     
