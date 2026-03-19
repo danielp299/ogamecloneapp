@@ -22,6 +22,16 @@
                 "/consoleloggerparameters:NoSummary"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "stop + run",
+            "type": "shell",
+            "command": "Stop-Process -Name 'myapp' -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; dotnet run --project ${workspaceFolder}/myapp.csproj --urls http://localhost:5264",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
         }
     ]
 }

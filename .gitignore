@@ -10,3 +10,5 @@ myapp.Tests/obj/
 *.db-wal
 nul
 artifacts/obj
+artifacts/test-obj/Debug
+artifacts

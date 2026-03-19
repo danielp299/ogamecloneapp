@@ -14,3 +14,8 @@ command = "dotnet run"
 name = "Interrumpir App"
 icon = "tool"
 command = "Get-Process | Where-Object { $_.ProcessName -like 'myapp*' -or $_.ProcessName -like 'dotnet*' } | Stop-Process -Force"
+
+[[actions]]
+name = "stop + run"
+icon = "tool"
+command = "Stop-Process -Name 'myapp' -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; dotnet run --project C:\\Users\\danie\\OneDrive\\Documentos\\git\\ogamecloneapp\\myapp.csproj --urls http://localhost:5264"

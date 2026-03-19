@@ -111,9 +111,12 @@
                 <!-- Quantity Selector -->
                 <div style="display: flex; justify-content: space-around; width: 100%; margin: 10px 0; gap: 5px;">
                     <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 1)">+1</button>
-                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 10)">+10</button>
-                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 50)">+50</button>
-                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 100)">+100</button>
+                    @if (!IsSingleInstanceDefense(unit))
+                    {
+                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 10)">+10</button>
+                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 50)">+50</button>
+                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 100)">+100</button>
+                    }
                 </div>
 
                 <!-- Input & Build Button -->
