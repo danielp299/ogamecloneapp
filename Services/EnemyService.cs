@@ -67,6 +67,18 @@ public class Enemy
     public string Coordinates => $"{Galaxy}:{System}:{Position}";
 }
 
+/// <summary>
+/// Represents a bot fleet in transit to attack another bot planet.
+/// Combat is resolved lazily when any bot activates after ArrivalTime.
+/// </summary>
+public class PendingBotAttack
+{
+    public string AttackerCoordinates { get; set; } = "";
+    public string TargetCoordinates   { get; set; } = "";
+    public Dictionary<string, int> Ships { get; set; } = new();
+    public DateTime ArrivalTime { get; set; }
+}
+
 public class EnemyService
 {
     private readonly GameDbContext _dbContext;
@@ -77,6 +89,9 @@ public class EnemyService
     
     // Enemy storage - key is coordinates "galaxy:system:position"
     private Dictionary<string, Enemy> _enemies = new();
+
+    // Bot-vs-bot attacks in transit; resolved lazily when any bot activates
+    private readonly List<PendingBotAttack> _pendingBotAttacks = new();
     
     public List<Enemy> Enemies => _enemies.Values.ToList();
     
@@ -530,6 +545,7 @@ public class EnemyService
 
     private void ExecuteAttackReaction(Enemy enemy)
     {
+        ResolvePendingBotAttacks();
         UpdateEnemyResources(enemy);
 
         var availableDefenses = GetAvailableDefenses(enemy);
@@ -602,6 +618,7 @@ public class EnemyService
 
     private void ExecuteEmpireAction(Enemy enemy, string? preferredBuilding, string? preferredTech, string? preferredShip, string? preferredDefense)
     {
+        ResolvePendingBotAttacks();
         var availableBuildings = GetAvailableBuildings(enemy);
         var availableTechs = GetAvailableTechnologies(enemy);
         var availableDefenses = GetAvailableDefenses(enemy);
@@ -1387,9 +1404,26 @@ public class EnemyService
         if (!attackShips.Any()) return false;
 
         string targetCoordinates = viableTargets[_random.Next(viableTargets.Count)];
-        OnEnemyAttackLaunched?.Invoke(enemy.Coordinates, targetCoordinates, attackShips);
+        bool targetIsBot = _enemies.ContainsKey(targetCoordinates);
 
-        // Deduct ships committed to the attack
+        if (targetIsBot)
+        {
+            // Bot-vs-bot: schedule lazy combat — flight takes ~30 seconds (game speed)
+            _pendingBotAttacks.Add(new PendingBotAttack
+            {
+                AttackerCoordinates = enemy.Coordinates,
+                TargetCoordinates   = targetCoordinates,
+                Ships               = new Dictionary<string, int>(attackShips),
+                ArrivalTime         = DateTime.Now.AddSeconds(30)
+            });
+        }
+        else
+        {
+            // Attack the player — handled by FleetService
+            OnEnemyAttackLaunched?.Invoke(enemy.Coordinates, targetCoordinates, attackShips);
+        }
+
+        // Deduct ships committed to the attack (in transit regardless of target type)
         foreach (var ship in attackShips)
         {
             enemy.Ships[ship.Key] -= ship.Value;
@@ -1398,6 +1432,89 @@ public class EnemyService
 
         enemy.LastActivity = DateTime.Now;
         return true;
+    }
+
+    /// <summary>
+    /// Resolves any pending bot-vs-bot attacks whose ArrivalTime has passed.
+    /// Called at the start of every bot action execution so resolution is lazy.
+    /// </summary>
+    private void ResolvePendingBotAttacks()
+    {
+        var now = DateTime.Now;
+        var arrived = _pendingBotAttacks.Where(a => now >= a.ArrivalTime).ToList();
+        if (!arrived.Any()) return;
+
+        foreach (var attack in arrived)
+        {
+            _pendingBotAttacks.Remove(attack);
+
+            if (!_enemies.TryGetValue(attack.AttackerCoordinates, out var attacker)) continue;
+            if (!_enemies.TryGetValue(attack.TargetCoordinates,   out var defender)) continue;
+
+            long atkPower = CalculateFleetPower(attack.Ships);
+            long defPower = CalculateEnemyPower(defender);
+
+            bool attackerWon = atkPower > defPower;
+
+            if (attackerWon)
+            {
+                // Attacker: 80% of sent ships return
+                foreach (var kvp in attack.Ships)
+                {
+                    int returning = (int)Math.Ceiling(kvp.Value * 0.80);
+                    if (returning <= 0) continue;
+                    attacker.Ships[kvp.Key] = attacker.Ships.GetValueOrDefault(kvp.Key, 0) + returning;
+                }
+                // Defender loses 50% ships and 20% defenses; attacker loots 30% of resources
+                foreach (var ship in defender.Ships.Keys.ToList())
+                    defender.Ships[ship] = (int)Math.Floor(defender.Ships[ship] * 0.50);
+                foreach (var def in defender.Defenses.Keys.ToList())
+                    defender.Defenses[def] = (int)Math.Floor(defender.Defenses[def] * 0.80);
+                long loot = (long)(defender.Metal * 0.30);
+                defender.Metal -= loot; attacker.Metal += loot;
+                loot = (long)(defender.Crystal * 0.30);
+                defender.Crystal -= loot; attacker.Crystal += loot;
+
+                _rankingService?.RecordCombat(
+                    attacker.Coordinates, attacker.Name, true,
+                    defender.Coordinates, defender.Name, true,
+                    attackerWon: true,
+                    defenderShipPts: RankingService.CalcPoints(defPower / 2, 0, 0),
+                    defenderDefPts: 0, attackerShipPts: 0);
+            }
+            else
+            {
+                // Attacker loses: 40% of ships return
+                foreach (var kvp in attack.Ships)
+                {
+                    int returning = (int)Math.Ceiling(kvp.Value * 0.40);
+                    if (returning <= 0) continue;
+                    attacker.Ships[kvp.Key] = attacker.Ships.GetValueOrDefault(kvp.Key, 0) + returning;
+                }
+                // Defender loses 10% defenses from the battle
+                foreach (var def in defender.Defenses.Keys.ToList())
+                    defender.Defenses[def] = (int)Math.Floor(defender.Defenses[def] * 0.90);
+
+                _rankingService?.RecordCombat(
+                    attacker.Coordinates, attacker.Name, true,
+                    defender.Coordinates, defender.Name, true,
+                    attackerWon: false,
+                    defenderShipPts: 0, defenderDefPts: 0,
+                    attackerShipPts: RankingService.CalcPoints(atkPower / 2, 0, 0));
+            }
+        }
+    }
+
+    // Power of a specific ship set (used for in-transit fleets)
+    private long CalculateFleetPower(Dictionary<string, int> ships)
+    {
+        long power = 0;
+        foreach (var s in ships)
+        {
+            var (m, c, d) = GetShipBaseCost(s.Key);
+            power += (m + c + d) * s.Value;
+        }
+        return power;
     }
 
     private long EstimateTargetPower(string coordinates)
