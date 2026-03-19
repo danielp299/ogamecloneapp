@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Blazor Server (HTTP)",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--launch-profile", "http"],
+      "port": 5264
+    },
+    {
+      "name": "Blazor Server (HTTPS)",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--launch-profile", "https"],
+      "port": 7191
+    }
+  ]
+}
