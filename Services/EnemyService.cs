@@ -1373,11 +1373,7 @@ public class EnemyService
         
         int currentLevel = enemy.Buildings[buildingName];
         
-        // Calculate cost (simplified formula)
-        double scaling = 2.0;
-        long metalCost = (long)(GetBuildingBaseCost(buildingName, "Metal") * Math.Pow(scaling, currentLevel));
-        long crystalCost = (long)(GetBuildingBaseCost(buildingName, "Crystal") * Math.Pow(scaling, currentLevel));
-        long deuteriumCost = (long)(GetBuildingBaseCost(buildingName, "Deuterium") * Math.Pow(scaling, currentLevel));
+        var (metalCost, crystalCost, deuteriumCost) = UnitCosts.Building(buildingName, currentLevel);
         
         // Check if enemy has enough resources
         if (enemy.Metal >= metalCost && enemy.Crystal >= crystalCost && enemy.Deuterium >= deuteriumCost)
@@ -1410,11 +1406,7 @@ public class EnemyService
         // Max level check
         if (currentLevel >= 20) return false;
         
-        // Calculate cost
-        double scaling = 2.0;
-        long metalCost = (long)(GetTechBaseCost(techName, "Metal") * Math.Pow(scaling, currentLevel));
-        long crystalCost = (long)(GetTechBaseCost(techName, "Crystal") * Math.Pow(scaling, currentLevel));
-        long deuteriumCost = (long)(GetTechBaseCost(techName, "Deuterium") * Math.Pow(scaling, currentLevel));
+        var (metalCost, crystalCost, deuteriumCost) = UnitCosts.Technology(techName, currentLevel);
         
         // Check if enemy has enough resources
         if (enemy.Metal >= metalCost && enemy.Crystal >= crystalCost && enemy.Deuterium >= deuteriumCost)
@@ -1489,82 +1481,12 @@ public class EnemyService
         return false;
     }
     
-    private long GetBuildingBaseCost(string buildingName, string resourceType)
-    {
-        // Simplified base costs
-        return buildingName switch
-        {
-            "Metal Mine" => resourceType == "Metal" ? 60 : resourceType == "Crystal" ? 15 : 0,
-            "Crystal Mine" => resourceType == "Metal" ? 48 : resourceType == "Crystal" ? 24 : 0,
-            "Deuterium Synthesizer" => resourceType == "Metal" ? 225 : resourceType == "Crystal" ? 75 : 0,
-            "Solar Plant" => resourceType == "Metal" ? 75 : resourceType == "Crystal" ? 30 : 0,
-            "Robotics Factory" => resourceType == "Metal" ? 400 : resourceType == "Crystal" ? 120 : resourceType == "Deuterium" ? 200 : 0,
-            "Shipyard" => resourceType == "Metal" ? 400 : resourceType == "Crystal" ? 200 : resourceType == "Deuterium" ? 100 : 0,
-            "Research Lab" => resourceType == "Metal" ? 200 : resourceType == "Crystal" ? 400 : resourceType == "Deuterium" ? 200 : 0,
-            "Metal Storage" => resourceType == "Metal" ? 1000 : 0,
-            "Crystal Storage" => resourceType == "Metal" ? 1000 : resourceType == "Crystal" ? 500 : 0,
-            "Deuterium Tank" => resourceType == "Metal" ? 1000 : resourceType == "Crystal" ? 1000 : 0,
-            _ => resourceType == "Metal" ? 500 : resourceType == "Crystal" ? 250 : 0
-        };
-    }
-    
-    private long GetTechBaseCost(string techName, string resourceType)
-    {
-        // Simplified base costs
-        return techName switch
-        {
-            "Espionage Technology" => resourceType == "Metal" ? 200 : resourceType == "Crystal" ? 1000 : resourceType == "Deuterium" ? 200 : 0,
-            "Computer Technology" => resourceType == "Crystal" ? 400 : resourceType == "Deuterium" ? 600 : 0,
-            "Weapons Technology" => resourceType == "Metal" ? 800 : resourceType == "Crystal" ? 200 : 0,
-            "Shielding Technology" => resourceType == "Metal" ? 200 : resourceType == "Crystal" ? 600 : 0,
-            "Armour Technology" => resourceType == "Metal" ? 1000 : 0,
-            "Energy Technology" => resourceType == "Crystal" ? 800 : resourceType == "Deuterium" ? 400 : 0,
-            "Hyperspace Technology" => resourceType == "Crystal" ? 4000 : resourceType == "Deuterium" ? 2000 : 0,
-            "Combustion Drive" => resourceType == "Metal" ? 400 : resourceType == "Deuterium" ? 600 : 0,
-            "Impulse Drive" => resourceType == "Metal" ? 2000 : resourceType == "Crystal" ? 4000 : resourceType == "Deuterium" ? 600 : 0,
-            "Hyperspace Drive" => resourceType == "Metal" ? 10000 : resourceType == "Crystal" ? 20000 : resourceType == "Deuterium" ? 6000 : 0,
-            "Laser Technology" => resourceType == "Metal" ? 200 : resourceType == "Crystal" ? 100 : 0,
-            "Ion Technology" => resourceType == "Metal" ? 1000 : resourceType == "Crystal" ? 300 : resourceType == "Deuterium" ? 100 : 0,
-            "Plasma Technology" => resourceType == "Metal" ? 2000 : resourceType == "Crystal" ? 4000 : resourceType == "Deuterium" ? 1000 : 0,
-            _ => resourceType == "Metal" ? 500 : resourceType == "Crystal" ? 250 : 0
-        };
-    }
-    
-    private (long metal, long crystal, long deuterium) GetDefenseBaseCost(string defenseType)
-    {
-        return defenseType switch
-        {
-            "Rocket Launcher" => (2000, 0, 0),
-            "Light Laser" => (1500, 500, 0),
-            "Heavy Laser" => (6000, 2000, 0),
-            "Gauss Cannon" => (20000, 15000, 2000),
-            "Ion Cannon" => (2000, 6000, 0),
-            "Plasma Turret" => (50000, 50000, 30000),
-            "Small Shield Dome" => (10000, 10000, 0),
-            "Large Shield Dome" => (50000, 50000, 0),
-            "Anti-Ballistic Missile" => (8000, 0, 2000),
-            _ => (1000, 500, 0)
-        };
-    }
-    
-    private (long metal, long crystal, long deuterium) GetShipBaseCost(string shipType)
-    {
-        return shipType switch
-        {
-            "SC" => (2000, 2000, 0),
-            "LC" => (6000, 6000, 0),
-            "LF" => (3000, 1000, 0),
-            "HF" => (6000, 4000, 0),
-            "CR" => (20000, 7000, 2000),
-            "BS" => (45000, 15000, 0),
-            "CS" => (10000, 20000, 10000),
-            "REC" => (10000, 6000, 2000),
-            "ESP" => (0, 1000, 0),
-            "DST" => (60000, 50000, 15000),
-            "RIP" => (5000000, 4000000, 1000000),
-            _ => (5000, 2000, 0)
-        };
-    }
+    // Cost lookups delegated to the shared UnitCosts catalog.
+    private static (long metal, long crystal, long deuterium) GetDefenseBaseCost(string defenseType)
+        => UnitCosts.Defense(defenseType);
+
+    private static (long metal, long crystal, long deuterium) GetShipBaseCost(string shipType)
+        => UnitCosts.Ship(shipType);
     
     public Enemy? GetEnemy(int galaxy, int system, int position)
     {
