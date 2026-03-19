@@ -378,7 +378,19 @@ public class EnemyService
                 
                 // Update production rates
                 UpdateEnemyProductionRates(enemy);
-                
+
+                // Seed player coordinates for bots that share the player's galaxy —
+                // guarantees some bots will eventually discover and attack the player
+                // without relying entirely on random exploration.
+                string playerCoords = $"{playerGalaxy}:{playerSystem}:{playerPosition}";
+                if (galaxy == playerGalaxy)
+                {
+                    AddKnownEnemyCoordinate(enemy, playerCoords);
+                    // Treat the player as a weak target initially so nearby bots
+                    // will consider attacking once they have enough ships.
+                    enemy.SpiedEnemyPower[playerCoords] = 500;
+                }
+
                 _enemies[key] = enemy;
                 enemiesCreated++;
             }
