@@ -4,6 +4,12 @@ using myapp.Data.Entities;
 
 namespace myapp.Services;
 
+public enum BotPersonality
+{
+    Default, // Balanced random behaviour
+    Bunker   // Prioritizes defenses and production; avoids aggressive ship builds and attacks
+}
+
 public class Enemy
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -49,6 +55,9 @@ public class Enemy
     
     // Colony tracking
     public int ColonyCount { get; set; } = 0;
+
+    // AI personality
+    public BotPersonality Personality { get; set; } = BotPersonality.Default;
 
     // Strategic memory
     public HashSet<int> ExploredGalaxies { get; set; } = new();
@@ -235,7 +244,8 @@ public class EnemyService
                         LastResourceUpdate = dbEnemy.LastResourceUpdate,
                         LastActivity = dbEnemy.LastActivity,
                         IsBot = dbEnemy.IsBot,
-                        ColonyCount = dbEnemy.ColonyCount
+                        ColonyCount = dbEnemy.ColonyCount,
+                        Personality = Enum.TryParse<BotPersonality>(dbEnemy.Personality, out var p) ? p : BotPersonality.Default
                     };
 
                     if (enemy.EmpireId == enemy.Id)
@@ -376,6 +386,11 @@ public class EnemyService
                 enemy.Ships["SC"] = _random.Next(0, 3);
                 enemy.Ships["LF"] = _random.Next(0, 3);
                 
+                // 20% of bots are Bunker specialists; the rest use Default balanced AI
+                enemy.Personality = _random.NextDouble() < 0.20
+                    ? BotPersonality.Bunker
+                    : BotPersonality.Default;
+
                 // Update production rates
                 UpdateEnemyProductionRates(enemy);
 
@@ -536,7 +551,7 @@ public class EnemyService
 
         while (actionsPerformed < actionsToPerform && possibleActions.Any())
         {
-            string actionType = possibleActions[_random.Next(possibleActions.Count)];
+            string actionType = PickAction(possibleActions, enemy.Personality);
             bool actionSuccess = false;
 
             switch (actionType)
@@ -606,7 +621,7 @@ public class EnemyService
 
         while (actionsPerformed < actionsToPerform && possibleActions.Any())
         {
-            string actionType = possibleActions[_random.Next(possibleActions.Count)];
+            string actionType = PickAction(possibleActions, enemy.Personality);
             bool actionSuccess = false;
 
             switch (actionType)
@@ -968,6 +983,7 @@ public class EnemyService
                 dbEnemy.ExploredGalaxiesJson      = System.Text.Json.JsonSerializer.Serialize(enemy.ExploredGalaxies);
                 dbEnemy.KnownEnemyCoordinatesJson = System.Text.Json.JsonSerializer.Serialize(enemy.KnownEnemyCoordinates);
                 dbEnemy.SpiedEnemyPowerJson       = System.Text.Json.JsonSerializer.Serialize(enemy.SpiedEnemyPower);
+                dbEnemy.Personality               = enemy.Personality.ToString();
             }
             await _dbContext.SaveChangesAsync();
         }
@@ -1036,6 +1052,7 @@ public class EnemyService
                 dbEnemy.ExploredGalaxiesJson = System.Text.Json.JsonSerializer.Serialize(enemy.ExploredGalaxies);
                 dbEnemy.KnownEnemyCoordinatesJson = System.Text.Json.JsonSerializer.Serialize(enemy.KnownEnemyCoordinates);
                 dbEnemy.SpiedEnemyPowerJson = System.Text.Json.JsonSerializer.Serialize(enemy.SpiedEnemyPower);
+                dbEnemy.Personality = enemy.Personality.ToString();
             }
             
             await _dbContext.SaveChangesAsync();
@@ -1081,6 +1098,11 @@ public class EnemyService
         if (!existingColumns.Contains("SpiedEnemyPowerJson"))
         {
             await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Enemies ADD COLUMN SpiedEnemyPowerJson TEXT NOT NULL DEFAULT '{}'");
+        }
+
+        if (!existingColumns.Contains("Personality"))
+        {
+            await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Enemies ADD COLUMN Personality TEXT NOT NULL DEFAULT 'Default'");
         }
 
         _enemyMemoryColumnsReady = true;
@@ -1548,6 +1570,38 @@ public class EnemyService
         return false;
     }
     
+    /// <summary>
+    /// Picks an action from the available list, weighting by personality.
+    /// Bunker bots: defense × 3, building × 2, no ship/attack weights.
+    /// Default bots: uniform random.
+    /// </summary>
+    private string PickAction(List<string> available, BotPersonality personality)
+    {
+        if (personality == BotPersonality.Default)
+            return available[_random.Next(available.Count)];
+
+        // Bunker: weighted pool
+        var weighted = new List<string>();
+        foreach (var a in available)
+        {
+            int weight = a switch
+            {
+                "defense"   => 4,
+                "building"  => 3,
+                "research"  => 2,
+                "explore"   => 1,
+                "spy"       => 1,
+                "ship"      => 0, // Bunkers don't invest in ships
+                "attack"    => 0, // Bunkers don't attack
+                _           => 1
+            };
+            for (int i = 0; i < weight; i++) weighted.Add(a);
+        }
+        // Fall back to uniform if all weights are 0 (e.g., only ship/attack available)
+        if (!weighted.Any()) return available[_random.Next(available.Count)];
+        return weighted[_random.Next(weighted.Count)];
+    }
+
     // Cost lookups delegated to the shared UnitCosts catalog.
     private static (long metal, long crystal, long deuterium) GetDefenseBaseCost(string defenseType)
         => UnitCosts.Defense(defenseType);

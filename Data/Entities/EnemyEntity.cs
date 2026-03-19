@@ -41,4 +41,5 @@ public class EnemyEntity
     public string ExploredGalaxiesJson { get; set; } = "[]";
     public string KnownEnemyCoordinatesJson { get; set; } = "[]";
     public string SpiedEnemyPowerJson { get; set; } = "{}";
+    public string Personality { get; set; } = "Default";
 }
