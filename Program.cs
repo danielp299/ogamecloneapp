@@ -65,6 +65,9 @@ using (var scope = app.Services.CreateScope())
     var defenseService = scope.ServiceProvider.GetRequiredService<DefenseService>();
     var messageService = scope.ServiceProvider.GetRequiredService<MessageService>();
     var playerStateService = scope.ServiceProvider.GetRequiredService<PlayerStateService>();
+    var rankingService = scope.ServiceProvider.GetRequiredService<RankingService>();
+
+    await rankingService.InitializeAsync();
 
     await initService.InitializeGameAsync(
         galaxyService,

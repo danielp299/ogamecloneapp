@@ -154,17 +154,20 @@ public class RankingService
         attacker.Points = Math.Max(0, attacker.Points + attackerGain - attackerLoss);
         defender.Points = Math.Max(0, defender.Points + defenderGain - defenderLoss);
 
-        if (attackerWon)
+        // Stars/Defeats only count in combats involving the player
+        bool playerInvolved = attackerKey == PlayerKey || defenderKey == PlayerKey;
+        if (playerInvolved)
         {
-            attacker.Stars = Math.Min(3, attacker.Stars + 1);
-            defender.Stars = Math.Max(0, defender.Stars - 1);
-            defender.Defeats = Math.Min(3, defender.Defeats + 1);
-        }
-        else
-        {
-            defender.Stars = Math.Min(3, defender.Stars + 1);
-            attacker.Stars = Math.Max(0, attacker.Stars - 1);
-            attacker.Defeats = Math.Min(3, attacker.Defeats + 1);
+            if (attackerWon)
+            {
+                attacker.Stars = Math.Min(3, attacker.Stars + 1);
+                defender.Defeats = Math.Min(3, defender.Defeats + 1);
+            }
+            else
+            {
+                defender.Stars = Math.Min(3, defender.Stars + 1);
+                attacker.Defeats = Math.Min(3, attacker.Defeats + 1);
+            }
         }
 
         _ = PersistEntryAsync(attackerKey);
