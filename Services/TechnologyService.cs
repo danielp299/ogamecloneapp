@@ -71,6 +71,7 @@ public class TechnologyService
     private readonly BuildingService _buildingService;
     private readonly DevModeService _devModeService;
     private readonly EnemyService _enemyService;
+    private readonly RankingService _rankingService;
     private readonly ILogger<TechnologyService> _logger;
 
     public List<Technology> Technologies { get; private set; } = new();
@@ -80,7 +81,7 @@ public class TechnologyService
     private bool _isProcessingResearch = false;
     private bool _isInitialized = false;
 
-    public TechnologyService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, DevModeService devModeService, EnemyService enemyService, ILogger<TechnologyService> logger)
+    public TechnologyService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, DevModeService devModeService, EnemyService enemyService, ILogger<TechnologyService> logger, RankingService? rankingService = null)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
@@ -88,6 +89,7 @@ public class TechnologyService
         _devModeService = devModeService;
         _enemyService = enemyService;
         _logger = logger;
+        _rankingService = rankingService;
         InitializeTechnologies();
     }
 
@@ -449,6 +451,7 @@ public class TechnologyService
         if (await _resourceService.HasResourcesAsync(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost))
         {
             await _resourceService.ConsumeResourcesAsync(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost);
+            _rankingService?.AddSpendingPoints(RankingService.PlayerKey, RankingService.PlayerName, false, tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost);
 
             CurrentResearch = tech;
             tech.IsResearching = true;

@@ -28,6 +28,7 @@ builder.Services.AddSingleton<GalaxyService>();
 builder.Services.AddSingleton<MessageService>();
 builder.Services.AddSingleton<DevModeService>();
 builder.Services.AddSingleton<EnemyService>();
+builder.Services.AddSingleton<RankingService>();
 
 builder.Services.AddCors(options =>
 {
@@ -76,6 +77,9 @@ using (var scope = app.Services.CreateScope())
         messageService,
         playerStateService
     );
+
+    var rankingService = scope.ServiceProvider.GetRequiredService<RankingService>();
+    await rankingService.InitializeAsync();
 }
 
 // Configure the HTTP request pipeline.
