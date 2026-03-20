@@ -1473,8 +1473,8 @@ public class EnemyService
                 defender.Crystal -= loot; attacker.Crystal += loot;
 
                 _rankingService?.RecordCombat(
-                    attacker.Coordinates, attacker.Name, true,
-                    defender.Coordinates, defender.Name, true,
+                    attacker.EmpireId.ToString(), attacker.IsHomeworld ? attacker.Name : attacker.Name.Replace("_Colony", ""), true,
+                    defender.EmpireId.ToString(), defender.IsHomeworld ? defender.Name : defender.Name.Replace("_Colony", ""), true,
                     attackerWon: true,
                     defenderShipPts: RankingService.CalcPoints(defPower / 2, 0, 0),
                     defenderDefPts: 0, attackerShipPts: 0);
@@ -1493,8 +1493,8 @@ public class EnemyService
                     defender.Defenses[def] = (int)Math.Floor(defender.Defenses[def] * 0.90);
 
                 _rankingService?.RecordCombat(
-                    attacker.Coordinates, attacker.Name, true,
-                    defender.Coordinates, defender.Name, true,
+                    attacker.EmpireId.ToString(), attacker.IsHomeworld ? attacker.Name : attacker.Name.Replace("_Colony", ""), true,
+                    defender.EmpireId.ToString(), defender.IsHomeworld ? defender.Name : defender.Name.Replace("_Colony", ""), true,
                     attackerWon: false,
                     defenderShipPts: 0, defenderDefPts: 0,
                     attackerShipPts: RankingService.CalcPoints(atkPower / 2, 0, 0));
@@ -1588,7 +1588,7 @@ public class EnemyService
 
             // Upgrade building
             enemy.Buildings[buildingName] = currentLevel + 1;
-            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
+            _rankingService?.AddSpendingPoints(enemy.EmpireId.ToString(), enemy.IsHomeworld ? enemy.Name : enemy.Name.Replace("_Colony", ""), true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
 
@@ -1621,7 +1621,7 @@ public class EnemyService
 
             // Research technology
             enemy.Technologies[techName] = currentLevel + 1;
-            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
+            _rankingService?.AddSpendingPoints(enemy.EmpireId.ToString(), enemy.IsHomeworld ? enemy.Name : enemy.Name.Replace("_Colony", ""), true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
 
@@ -1649,7 +1649,7 @@ public class EnemyService
             if (!enemy.Defenses.ContainsKey(defenseType))
                 enemy.Defenses[defenseType] = 0;
             enemy.Defenses[defenseType]++;
-            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
+            _rankingService?.AddSpendingPoints(enemy.EmpireId.ToString(), enemy.IsHomeworld ? enemy.Name : enemy.Name.Replace("_Colony", ""), true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
 
@@ -1677,7 +1677,7 @@ public class EnemyService
             if (!enemy.Ships.ContainsKey(shipType))
                 enemy.Ships[shipType] = 0;
             enemy.Ships[shipType]++;
-            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
+            _rankingService?.AddSpendingPoints(enemy.EmpireId.ToString(), enemy.IsHomeworld ? enemy.Name : enemy.Name.Replace("_Colony", ""), true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
 
