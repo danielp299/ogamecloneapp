@@ -80,9 +80,6 @@ using (var scope = app.Services.CreateScope())
         messageService,
         playerStateService
     );
-
-    var rankingService = scope.ServiceProvider.GetRequiredService<RankingService>();
-    await rankingService.InitializeAsync();
 }
 
 // Configure the HTTP request pipeline.
