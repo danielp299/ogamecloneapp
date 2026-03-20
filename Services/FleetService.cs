@@ -100,6 +100,7 @@ public class FleetService
     private readonly DefenseService _defenseService;
     private readonly DevModeService _devModeService;
     private readonly EnemyService _enemyService;
+    private readonly RankingService _rankingService;
 
     public List<Ship> ShipDefinitions { get; private set; } = new();
     
@@ -125,7 +126,7 @@ public class FleetService
     public double CombatDefenseLossMinPercentage { get; private set; } = 0.10;
     public double CombatDefenseLossMaxPercentage { get; private set; } = 0.25;
 
-    public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, GamePersistenceService persistenceService, MessageService messageService, DefenseService defenseService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
+    public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, GamePersistenceService persistenceService, MessageService messageService, DefenseService defenseService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService, RankingService? rankingService = null)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
@@ -138,6 +139,7 @@ public class FleetService
         _devModeService = devModeService;
         _enemyService = enemyService;
         _playerStateService = playerStateService;
+        _rankingService = rankingService;
         
         InitializeShips();
 
@@ -1139,25 +1141,20 @@ public class FleetService
                 if (lost > 0) defenderDefenseLosses[defense.Key] = lost;
             }
 
-            result = $"<span style='color:green'>VICTORY</span><br/>" +
-                     $"Battle at [{mission.TargetCoordinates}]<br/><br/>" +
-                     $"Flota Atacante:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
-                     $"Defensas del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenses)}<br/><br/>" +
-                     $"Flota del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenderShips)}<br/><br/>" +
-                     $"Power Comparison:<br/>" +
-                     $"Atacante: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                     $"Defenzor: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                     $"Perdidas del Atacante:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
-                     $"Perdidas del Defenzor (Defensas):<br/>{FormatUnitDictionary(defenderDefenseLosses)}<br/><br/>" +
-                     $"Perdidas del Defenzor (Naves - estimadas):<br/>{FormatUnitDictionary(defenderShipLosses)}<br/><br/>" +
-                     $"Botin Capturado por el Atacante:<br/>" +
-                     $"Metal: {lootM:N0}<br/>" +
-                     $"Crystal: {lootC:N0}<br/>" +
-                     $"Deuterium: {lootD:N0}<br/><br/>" +
-                     $"Debris Field:<br/>" +
-                     $"Metal: {debrisM:N0}<br/>" +
-                     $"Crystal: {debrisC:N0}<br/>" +
-                     $"Status: {(debrisM > 0 || debrisC > 0 ? "Created" : "No debris")}";
+            result = BuildCombatReportHtml(
+                isOutgoingAttack: true,
+                playerWon: true,
+                battleCoordinates: mission.TargetCoordinates,
+                attackerShips: ToNamedShipDict(initialAttackerShips),
+                defenderShips: ToNamedShipDict(initialDefenderShips),
+                defenderDefenses: initialDefenses,
+                attackerAttackPower: attackerAttack, attackerHealth: attackerHealth,
+                defenderAttackPower: defenderAttack, defenderHealth: defenderHealth,
+                attackerLosses: attackerLosses,
+                defenderShipLosses: defenderShipLosses,
+                defenderDefenseLosses: defenderDefenseLosses,
+                lootMetal: lootM, lootCrystal: lootC, lootDeuterium: lootD,
+                debrisMetal: debrisM, debrisCrystal: debrisC);
         }
         else
         {
@@ -1192,21 +1189,20 @@ public class FleetService
                 if (lost > 0) defenderDefenseLosses[defense.Key] = lost;
             }
 
-            result = $"<span style='color:red'>DEFEAT</span><br/>" +
-                     $"Battle at [{mission.TargetCoordinates}]<br/><br/>" +
-                     $"Flota Atacante:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
-                     $"Defensas del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenses)}<br/><br/>" +
-                     $"Flota del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenderShips)}<br/><br/>" +
-                     $"Power Comparison:<br/>" +
-                     $"Atacante: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                     $"Defenzor: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                     $"Perdidas del Atacante:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
-                     $"Perdidas del Defenzor (Defensas):<br/>{FormatUnitDictionary(defenderDefenseLosses)}<br/><br/>" +
-                     $"Perdidas del Defenzor (Naves):<br/>{FormatUnitDictionary(defenderShipLosses)}<br/><br/>" +
-                     $"Debris Field:<br/>" +
-                     $"Metal: {debrisM:N0}<br/>" +
-                     $"Crystal: {debrisC:N0}<br/>" +
-                     $"Status: {(debrisM > 0 || debrisC > 0 ? "Created" : "No debris")}";
+            result = BuildCombatReportHtml(
+                isOutgoingAttack: true,
+                playerWon: false,
+                battleCoordinates: mission.TargetCoordinates,
+                attackerShips: ToNamedShipDict(initialAttackerShips),
+                defenderShips: ToNamedShipDict(initialDefenderShips),
+                defenderDefenses: initialDefenses,
+                attackerAttackPower: attackerAttack, attackerHealth: attackerHealth,
+                defenderAttackPower: defenderAttack, defenderHealth: defenderHealth,
+                attackerLosses: attackerLosses,
+                defenderShipLosses: defenderShipLosses,
+                defenderDefenseLosses: defenderDefenseLosses,
+                lootMetal: 0, lootCrystal: 0, lootDeuterium: 0,
+                debrisMetal: debrisM, debrisCrystal: debrisC);
         }
 
         _messageService.AddMessage($"Combat Report [{mission.TargetCoordinates}]", result, "Combat");
@@ -1218,6 +1214,37 @@ public class FleetService
             int.TryParse(parts[2], out int p))
         {
             _ = _enemyService.OnPlayerAttack(g, s, p, attackerWon);
+
+            // Ranking: calcular valores de unidades destruidas
+            string botKey = mission.TargetCoordinates;
+            string botName = _enemyService.GetEnemy(g, s, p)?.Name ?? botKey;
+
+            double defShipPts = 0;
+            foreach (var loss in defenderShipLosses)
+            {
+                var def = ShipDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) defShipPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            double defDefPts = 0;
+            foreach (var loss in defenderDefenseLosses)
+            {
+                var def = _defenseService.DefenseDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) defDefPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            double atkShipPts = 0;
+            foreach (var loss in attackerLosses)
+            {
+                var def = ShipDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) atkShipPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            _rankingService?.RecordCombat(
+                RankingService.PlayerKey, RankingService.PlayerName, false,
+                botKey, botName, true,
+                attackerWon,
+                defShipPts, defDefPts, atkShipPts);
         }
     }
 
@@ -1497,27 +1524,62 @@ public class FleetService
             planet.HasDebris = true;
         }
 
-        string result = $"<span style='color:{(attackerWon ? "red" : "green")}'>{(attackerWon ? "DEFEAT" : "VICTORY")}</span><br/>" +
-                        $"Battle at [{mission.TargetCoordinates}]<br/><br/>" +
-                        $"Flota Atacante:<br/>{FormatShipDictionary(initialAttackerShips)}<br/><br/>" +
-                        $"Defensas del Defenzor (antes):<br/>{FormatUnitDictionary(initialDefenderDefenses.ToDictionary(x => MapDefenseIdToName(x.Key), x => x.Value))}<br/><br/>" +
-                        $"Flota del Defenzor (antes):<br/>{FormatShipDictionary(initialDefenderShips)}<br/><br/>" +
-                        $"Power Comparison:<br/>" +
-                        $"Atacante: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                        $"Defenzor: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                        $"Perdidas del Atacante:<br/>{FormatUnitDictionary(attackerLosses)}<br/><br/>" +
-                        $"Perdidas del Defenzor (Defensas):<br/>{FormatUnitDictionary(defenderLossesDefenses)}<br/><br/>" +
-                        $"Perdidas del Defenzor (Naves):<br/>{FormatUnitDictionary(defenderLossesShips)}<br/><br/>" +
-                        $"Botin Capturado por el Atacante (estimado):<br/>" +
-                        $"Metal: {(attackerWon ? playerPlanetState.Resources["Metal"] / 2 : 0):N0}<br/>" +
-                        $"Crystal: {(attackerWon ? playerPlanetState.Resources["Crystal"] / 2 : 0):N0}<br/>" +
-                        $"Deuterium: {(attackerWon ? playerPlanetState.Resources["Deuterium"] / 2 : 0):N0}<br/><br/>" +
-                        $"Debris Field:<br/>" +
-                        $"Metal: {debrisM:N0}<br/>" +
-                        $"Crystal: {debrisC:N0}<br/>" +
-                        $"Status: {(debrisM > 0 || debrisC > 0 ? "Created" : "No debris")}";
+        var namedDefenderDefenses = initialDefenderDefenses.ToDictionary(x => MapDefenseIdToName(x.Key), x => x.Value);
+        long incomingLootM = attackerWon ? playerPlanetState.Resources["Metal"] / 2 : 0;
+        long incomingLootC = attackerWon ? playerPlanetState.Resources["Crystal"] / 2 : 0;
+        long incomingLootD = attackerWon ? playerPlanetState.Resources["Deuterium"] / 2 : 0;
+
+        string result = BuildCombatReportHtml(
+            isOutgoingAttack: false,
+            playerWon: !attackerWon,
+            battleCoordinates: mission.TargetCoordinates,
+            attackerShips: ToNamedShipDict(initialAttackerShips),
+            defenderShips: ToNamedShipDict(initialDefenderShips),
+            defenderDefenses: namedDefenderDefenses,
+            attackerAttackPower: attackerAttack, attackerHealth: attackerHealth,
+            defenderAttackPower: defenderAttack, defenderHealth: defenderHealth,
+            attackerLosses: attackerLosses,
+            defenderShipLosses: defenderLossesShips,
+            defenderDefenseLosses: defenderLossesDefenses,
+            lootMetal: incomingLootM, lootCrystal: incomingLootC, lootDeuterium: incomingLootD,
+            debrisMetal: debrisM, debrisCrystal: debrisC);
 
         _messageService.AddMessage($"Combat Report [{mission.TargetCoordinates}]", result, "Combat");
+
+        // Ranking: incoming attack combat result
+        if (TryParseCoordinates(mission.OriginCoordinates, out int og, out int os, out int op))
+        {
+            string botKey = mission.OriginCoordinates;
+            string botName = _enemyService.GetEnemy(og, os, op)?.Name ?? botKey;
+
+            double defShipPts = 0;
+            foreach (var loss in defenderLossesShips)
+            {
+                var def = ShipDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) defShipPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            double defDefPts = 0;
+            foreach (var loss in defenderLossesDefenses)
+            {
+                var def = _defenseService.DefenseDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) defDefPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            double atkShipPts = 0;
+            foreach (var loss in attackerLosses)
+            {
+                var def = ShipDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) atkShipPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            // In incoming attack: bot is attacker, player is defender
+            _rankingService?.RecordCombat(
+                botKey, botName, true,
+                RankingService.PlayerKey, RankingService.PlayerName, false,
+                attackerWon,
+                defShipPts, defDefPts, atkShipPts);
+        }
     }
 
     private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses, Dictionary<string, int> Ships) GetPlayerPlanetCombatState(int g, int s, int p)
@@ -1738,7 +1800,8 @@ public class FleetService
         if (await _resourceService.HasResourcesAsync(totalMetal, totalCrystal, totalDeuterium))
         {
             await _resourceService.ConsumeResourcesAsync(totalMetal, totalCrystal, totalDeuterium);
-            
+            _rankingService?.AddSpendingPoints(RankingService.PlayerKey, RankingService.PlayerName, false, totalMetal, totalCrystal, totalDeuterium);
+
             var calculatedDuration = CalculateShipConstructionDuration(ship);
             var finalDuration = _devModeService.GetDuration(calculatedDuration, 1);
 
@@ -1905,6 +1968,155 @@ public class FleetService
         if (remaining <= TimeSpan.Zero) return fallback;
         if (remaining > fallback) return fallback;
         return remaining;
+    }
+
+    // ---- Combat Report HTML Builder ----
+
+    private Dictionary<string, int> ToNamedShipDict(Dictionary<string, int> ships)
+    {
+        var result = new Dictionary<string, int>();
+        foreach (var kvp in ships)
+        {
+            var def = ShipDefinitions.FirstOrDefault(x => x.Id == kvp.Key || x.Name == kvp.Key);
+            string name = def?.Name ?? kvp.Key;
+            result[name] = result.ContainsKey(name) ? result[name] + kvp.Value : kvp.Value;
+        }
+        return result;
+    }
+
+    private static string FormatUnitsHtml(Dictionary<string, int> units)
+    {
+        var filtered = units.Where(x => x.Value > 0).ToList();
+        if (!filtered.Any()) return "<span class='cr-none'>Ninguna</span>";
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var item in filtered)
+            sb.Append($"<div class='cr-unit-row'><span>{item.Key}</span><span class='cr-unit-count'>{item.Value:N0}</span></div>");
+        return sb.ToString();
+    }
+
+    private static string BuildCombatReportHtml(
+        bool isOutgoingAttack,
+        bool playerWon,
+        string battleCoordinates,
+        Dictionary<string, int> attackerShips,
+        Dictionary<string, int> defenderShips,
+        Dictionary<string, int> defenderDefenses,
+        long attackerAttackPower, long attackerHealth,
+        long defenderAttackPower, long defenderHealth,
+        Dictionary<string, int> attackerLosses,
+        Dictionary<string, int> defenderShipLosses,
+        Dictionary<string, int> defenderDefenseLosses,
+        long lootMetal, long lootCrystal, long lootDeuterium,
+        long debrisMetal, long debrisCrystal)
+    {
+        string headerClass   = isOutgoingAttack ? "cr-outgoing" : "cr-incoming";
+        string dirLabel      = isOutgoingAttack ? "⚔ ATAQUE ENVIADO" : "⚠ ATAQUE RECIBIDO";
+        string outcomeClass  = playerWon ? "cr-victory" : "cr-defeat";
+        string outcomeBadge  = playerWon ? "✓ VICTORIA" : "✗ DERROTA";
+        string outcomeSub    = isOutgoingAttack
+            ? (playerWon ? "Atacaste con éxito y saqueaste el planeta enemigo"
+                         : "Tu flota fue repelida por las defensas enemigas")
+            : (playerWon ? "Tus defensas resistieron el ataque enemigo"
+                         : "Tu planeta fue atacado y saqueado");
+        string atkLabel = isOutgoingAttack ? "Tu flota" : "Flota enemiga";
+        string defLabel = isOutgoingAttack ? "Planeta enemigo" : "Tu planeta";
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<div class='cr'>");
+
+        // ── Header ──
+        sb.Append($"<div class='cr-header {headerClass}'>");
+        sb.Append($"<span>{dirLabel}</span>");
+        sb.Append($"<span class='cr-coords'>[ {battleCoordinates} ]</span>");
+        sb.Append("</div>");
+
+        // ── Outcome ──
+        sb.Append($"<div class='cr-outcome {outcomeClass}'>");
+        sb.Append($"<span class='cr-outcome-badge'>{outcomeBadge}</span>");
+        sb.Append($"<span class='cr-outcome-sub'>{outcomeSub}</span>");
+        sb.Append("</div>");
+
+        // ── Fuerzas iniciales ──
+        sb.Append("<div class='cr-section'>");
+        sb.Append("<div class='cr-section-title'>⚔ Fuerzas iniciales</div>");
+        sb.Append("<div class='cr-two-col'>");
+
+        sb.Append($"<div class='cr-col cr-attacker'><div class='cr-col-label'>{atkLabel}</div>");
+        sb.Append(FormatUnitsHtml(attackerShips));
+        sb.Append("</div>");
+
+        sb.Append($"<div class='cr-col cr-defender'><div class='cr-col-label'>{defLabel}</div>");
+        bool hasDefShips = defenderShips.Any(x => x.Value > 0);
+        bool hasDefDef   = defenderDefenses.Any(x => x.Value > 0);
+        if (hasDefShips)
+        {
+            sb.Append("<div class='cr-subsection-label'>Naves</div>");
+            sb.Append(FormatUnitsHtml(defenderShips));
+        }
+        if (hasDefDef)
+        {
+            sb.Append("<div class='cr-subsection-label'>Defensas</div>");
+            sb.Append(FormatUnitsHtml(defenderDefenses));
+        }
+        if (!hasDefShips && !hasDefDef) sb.Append("<span class='cr-none'>Sin fuerzas</span>");
+        sb.Append("</div>");
+        sb.Append("</div></div>");
+
+        // ── Análisis de combate ──
+        sb.Append("<div class='cr-section'>");
+        sb.Append("<div class='cr-section-title'>📊 Análisis de combate</div>");
+        sb.Append("<div class='cr-power-row'>");
+        sb.Append($"<div class='cr-power-item'><div class='cr-power-label'>{atkLabel} — Ataque</div><div class='cr-power-value'>{attackerAttackPower:N0}</div></div>");
+        sb.Append($"<div class='cr-power-item'><div class='cr-power-label'>{atkLabel} — HP</div><div class='cr-power-value'>{attackerHealth:N0}</div></div>");
+        sb.Append($"<div class='cr-power-item'><div class='cr-power-label'>{defLabel} — Ataque</div><div class='cr-power-value'>{defenderAttackPower:N0}</div></div>");
+        sb.Append($"<div class='cr-power-item'><div class='cr-power-label'>{defLabel} — HP</div><div class='cr-power-value'>{defenderHealth:N0}</div></div>");
+        sb.Append("</div></div>");
+
+        // ── Bajas ──
+        sb.Append("<div class='cr-section'>");
+        sb.Append("<div class='cr-section-title'>💀 Bajas de combate</div>");
+        sb.Append("<div class='cr-losses-two-col'>");
+
+        sb.Append($"<div class='cr-col cr-attacker'><div class='cr-col-label'>{atkLabel}</div>");
+        sb.Append(FormatUnitsHtml(attackerLosses));
+        sb.Append("</div>");
+
+        sb.Append($"<div class='cr-col cr-defender'><div class='cr-col-label'>{defLabel}</div>");
+        var allDefLosses = new Dictionary<string, int>(defenderShipLosses);
+        foreach (var kvp in defenderDefenseLosses) allDefLosses[kvp.Key] = kvp.Value;
+        sb.Append(FormatUnitsHtml(allDefLosses));
+        sb.Append("</div>");
+        sb.Append("</div></div>");
+
+        // ── Botín / Recursos perdidos ──
+        if (lootMetal > 0 || lootCrystal > 0 || lootDeuterium > 0)
+        {
+            bool isLoot = isOutgoingAttack && playerWon;
+            string resClass = isLoot ? "cr-res-loot" : "cr-res-loss";
+            string lootTitle = isLoot ? "💰 Botín capturado" : "💸 Recursos saqueados";
+            sb.Append("<div class='cr-section'>");
+            sb.Append($"<div class='cr-section-title'>{lootTitle}</div>");
+            sb.Append("<div class='cr-loot-grid'>");
+            sb.Append($"<div class='cr-res-item {resClass}'><div class='cr-res-label'>Metal</div><div class='cr-res-metal'>{lootMetal:N0}</div></div>");
+            sb.Append($"<div class='cr-res-item {resClass}'><div class='cr-res-label'>Crystal</div><div class='cr-res-crystal'>{lootCrystal:N0}</div></div>");
+            sb.Append($"<div class='cr-res-item {resClass}'><div class='cr-res-label'>Deuterium</div><div class='cr-res-deuterium'>{lootDeuterium:N0}</div></div>");
+            sb.Append("</div></div>");
+        }
+
+        // ── Campo de escombros ──
+        if (debrisMetal > 0 || debrisCrystal > 0)
+        {
+            sb.Append("<div class='cr-section'>");
+            sb.Append("<div class='cr-section-title'>🌌 Campo de escombros generado</div>");
+            sb.Append("<div class='cr-debris-grid'>");
+            sb.Append($"<div class='cr-res-item cr-res-debris'><div class='cr-res-label'>Metal</div><div class='cr-res-metal'>{debrisMetal:N0}</div></div>");
+            sb.Append($"<div class='cr-res-item cr-res-debris'><div class='cr-res-label'>Crystal</div><div class='cr-res-crystal'>{debrisCrystal:N0}</div></div>");
+            sb.Append("</div></div>");
+        }
+
+        sb.Append("</div>"); // .cr
+        return sb.ToString();
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();

@@ -1,8 +1,17 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using myapp.Data;
 using myapp.Data.Entities;
 
 namespace myapp.Services;
+
+public enum BotPersonality
+{
+    Default,     // Balanced: buildings first, then even mix of all actions
+    Economist,   // Production focus: mines and storage, cargo ships, avoids combat
+    Militarist,  // Aggression focus: ships and attacks, still upgrades buildings first
+    Researcher,  // Tech focus: research lab and technologies, explores aggressively
+    Bunker       // Defense focus: defense structures and buildings, never ships or attacks
+}
 
 public class Enemy
 {
@@ -50,6 +59,9 @@ public class Enemy
     // Colony tracking
     public int ColonyCount { get; set; } = 0;
 
+    // AI personality
+    public BotPersonality Personality { get; set; } = BotPersonality.Default;
+
     // Strategic memory
     public HashSet<int> ExploredGalaxies { get; set; } = new();
     public List<string> KnownEnemyCoordinates { get; set; } = new();
@@ -58,15 +70,31 @@ public class Enemy
     public string Coordinates => $"{Galaxy}:{System}:{Position}";
 }
 
+/// <summary>
+/// Represents a bot fleet in transit to attack another bot planet.
+/// Combat is resolved lazily when any bot activates after ArrivalTime.
+/// </summary>
+public class PendingBotAttack
+{
+    public string AttackerCoordinates { get; set; } = "";
+    public string TargetCoordinates   { get; set; } = "";
+    public Dictionary<string, int> Ships { get; set; } = new();
+    public DateTime ArrivalTime { get; set; }
+}
+
 public class EnemyService
 {
     private readonly GameDbContext _dbContext;
     private readonly GalaxyService _galaxyService;
+    private readonly RankingService _rankingService;
     private readonly Random _random = new Random();
     private readonly object _lockObject = new object();
     
     // Enemy storage - key is coordinates "galaxy:system:position"
     private Dictionary<string, Enemy> _enemies = new();
+
+    // Bot-vs-bot attacks in transit; resolved lazily when any bot activates
+    private readonly List<PendingBotAttack> _pendingBotAttacks = new();
     
     public List<Enemy> Enemies => _enemies.Values.ToList();
     
@@ -74,7 +102,9 @@ public class EnemyService
     public event Action<string, string, Dictionary<string, int>>? OnEnemyAttackLaunched;
     
     private const int MAX_ENEMIES = 100;
-    private const double BUILDING_UPGRADE_CHANCE = 0.70; // 70%
+    // Fraction of enemy empires eligible to react per player-action event.
+    private const double ACTIVATION_RATE = 0.50;
+    private const double BUILDING_UPGRADE_CHANCE = 0.70; // 70% (of activated empires)
     private const double RESEARCH_CHANCE = 0.80; // 80%
     private const double DEFENSE_BUILD_CHANCE = 0.60; // 60%
     private const double SHIP_BUILD_CHANCE = 0.50; // 50%
@@ -180,10 +210,11 @@ public class EnemyService
     private bool _isInitialized = false;
     private bool _enemyMemoryColumnsReady = false;
 
-    public EnemyService(GameDbContext dbContext, GalaxyService galaxyService)
+    public EnemyService(GameDbContext dbContext, GalaxyService galaxyService, RankingService? rankingService = null)
     {
         _dbContext = dbContext;
         _galaxyService = galaxyService;
+        _rankingService = rankingService;
         // NOTA: La inicialización es lazy via Initialize() o GenerateInitialEnemiesAsync()
     }
 
@@ -231,7 +262,8 @@ public class EnemyService
                         LastResourceUpdate = dbEnemy.LastResourceUpdate,
                         LastActivity = dbEnemy.LastActivity,
                         IsBot = dbEnemy.IsBot,
-                        ColonyCount = dbEnemy.ColonyCount
+                        ColonyCount = dbEnemy.ColonyCount,
+                        Personality = Enum.TryParse<BotPersonality>(dbEnemy.Personality, out var p) ? p : BotPersonality.Default
                     };
 
                     if (enemy.EmpireId == enemy.Id)
@@ -372,9 +404,20 @@ public class EnemyService
                 enemy.Ships["SC"] = _random.Next(0, 3);
                 enemy.Ships["LF"] = _random.Next(0, 3);
                 
+                // Assign personality: Economist 25%, Militarist 20%, Researcher 15%, Bunker 20%, Default 20%
+                double personalityRoll = _random.NextDouble();
+                enemy.Personality = personalityRoll switch
+                {
+                    < 0.25 => BotPersonality.Economist,
+                    < 0.45 => BotPersonality.Militarist,
+                    < 0.60 => BotPersonality.Researcher,
+                    < 0.80 => BotPersonality.Bunker,
+                    _      => BotPersonality.Default
+                };
+
                 // Update production rates
                 UpdateEnemyProductionRates(enemy);
-                
+
                 _enemies[key] = enemy;
                 enemiesCreated++;
             }
@@ -499,6 +542,7 @@ public class EnemyService
 
     private void ExecuteAttackReaction(Enemy enemy)
     {
+        ResolvePendingBotAttacks();
         UpdateEnemyResources(enemy);
 
         var availableDefenses = GetAvailableDefenses(enemy);
@@ -520,7 +564,7 @@ public class EnemyService
 
         while (actionsPerformed < actionsToPerform && possibleActions.Any())
         {
-            string actionType = possibleActions[_random.Next(possibleActions.Count)];
+            string actionType = PickAction(possibleActions, enemy.Personality);
             bool actionSuccess = false;
 
             switch (actionType)
@@ -571,6 +615,7 @@ public class EnemyService
 
     private void ExecuteEmpireAction(Enemy enemy, string? preferredBuilding, string? preferredTech, string? preferredShip, string? preferredDefense)
     {
+        ResolvePendingBotAttacks();
         var availableBuildings = GetAvailableBuildings(enemy);
         var availableTechs = GetAvailableTechnologies(enemy);
         var availableDefenses = GetAvailableDefenses(enemy);
@@ -590,7 +635,7 @@ public class EnemyService
 
         while (actionsPerformed < actionsToPerform && possibleActions.Any())
         {
-            string actionType = possibleActions[_random.Next(possibleActions.Count)];
+            string actionType = PickAction(possibleActions, enemy.Personality);
             bool actionSuccess = false;
 
             switch (actionType)
@@ -909,6 +954,60 @@ public class EnemyService
         return available;
     }
     
+    private async Task SaveModifiedEnemiesAsync(ICollection<Enemy> modified)
+    {
+        if (!modified.Any()) return;
+        try
+        {
+            await EnsureEnemyMemoryColumnsAsync();
+            var ids = modified.Select(e => e.Id).ToHashSet();
+            var existingEnemies = await _dbContext.Enemies.Where(e => ids.Contains(e.Id)).ToListAsync();
+            foreach (var enemy in modified)
+            {
+                var dbEnemy = existingEnemies.FirstOrDefault(e => e.Id == enemy.Id);
+                if (dbEnemy == null)
+                {
+                    dbEnemy = new EnemyEntity
+                    {
+                        Id = enemy.Id, Name = enemy.Name,
+                        Galaxy = enemy.Galaxy, System = enemy.System, Position = enemy.Position,
+                        EmpireId = enemy.EmpireId, IsHomeworld = enemy.IsHomeworld,
+                        Metal = enemy.Metal, Crystal = enemy.Crystal,
+                        Deuterium = enemy.Deuterium, Energy = enemy.Energy,
+                        LastResourceUpdate = enemy.LastResourceUpdate,
+                        LastActivity = enemy.LastActivity,
+                        IsBot = enemy.IsBot, ColonyCount = enemy.ColonyCount
+                    };
+                    _dbContext.Enemies.Add(dbEnemy);
+                }
+                else
+                {
+                    dbEnemy.Metal = enemy.Metal; dbEnemy.Crystal = enemy.Crystal;
+                    dbEnemy.Deuterium = enemy.Deuterium; dbEnemy.Energy = enemy.Energy;
+                    dbEnemy.LastResourceUpdate = enemy.LastResourceUpdate;
+                    dbEnemy.LastActivity = enemy.LastActivity;
+                    dbEnemy.ColonyCount = enemy.ColonyCount;
+                    dbEnemy.EmpireId = enemy.EmpireId; dbEnemy.IsHomeworld = enemy.IsHomeworld;
+                    dbEnemy.Name = enemy.Name;
+                }
+                dbEnemy.BuildingsJson    = System.Text.Json.JsonSerializer.Serialize(enemy.Buildings);
+                dbEnemy.TechnologiesJson = System.Text.Json.JsonSerializer.Serialize(enemy.Technologies);
+                dbEnemy.DefensesJson     = System.Text.Json.JsonSerializer.Serialize(enemy.Defenses);
+                dbEnemy.ShipsJson        = System.Text.Json.JsonSerializer.Serialize(enemy.Ships);
+                dbEnemy.ExploredGalaxiesJson      = System.Text.Json.JsonSerializer.Serialize(enemy.ExploredGalaxies);
+                dbEnemy.KnownEnemyCoordinatesJson = System.Text.Json.JsonSerializer.Serialize(enemy.KnownEnemyCoordinates);
+                dbEnemy.SpiedEnemyPowerJson       = System.Text.Json.JsonSerializer.Serialize(enemy.SpiedEnemyPower);
+                dbEnemy.Personality               = enemy.Personality.ToString();
+            }
+            await _dbContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving enemies: {ex.Message}");
+        }
+    }
+
+    // Full save kept for initial generation and resets.
     private async Task SaveEnemiesAsync()
     {
         try
@@ -967,6 +1066,7 @@ public class EnemyService
                 dbEnemy.ExploredGalaxiesJson = System.Text.Json.JsonSerializer.Serialize(enemy.ExploredGalaxies);
                 dbEnemy.KnownEnemyCoordinatesJson = System.Text.Json.JsonSerializer.Serialize(enemy.KnownEnemyCoordinates);
                 dbEnemy.SpiedEnemyPowerJson = System.Text.Json.JsonSerializer.Serialize(enemy.SpiedEnemyPower);
+                dbEnemy.Personality = enemy.Personality.ToString();
             }
             
             await _dbContext.SaveChangesAsync();
@@ -977,7 +1077,7 @@ public class EnemyService
         }
     }
 
-    private async Task EnsureEnemyMemoryColumnsAsync()
+    public async Task EnsureEnemyMemoryColumnsAsync()
     {
         if (_enemyMemoryColumnsReady) return;
         if (!_dbContext.Database.IsSqlite()) return;
@@ -1014,10 +1114,15 @@ public class EnemyService
             await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Enemies ADD COLUMN SpiedEnemyPowerJson TEXT NOT NULL DEFAULT '{}'");
         }
 
+        if (!existingColumns.Contains("Personality"))
+        {
+            await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Enemies ADD COLUMN Personality TEXT NOT NULL DEFAULT 'Default'");
+        }
+
         _enemyMemoryColumnsReady = true;
     }
     
-    // Triggered when player upgrades a building - 70% of enemies upgrade buildings
+    // Triggered when player upgrades a building - 70% of activated enemies upgrade buildings
     public async Task OnPlayerBuildingUpgraded(string buildingName)
     {
         List<IGrouping<Guid, Enemy>> enemyEmpires;
@@ -1026,26 +1131,26 @@ public class EnemyService
             enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
         }
 
-        foreach (var empire in enemyEmpires)
+        var modified = new List<Enemy>();
+        foreach (var empire in enemyEmpires.Where(_ => _random.NextDouble() < ACTIVATION_RATE))
         {
             bool empireActs = _random.NextDouble() < BUILDING_UPGRADE_CHANCE;
             foreach (var enemy in empire)
             {
                 UpdateEnemyResources(enemy);
-                if (empireActs)
-                {
-                    ExecuteEmpireAction(enemy, buildingName, null, null, null);
-                }
+                if (empireActs) ExecuteEmpireAction(enemy, buildingName, null, null, null);
+                modified.Add(enemy);
             }
 
             if (_random.NextDouble() < 0.05)
             {
                 var homeworld = empire.FirstOrDefault(e => e.IsHomeworld) ?? empire.First();
                 await TryEnemyColonize(homeworld);
+                foreach (var e in empire) if (!modified.Contains(e)) modified.Add(e);
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified);
         NotifyStateChanged();
     }
 
@@ -1138,20 +1243,19 @@ public class EnemyService
             enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
         }
 
-        foreach (var empire in enemyEmpires)
+        var modified = new List<Enemy>();
+        foreach (var empire in enemyEmpires.Where(_ => _random.NextDouble() < ACTIVATION_RATE))
         {
             bool empireActs = _random.NextDouble() < RESEARCH_CHANCE;
             foreach (var enemy in empire)
             {
                 UpdateEnemyResources(enemy);
-                if (empireActs)
-                {
-                    ExecuteEmpireAction(enemy, null, techName, null, null);
-                }
+                if (empireActs) ExecuteEmpireAction(enemy, null, techName, null, null);
+                modified.Add(enemy);
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified);
         NotifyStateChanged();
     }
     
@@ -1164,48 +1268,50 @@ public class EnemyService
             enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
         }
 
-        foreach (var empire in enemyEmpires)
+        var modified = new List<Enemy>();
+        foreach (var empire in enemyEmpires.Where(_ => _random.NextDouble() < ACTIVATION_RATE))
         {
             foreach (var enemy in empire)
             {
                 UpdateEnemyResources(enemy);
                 ExecuteEmpireAction(enemy, null, null, shipType, null);
+                modified.Add(enemy);
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified);
         NotifyStateChanged();
     }
     
-    // Triggered when player attacks - enemies build defenses or spend resources
+    // Triggered when player attacks - the attacked empire always reacts; others may react
     public async Task OnPlayerAttack(int targetGalaxy, int targetSystem, int targetPosition, bool wasVictory)
     {
         var key = $"{targetGalaxy}:{targetSystem}:{targetPosition}";
-        
+        var modified = new List<Enemy>();
+
         lock (_lockObject)
         {
-            // Find the target enemy
             if (_enemies.TryGetValue(key, out var targetEnemy))
             {
-                var empirePlanets = GetEmpirePlanets(targetEnemy);
-                foreach (var planet in empirePlanets)
+                foreach (var planet in GetEmpirePlanets(targetEnemy))
                 {
                     ExecuteAttackReaction(planet);
+                    modified.Add(planet);
                 }
             }
-            
-            // Other enemies may also react to the attack (fear factor)
+
+            // Fear factor: ACTIVATION_RATE of other enemies react
             foreach (var enemy in _enemies.Values)
             {
-                if (enemy.Coordinates != key && _random.NextDouble() < 0.3) // 30% of other enemies react
+                if (enemy.Coordinates != key && _random.NextDouble() < ACTIVATION_RATE)
                 {
-                    // First update their resources
                     ExecuteAttackReaction(enemy);
+                    modified.Add(enemy);
                 }
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified.Distinct().ToList());
         NotifyStateChanged();
     }
     
@@ -1218,20 +1324,19 @@ public class EnemyService
             enemyEmpires = _enemies.Values.GroupBy(e => e.EmpireId).ToList();
         }
 
-        foreach (var empire in enemyEmpires)
+        var modified = new List<Enemy>();
+        foreach (var empire in enemyEmpires.Where(_ => _random.NextDouble() < ACTIVATION_RATE))
         {
             bool empireActs = _random.NextDouble() < DEFENSE_BUILD_CHANCE;
             foreach (var enemy in empire)
             {
                 UpdateEnemyResources(enemy);
-                if (empireActs)
-                {
-                    ExecuteEmpireAction(enemy, null, null, null, defenseType);
-                }
+                if (empireActs) ExecuteEmpireAction(enemy, null, null, null, defenseType);
+                modified.Add(enemy);
             }
         }
-        
-        await SaveEnemiesAsync();
+
+        await SaveModifiedEnemiesAsync(modified);
         NotifyStateChanged();
     }
 
@@ -1296,9 +1401,117 @@ public class EnemyService
         if (!attackShips.Any()) return false;
 
         string targetCoordinates = viableTargets[_random.Next(viableTargets.Count)];
-        OnEnemyAttackLaunched?.Invoke(enemy.Coordinates, targetCoordinates, attackShips);
+        bool targetIsBot = _enemies.ContainsKey(targetCoordinates);
+
+        if (targetIsBot)
+        {
+            // Bot-vs-bot: schedule lazy combat — flight takes ~30 seconds (game speed)
+            _pendingBotAttacks.Add(new PendingBotAttack
+            {
+                AttackerCoordinates = enemy.Coordinates,
+                TargetCoordinates   = targetCoordinates,
+                Ships               = new Dictionary<string, int>(attackShips),
+                ArrivalTime         = DateTime.Now.AddSeconds(30)
+            });
+        }
+        else
+        {
+            // Attack the player — handled by FleetService
+            OnEnemyAttackLaunched?.Invoke(enemy.Coordinates, targetCoordinates, attackShips);
+        }
+
+        // Deduct ships committed to the attack (in transit regardless of target type)
+        foreach (var ship in attackShips)
+        {
+            enemy.Ships[ship.Key] -= ship.Value;
+            if (enemy.Ships[ship.Key] <= 0) enemy.Ships.Remove(ship.Key);
+        }
+
         enemy.LastActivity = DateTime.Now;
         return true;
+    }
+
+    /// <summary>
+    /// Resolves any pending bot-vs-bot attacks whose ArrivalTime has passed.
+    /// Called at the start of every bot action execution so resolution is lazy.
+    /// </summary>
+    private void ResolvePendingBotAttacks()
+    {
+        var now = DateTime.Now;
+        var arrived = _pendingBotAttacks.Where(a => now >= a.ArrivalTime).ToList();
+        if (!arrived.Any()) return;
+
+        foreach (var attack in arrived)
+        {
+            _pendingBotAttacks.Remove(attack);
+
+            if (!_enemies.TryGetValue(attack.AttackerCoordinates, out var attacker)) continue;
+            if (!_enemies.TryGetValue(attack.TargetCoordinates,   out var defender)) continue;
+
+            long atkPower = CalculateFleetPower(attack.Ships);
+            long defPower = CalculateEnemyPower(defender);
+
+            bool attackerWon = atkPower > defPower;
+
+            if (attackerWon)
+            {
+                // Attacker: 80% of sent ships return
+                foreach (var kvp in attack.Ships)
+                {
+                    int returning = (int)Math.Ceiling(kvp.Value * 0.80);
+                    if (returning <= 0) continue;
+                    attacker.Ships[kvp.Key] = attacker.Ships.GetValueOrDefault(kvp.Key, 0) + returning;
+                }
+                // Defender loses 50% ships and 20% defenses; attacker loots 30% of resources
+                foreach (var ship in defender.Ships.Keys.ToList())
+                    defender.Ships[ship] = (int)Math.Floor(defender.Ships[ship] * 0.50);
+                foreach (var def in defender.Defenses.Keys.ToList())
+                    defender.Defenses[def] = (int)Math.Floor(defender.Defenses[def] * 0.80);
+                long loot = (long)(defender.Metal * 0.30);
+                defender.Metal -= loot; attacker.Metal += loot;
+                loot = (long)(defender.Crystal * 0.30);
+                defender.Crystal -= loot; attacker.Crystal += loot;
+
+                _rankingService?.RecordCombat(
+                    attacker.Coordinates, attacker.Name, true,
+                    defender.Coordinates, defender.Name, true,
+                    attackerWon: true,
+                    defenderShipPts: RankingService.CalcPoints(defPower / 2, 0, 0),
+                    defenderDefPts: 0, attackerShipPts: 0);
+            }
+            else
+            {
+                // Attacker loses: 40% of ships return
+                foreach (var kvp in attack.Ships)
+                {
+                    int returning = (int)Math.Ceiling(kvp.Value * 0.40);
+                    if (returning <= 0) continue;
+                    attacker.Ships[kvp.Key] = attacker.Ships.GetValueOrDefault(kvp.Key, 0) + returning;
+                }
+                // Defender loses 10% defenses from the battle
+                foreach (var def in defender.Defenses.Keys.ToList())
+                    defender.Defenses[def] = (int)Math.Floor(defender.Defenses[def] * 0.90);
+
+                _rankingService?.RecordCombat(
+                    attacker.Coordinates, attacker.Name, true,
+                    defender.Coordinates, defender.Name, true,
+                    attackerWon: false,
+                    defenderShipPts: 0, defenderDefPts: 0,
+                    attackerShipPts: RankingService.CalcPoints(atkPower / 2, 0, 0));
+            }
+        }
+    }
+
+    // Power of a specific ship set (used for in-transit fleets)
+    private long CalculateFleetPower(Dictionary<string, int> ships)
+    {
+        long power = 0;
+        foreach (var s in ships)
+        {
+            var (m, c, d) = GetShipBaseCost(s.Key);
+            power += (m + c + d) * s.Value;
+        }
+        return power;
     }
 
     private long EstimateTargetPower(string coordinates)
@@ -1363,11 +1576,7 @@ public class EnemyService
         
         int currentLevel = enemy.Buildings[buildingName];
         
-        // Calculate cost (simplified formula)
-        double scaling = 2.0;
-        long metalCost = (long)(GetBuildingBaseCost(buildingName, "Metal") * Math.Pow(scaling, currentLevel));
-        long crystalCost = (long)(GetBuildingBaseCost(buildingName, "Crystal") * Math.Pow(scaling, currentLevel));
-        long deuteriumCost = (long)(GetBuildingBaseCost(buildingName, "Deuterium") * Math.Pow(scaling, currentLevel));
+        var (metalCost, crystalCost, deuteriumCost) = UnitCosts.Building(buildingName, currentLevel);
         
         // Check if enemy has enough resources
         if (enemy.Metal >= metalCost && enemy.Crystal >= crystalCost && enemy.Deuterium >= deuteriumCost)
@@ -1376,15 +1585,16 @@ public class EnemyService
             enemy.Metal -= metalCost;
             enemy.Crystal -= crystalCost;
             enemy.Deuterium -= deuteriumCost;
-            
+
             // Upgrade building
             enemy.Buildings[buildingName] = currentLevel + 1;
+            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
-        
+
         return false;
     }
-    
+
     private bool TryResearchTechnology(Enemy enemy, string techName)
     {
         // First check if enemy meets requirements for this technology
@@ -1399,11 +1609,7 @@ public class EnemyService
         // Max level check
         if (currentLevel >= 20) return false;
         
-        // Calculate cost
-        double scaling = 2.0;
-        long metalCost = (long)(GetTechBaseCost(techName, "Metal") * Math.Pow(scaling, currentLevel));
-        long crystalCost = (long)(GetTechBaseCost(techName, "Crystal") * Math.Pow(scaling, currentLevel));
-        long deuteriumCost = (long)(GetTechBaseCost(techName, "Deuterium") * Math.Pow(scaling, currentLevel));
+        var (metalCost, crystalCost, deuteriumCost) = UnitCosts.Technology(techName, currentLevel);
         
         // Check if enemy has enough resources
         if (enemy.Metal >= metalCost && enemy.Crystal >= crystalCost && enemy.Deuterium >= deuteriumCost)
@@ -1412,15 +1618,16 @@ public class EnemyService
             enemy.Metal -= metalCost;
             enemy.Crystal -= crystalCost;
             enemy.Deuterium -= deuteriumCost;
-            
+
             // Research technology
             enemy.Technologies[techName] = currentLevel + 1;
+            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
-        
+
         return false;
     }
-    
+
     private bool TryBuildDefense(Enemy enemy, string defenseType)
     {
         // First check if enemy meets requirements for this defense
@@ -1437,17 +1644,18 @@ public class EnemyService
             enemy.Metal -= metalCost;
             enemy.Crystal -= crystalCost;
             enemy.Deuterium -= deuteriumCost;
-            
+
             // Build defense
             if (!enemy.Defenses.ContainsKey(defenseType))
                 enemy.Defenses[defenseType] = 0;
             enemy.Defenses[defenseType]++;
+            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
-        
+
         return false;
     }
-    
+
     private bool TryBuildShip(Enemy enemy, string shipType)
     {
         // First check if enemy meets requirements for this ship
@@ -1464,93 +1672,78 @@ public class EnemyService
             enemy.Metal -= metalCost;
             enemy.Crystal -= crystalCost;
             enemy.Deuterium -= deuteriumCost;
-            
+
             // Build ship
             if (!enemy.Ships.ContainsKey(shipType))
                 enemy.Ships[shipType] = 0;
             enemy.Ships[shipType]++;
+            _rankingService?.AddSpendingPoints(enemy.Coordinates, enemy.Name, true, metalCost, crystalCost, deuteriumCost);
             return true;
         }
-        
+
         return false;
     }
     
-    private long GetBuildingBaseCost(string buildingName, string resourceType)
+    /// <summary>
+    /// <summary>
+    /// Picks an action from the available list using personality-based weights.
+    /// Universal rule: buildings always score 6 (highest) for every personality --
+    /// infrastructure must be developed before ships or defenses.
+    /// </summary>
+    private string PickAction(List<string> available, BotPersonality personality)
     {
-        // Simplified base costs
-        return buildingName switch
+        int Weight(string action) => (personality, action) switch
         {
-            "Metal Mine" => resourceType == "Metal" ? 60 : resourceType == "Crystal" ? 15 : 0,
-            "Crystal Mine" => resourceType == "Metal" ? 48 : resourceType == "Crystal" ? 24 : 0,
-            "Deuterium Synthesizer" => resourceType == "Metal" ? 225 : resourceType == "Crystal" ? 75 : 0,
-            "Solar Plant" => resourceType == "Metal" ? 75 : resourceType == "Crystal" ? 30 : 0,
-            "Robotics Factory" => resourceType == "Metal" ? 400 : resourceType == "Crystal" ? 120 : resourceType == "Deuterium" ? 200 : 0,
-            "Shipyard" => resourceType == "Metal" ? 400 : resourceType == "Crystal" ? 200 : resourceType == "Deuterium" ? 100 : 0,
-            "Research Lab" => resourceType == "Metal" ? 200 : resourceType == "Crystal" ? 400 : resourceType == "Deuterium" ? 200 : 0,
-            "Metal Storage" => resourceType == "Metal" ? 1000 : 0,
-            "Crystal Storage" => resourceType == "Metal" ? 1000 : resourceType == "Crystal" ? 500 : 0,
-            "Deuterium Tank" => resourceType == "Metal" ? 1000 : resourceType == "Crystal" ? 1000 : 0,
-            _ => resourceType == "Metal" ? 500 : resourceType == "Crystal" ? 250 : 0
+            (_, "building")                          => 6,
+            (BotPersonality.Economist, "research")   => 2,
+            (BotPersonality.Economist, "explore")    => 3,
+            (BotPersonality.Economist, "spy")        => 2,
+            (BotPersonality.Economist, "ship")       => 2,
+            (BotPersonality.Economist, "defense")    => 1,
+            (BotPersonality.Economist, "attack")     => 0,
+            (BotPersonality.Militarist, "ship")      => 4,
+            (BotPersonality.Militarist, "attack")    => 3,
+            (BotPersonality.Militarist, "spy")       => 3,
+            (BotPersonality.Militarist, "explore")   => 2,
+            (BotPersonality.Militarist, "research")  => 2,
+            (BotPersonality.Militarist, "defense")   => 1,
+            (BotPersonality.Researcher, "research")  => 5,
+            (BotPersonality.Researcher, "explore")   => 4,
+            (BotPersonality.Researcher, "spy")       => 3,
+            (BotPersonality.Researcher, "defense")   => 1,
+            (BotPersonality.Researcher, "ship")      => 1,
+            (BotPersonality.Researcher, "attack")    => 0,
+            (BotPersonality.Bunker, "defense")       => 5,
+            (BotPersonality.Bunker, "research")      => 2,
+            (BotPersonality.Bunker, "explore")       => 1,
+            (BotPersonality.Bunker, "spy")           => 1,
+            (BotPersonality.Bunker, "ship")          => 0,
+            (BotPersonality.Bunker, "attack")        => 0,
+            (BotPersonality.Default, "ship")         => 2,
+            (BotPersonality.Default, "defense")      => 2,
+            (BotPersonality.Default, "research")     => 2,
+            (BotPersonality.Default, "explore")      => 2,
+            (BotPersonality.Default, "spy")          => 2,
+            (BotPersonality.Default, "attack")       => 1,
+            _                                        => 1
         };
-    }
-    
-    private long GetTechBaseCost(string techName, string resourceType)
-    {
-        // Simplified base costs
-        return techName switch
+
+        var weighted = new List<string>();
+        foreach (var a in available)
         {
-            "Espionage Technology" => resourceType == "Metal" ? 200 : resourceType == "Crystal" ? 1000 : resourceType == "Deuterium" ? 200 : 0,
-            "Computer Technology" => resourceType == "Crystal" ? 400 : resourceType == "Deuterium" ? 600 : 0,
-            "Weapons Technology" => resourceType == "Metal" ? 800 : resourceType == "Crystal" ? 200 : 0,
-            "Shielding Technology" => resourceType == "Metal" ? 200 : resourceType == "Crystal" ? 600 : 0,
-            "Armour Technology" => resourceType == "Metal" ? 1000 : 0,
-            "Energy Technology" => resourceType == "Crystal" ? 800 : resourceType == "Deuterium" ? 400 : 0,
-            "Hyperspace Technology" => resourceType == "Crystal" ? 4000 : resourceType == "Deuterium" ? 2000 : 0,
-            "Combustion Drive" => resourceType == "Metal" ? 400 : resourceType == "Deuterium" ? 600 : 0,
-            "Impulse Drive" => resourceType == "Metal" ? 2000 : resourceType == "Crystal" ? 4000 : resourceType == "Deuterium" ? 600 : 0,
-            "Hyperspace Drive" => resourceType == "Metal" ? 10000 : resourceType == "Crystal" ? 20000 : resourceType == "Deuterium" ? 6000 : 0,
-            "Laser Technology" => resourceType == "Metal" ? 200 : resourceType == "Crystal" ? 100 : 0,
-            "Ion Technology" => resourceType == "Metal" ? 1000 : resourceType == "Crystal" ? 300 : resourceType == "Deuterium" ? 100 : 0,
-            "Plasma Technology" => resourceType == "Metal" ? 2000 : resourceType == "Crystal" ? 4000 : resourceType == "Deuterium" ? 1000 : 0,
-            _ => resourceType == "Metal" ? 500 : resourceType == "Crystal" ? 250 : 0
-        };
+            int w = Weight(a);
+            for (int i = 0; i < w; i++) weighted.Add(a);
+        }
+        if (!weighted.Any()) return available[_random.Next(available.Count)];
+        return weighted[_random.Next(weighted.Count)];
     }
-    
-    private (long metal, long crystal, long deuterium) GetDefenseBaseCost(string defenseType)
-    {
-        return defenseType switch
-        {
-            "Rocket Launcher" => (2000, 0, 0),
-            "Light Laser" => (1500, 500, 0),
-            "Heavy Laser" => (6000, 2000, 0),
-            "Gauss Cannon" => (20000, 15000, 2000),
-            "Ion Cannon" => (2000, 6000, 0),
-            "Plasma Turret" => (50000, 50000, 30000),
-            "Small Shield Dome" => (10000, 10000, 0),
-            "Large Shield Dome" => (50000, 50000, 0),
-            "Anti-Ballistic Missile" => (8000, 0, 2000),
-            _ => (1000, 500, 0)
-        };
-    }
-    
-    private (long metal, long crystal, long deuterium) GetShipBaseCost(string shipType)
-    {
-        return shipType switch
-        {
-            "SC" => (2000, 2000, 0),
-            "LC" => (6000, 6000, 0),
-            "LF" => (3000, 1000, 0),
-            "HF" => (6000, 4000, 0),
-            "CR" => (20000, 7000, 2000),
-            "BS" => (45000, 15000, 0),
-            "CS" => (10000, 20000, 10000),
-            "REC" => (10000, 6000, 2000),
-            "ESP" => (0, 1000, 0),
-            "DST" => (60000, 50000, 15000),
-            "RIP" => (5000000, 4000000, 1000000),
-            _ => (5000, 2000, 0)
-        };
-    }
+
+    // Cost lookups delegated to the shared UnitCosts catalog.
+    private static (long metal, long crystal, long deuterium) GetDefenseBaseCost(string defenseType)
+        => UnitCosts.Defense(defenseType);
+
+    private static (long metal, long crystal, long deuterium) GetShipBaseCost(string shipType)
+        => UnitCosts.Ship(shipType);
     
     public Enemy? GetEnemy(int galaxy, int system, int position)
     {
