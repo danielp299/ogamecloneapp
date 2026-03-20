@@ -52,6 +52,7 @@ public class DefenseService
     private readonly DevModeService _devModeService;
     private readonly EnemyService _enemyService;
     private readonly PlayerStateService _playerStateService;
+    private readonly RankingService _rankingService;
 
     public List<DefenseUnit> DefenseDefinitions { get; private set; } = new();
     
@@ -67,7 +68,7 @@ public class DefenseService
     public event Action? OnChange;
     private bool _isInitialized = false;
 
-    public DefenseService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
+    public DefenseService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService, RankingService? rankingService = null)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
@@ -76,6 +77,7 @@ public class DefenseService
         _devModeService = devModeService;
         _enemyService = enemyService;
         _playerStateService = playerStateService;
+        _rankingService = rankingService;
         
         InitializeDefenses();
 
@@ -330,7 +332,8 @@ public class DefenseService
         if (await _resourceService.HasResourcesAsync(totalMetal, totalCrystal, totalDeuterium))
         {
             await _resourceService.ConsumeResourcesAsync(totalMetal, totalCrystal, totalDeuterium);
-            
+            _rankingService?.AddSpendingPoints(RankingService.PlayerKey, RankingService.PlayerName, false, totalMetal, totalCrystal, totalDeuterium);
+
             var calculatedDuration = CalculateDefenseConstructionDuration(unit);
             var finalDuration = _devModeService.GetDuration(calculatedDuration, 1);
 

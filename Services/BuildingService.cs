@@ -55,6 +55,7 @@ public class BuildingService
     private readonly DevModeService _devModeService;
     private readonly EnemyService _enemyService;
     private readonly PlayerStateService _playerStateService;
+    private readonly RankingService _rankingService;
     public List<Building> Buildings { get; private set; } = new();
     public List<Building> ConstructionQueue { get; private set; } = new();
     private List<QueuedBuildingState> _allConstructionQueue = new();
@@ -83,13 +84,14 @@ private bool _isInitialized = false;
         set => _maxQueueSize = Math.Max(1, value);
     }
 
-    public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService)
+    public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService, RankingService? rankingService = null)
     {
         _dbContext = dbContext;
         _resourceService = resourceService;
         _devModeService = devModeService;
         _enemyService = enemyService;
         _playerStateService = playerStateService;
+        _rankingService = rankingService;
         
         InitializeBuildings();
         _ = ProcessQueueLoop();
@@ -551,6 +553,7 @@ private bool _isInitialized = false;
         if (await _resourceService.HasResourcesAsync(queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost))
         {
             await _resourceService.ConsumeResourcesAsync(queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost);
+            _rankingService?.AddSpendingPoints(RankingService.PlayerKey, RankingService.PlayerName, false, queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost);
 
             var calculatedDuration = CalculateConstructionDuration(queueBuilding);
             var duration = _devModeService.GetDuration(calculatedDuration, 1);
