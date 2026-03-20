@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "Bash(dotnet build:*)",
+      "Bash(xargs grep:*)",
+      "Bash(git -C /c/Users/danie/OneDrive/Documentos/git/ogamecloneapp branch -v)",
+      "Bash(git -C /c/Users/danie/OneDrive/Documentos/git/ogamecloneapp status --short)",
+      "Bash(cp /c/Users/danie/OneDrive/Documentos/git/ogamecloneapp/Services/RankingService.cs /c/Users/danie/OneDrive/Documentos/git/ogamecloneapp/.claude/worktrees/hopeful-villani/Services/RankingService.cs)",
+      "Bash(cp /c/Users/danie/OneDrive/Documentos/git/ogamecloneapp/Components/Pages/RankingPage.razor /c/Users/danie/OneDrive/Documentos/git/ogamecloneapp/.claude/worktrees/hopeful-villani/Components/Pages/RankingPage.razor)",
+      "Bash(git -C /c/Users/danie/OneDrive/Documentos/git/ogamecloneapp/.claude/worktrees/hopeful-villani add Services/RankingService.cs Components/Pages/RankingPage.razor Program.cs Components/Layout/NavMenu.razor Services/EnemyService.cs)",
+      "Bash(git -C /c/Users/danie/OneDrive/Documentos/git/ogamecloneapp/.claude/worktrees/hopeful-villani status --short)",
+      "Bash(git -C:*)"
     ]
   }
 }
