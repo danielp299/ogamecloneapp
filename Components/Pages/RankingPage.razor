@@ -1,0 +1,312 @@
+@page "/ranking"
+@using myapp.Services
+@inject RankingService RankingService
+@implements IDisposable
+
+<div class="ranking-page">
+    <div class="banner">
+        <img src="assets/banners/banner_galaxy.jpg" alt="Ranking" onerror="this.style.display='none'" />
+        <div class="banner-title">Ranking</div>
+    </div>
+
+    <div class="ranking-container">
+        <table class="ranking-table">
+            <thead>
+                <tr>
+                    <th class="col-rank">#</th>
+                    <th class="col-name">Jugador</th>
+                    <th class="col-type">Tipo</th>
+                    <th class="col-points">Puntos</th>
+                    <th class="col-stars">Victorias</th>
+                    <th class="col-defeats">Derrotas</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var rankings = RankingService.GetRankings();
+                    int rank = 1;
+                }
+                @foreach (var entry in rankings)
+                {
+                    <tr class="@(entry.PlayerKey == RankingService.PlayerKey ? "row-player" : "row-bot")">
+                        <td class="col-rank">@rank</td>
+                        <td class="col-name">
+                            <span class="player-name">@entry.DisplayName</span>
+                            @if (!string.IsNullOrEmpty(entry.PlayerKey) && entry.PlayerKey != RankingService.PlayerKey)
+                            {
+                                <span class="coords">[@entry.PlayerKey]</span>
+                            }
+                        </td>
+                        <td class="col-type">
+                            @if (entry.IsBot)
+                            {
+                                <span class="badge-bot">Bot</span>
+                            }
+                            else
+                            {
+                                <span class="badge-player">Jugador</span>
+                            }
+                        </td>
+                        <td class="col-points">@entry.Points.ToString("N0")</td>
+                        <td class="col-stars">
+                            @for (int i = 0; i < entry.Stars; i++)
+                            {
+                                <span class="star filled">★</span>
+                            }
+                            @for (int i = entry.Stars; i < 3; i++)
+                            {
+                                <span class="star empty">☆</span>
+                            }
+                        </td>
+                        <td class="col-defeats">
+                            @for (int i = 0; i < entry.Defeats; i++)
+                            {
+                                <span class="defeat-mark">✕</span>
+                            }
+                            @for (int i = entry.Defeats; i < 3; i++)
+                            {
+                                <span class="defeat-empty">·</span>
+                            }
+                        </td>
+                    </tr>
+                    rank++;
+                }
+                @if (!rankings.Any())
+                {
+                    <tr>
+                        <td colspan="6" class="empty-msg">No hay datos de ranking todavia. Empieza a construir y combatir para aparecer en la tabla.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="legend">
+            <h3>Reglas de puntuacion</h3>
+            <ul>
+                <li>Cada 1.000 Metal gastado = <strong>1 pto</strong></li>
+                <li>Cada 1.000 Crystal gastado = <strong>1.2 ptos</strong></li>
+                <li>Cada 1.000 Deuterio gastado = <strong>1.5 ptos</strong></li>
+                <li>Destruir naves enemigas = <strong>+10%</strong> del valor en puntos</li>
+                <li>Destruir defensas enemigas = <strong>+5%</strong> del valor en puntos</li>
+                <li>Naves/Defensas propias destruidas = <strong>-puntos</strong> equivalentes</li>
+                <li><span class="star filled">★</span> = Victoria en batalla (max 3)</li>
+                <li><span class="defeat-mark">✕</span> = Derrota en batalla (max 3)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    .ranking-page {
+        min-height: 100vh;
+        background: #000;
+        color: #eee;
+    }
+
+    .banner {
+        position: relative;
+        width: 100%;
+        height: 120px;
+        overflow: hidden;
+        background: linear-gradient(135deg, #0a0a1a, #1a1a3e);
+        display: flex;
+        align-items: center;
+    }
+
+    .banner img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.4;
+        position: absolute;
+        top: 0; left: 0;
+    }
+
+    .banner-title {
+        position: relative;
+        z-index: 1;
+        font-size: 2rem;
+        font-weight: bold;
+        color: #ffd700;
+        text-shadow: 0 0 20px rgba(255,215,0,0.5);
+        padding: 0 2rem;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+    }
+
+    .ranking-container {
+        padding: 2rem;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .ranking-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #111;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    .ranking-table thead th {
+        background: #1a1a2e;
+        color: #ffd700;
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 1px;
+        border-bottom: 2px solid #333;
+    }
+
+    .ranking-table tbody tr {
+        border-bottom: 1px solid #222;
+        transition: background 0.2s;
+    }
+
+    .ranking-table tbody tr:hover {
+        background: #1a1a1a;
+    }
+
+    .row-player {
+        background: rgba(255, 215, 0, 0.05) !important;
+        border-left: 3px solid #ffd700;
+    }
+
+    .row-player:hover {
+        background: rgba(255, 215, 0, 0.1) !important;
+    }
+
+    .ranking-table td {
+        padding: 10px 16px;
+        color: #ccc;
+        font-size: 0.95rem;
+    }
+
+    .col-rank {
+        font-weight: bold;
+        color: #888;
+        width: 50px;
+        text-align: center;
+    }
+
+    .row-player .col-rank { color: #ffd700; }
+
+    .col-name {
+        font-weight: 600;
+    }
+
+    .player-name { color: #eee; }
+    .row-player .player-name { color: #ffd700; }
+
+    .coords {
+        font-size: 0.75rem;
+        color: #666;
+        margin-left: 8px;
+    }
+
+    .col-points {
+        font-family: monospace;
+        font-size: 1rem;
+        color: #4fc3f7;
+        font-weight: bold;
+    }
+
+    .badge-player {
+        background: #1a3a6e;
+        color: #4fc3f7;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.78rem;
+    }
+
+    .badge-bot {
+        background: #2a1a1a;
+        color: #e57373;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.78rem;
+    }
+
+    .star {
+        font-size: 1.2rem;
+        margin: 0 1px;
+    }
+
+    .star.filled { color: #ffd700; }
+    .star.empty  { color: #333; }
+
+    .defeat-mark {
+        color: #e57373;
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin: 0 2px;
+    }
+
+    .defeat-empty {
+        color: #333;
+        font-size: 1.1rem;
+        margin: 0 2px;
+    }
+
+    .empty-msg {
+        text-align: center;
+        color: #555;
+        padding: 40px !important;
+        font-style: italic;
+    }
+
+    .legend {
+        margin-top: 2rem;
+        background: #111;
+        border: 1px solid #222;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+
+    .legend h3 {
+        color: #ffd700;
+        margin: 0 0 1rem 0;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .legend ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 6px;
+    }
+
+    .legend li {
+        color: #aaa;
+        font-size: 0.88rem;
+        padding: 4px 0;
+    }
+
+    .legend strong {
+        color: #eee;
+    }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        RankingService.OnChange += OnRankingChanged;
+    }
+
+    private void OnRankingChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        RankingService.OnChange -= OnRankingChanged;
+    }
+}
