@@ -64,6 +64,13 @@ public class RankingService
         if (connection.State != System.Data.ConnectionState.Open)
             await connection.OpenAsync();
 
+        // Remove stale entries that used planet coordinates as key (e.g. "1:2:3")
+        await using (var cleanCmd = connection.CreateCommand())
+        {
+            cleanCmd.CommandText = "DELETE FROM Rankings WHERE PlayerKey GLOB '[0-9]*:[0-9]*:[0-9]*'";
+            await cleanCmd.ExecuteNonQueryAsync();
+        }
+
         await using var cmd = connection.CreateCommand();
         cmd.CommandText = "SELECT PlayerKey, DisplayName, IsBot, Points, Stars, Defeats FROM Rankings";
         await using var reader = await cmd.ExecuteReaderAsync();
@@ -94,6 +101,24 @@ public class RankingService
             };
             _ = PersistEntryAsync(PlayerKey);
         }
+    }
+
+    // Pre-registers bots so they appear in the ranking even before any activity.
+    // Pass one (empireId, homeworldName) per empire.
+    public void EnsureBotEntries(IEnumerable<(string empireId, string name)> bots)
+    {
+        if (!_isInitialized) return;
+        bool changed = false;
+        foreach (var (empireId, name) in bots)
+        {
+            if (!_rankings.ContainsKey(empireId))
+            {
+                _rankings[empireId] = new RankingEntry { PlayerKey = empireId, DisplayName = name, IsBot = true };
+                _ = PersistEntryAsync(empireId);
+                changed = true;
+            }
+        }
+        if (changed) OnChange?.Invoke();
     }
 
     private RankingEntry EnsureEntry(string playerKey, string displayName, bool isBot)

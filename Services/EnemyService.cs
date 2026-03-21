@@ -101,7 +101,7 @@ public class EnemyService
     public event Action? OnChange;
     public event Action<string, string, Dictionary<string, int>>? OnEnemyAttackLaunched;
     
-    private const int MAX_ENEMIES = 100;
+    private const int MAX_ENEMIES = 99;
     // Fraction of enemy empires eligible to react per player-action event.
     private const double ACTIVATION_RATE = 0.50;
     private const double BUILDING_UPGRADE_CHANCE = 0.70; // 70% (of activated empires)
@@ -223,6 +223,25 @@ public class EnemyService
         if (_isInitialized) return;
         await LoadEnemiesAsync();
         _isInitialized = true;
+        RegisterAllBotsInRanking();
+    }
+
+    private void RegisterAllBotsInRanking()
+    {
+        if (_rankingService == null) return;
+        IEnumerable<(string, string)> bots;
+        lock (_lockObject)
+        {
+            bots = _enemies.Values
+                .GroupBy(e => e.EmpireId)
+                .Select(g =>
+                {
+                    var hw = g.FirstOrDefault(e => e.IsHomeworld) ?? g.First();
+                    return (g.Key.ToString(), hw.Name);
+                })
+                .ToList();
+        }
+        _rankingService.EnsureBotEntries(bots);
     }
 
     public void ResetState()
@@ -427,6 +446,7 @@ public class EnemyService
         await SaveEnemiesAsync();
         
         _isInitialized = true;
+        RegisterAllBotsInRanking();
         NotifyStateChanged();
         Console.WriteLine($"Generated {enemiesCreated} initial enemies");
     }
@@ -1754,6 +1774,15 @@ public class EnemyService
         }
     }
     
+    public string? GetHomeworldName(Guid empireId)
+    {
+        lock (_lockObject)
+        {
+            var homeworld = _enemies.Values.FirstOrDefault(e => e.EmpireId == empireId && e.IsHomeworld);
+            return homeworld?.Name;
+        }
+    }
+
     public List<Enemy> GetEnemiesInSystem(int galaxy, int system)
     {
         lock (_lockObject)

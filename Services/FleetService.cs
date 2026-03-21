@@ -1216,8 +1216,9 @@ public class FleetService
             _ = _enemyService.OnPlayerAttack(g, s, p, attackerWon);
 
             // Ranking: calcular valores de unidades destruidas
-            string botKey = mission.TargetCoordinates;
-            string botName = _enemyService.GetEnemy(g, s, p)?.Name ?? botKey;
+            var botEnemy = _enemyService.GetEnemy(g, s, p);
+            string botKey = botEnemy != null ? botEnemy.EmpireId.ToString() : mission.TargetCoordinates;
+            string botName = botEnemy != null ? (_enemyService.GetHomeworldName(botEnemy.EmpireId) ?? botEnemy.Name) : mission.TargetCoordinates;
 
             double defShipPts = 0;
             foreach (var loss in defenderShipLosses)
@@ -1549,8 +1550,9 @@ public class FleetService
         // Ranking: incoming attack combat result
         if (TryParseCoordinates(mission.OriginCoordinates, out int og, out int os, out int op))
         {
-            string botKey = mission.OriginCoordinates;
-            string botName = _enemyService.GetEnemy(og, os, op)?.Name ?? botKey;
+            var botEnemyIncoming = _enemyService.GetEnemy(og, os, op);
+            string botKey = botEnemyIncoming != null ? botEnemyIncoming.EmpireId.ToString() : mission.OriginCoordinates;
+            string botName = botEnemyIncoming != null ? (_enemyService.GetHomeworldName(botEnemyIncoming.EmpireId) ?? botEnemyIncoming.Name) : mission.OriginCoordinates;
 
             double defShipPts = 0;
             foreach (var loss in defenderLossesShips)
