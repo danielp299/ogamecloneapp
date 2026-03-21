@@ -40,7 +40,7 @@
                 Select the asset pack to use for all game images.
             </p>
             <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                @foreach (var skin in new[] { "skin1" })
+                @foreach (var skin in new[] { "skin1", "skin2" })
                 {
                     <button class="ogame-btn @(SkinConfig.CurrentSkin == skin ? "btn-primary" : "btn-secondary")"
                             @onclick="() => SetSkin(skin)">
