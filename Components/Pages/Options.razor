@@ -4,6 +4,7 @@
 @inject GameInitializationService GameInitializationService
 @inject PlayerStateService PlayerStateService
 @inject DevModeService DevModeService
+@inject PlayerProfileService PlayerProfileService
 @inject NavigationManager Navigation
 @implements IDisposable
 
@@ -42,9 +43,9 @@
             <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                 @foreach (var skin in new[] { "skin1", "skin2" })
                 {
-                    <button class="ogame-btn @(SkinConfig.CurrentSkin == skin ? "btn-primary" : "btn-secondary")"
-                            @onclick="() => SetSkin(skin)">
-                        @skin @(SkinConfig.CurrentSkin == skin ? "✓" : "")
+                    <button class="ogame-btn @(PlayerProfileService.CurrentSkin == skin ? "btn-primary" : "btn-secondary")"
+                            @onclick="async () => await SetSkinAsync(skin)">
+                        @skin @(PlayerProfileService.CurrentSkin == skin ? "✓" : "")
                     </button>
                 }
             </div>
@@ -225,9 +226,9 @@
         }
     }
 
-    private void SetSkin(string skin)
+    private async Task SetSkinAsync(string skin)
     {
-        SkinConfig.CurrentSkin = skin;
+        await PlayerProfileService.SetSkinAsync(skin);
         ShowStatus($"Skin changed to {skin}", false);
     }
 

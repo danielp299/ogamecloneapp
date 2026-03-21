@@ -29,6 +29,7 @@ builder.Services.AddSingleton<MessageService>();
 builder.Services.AddSingleton<DevModeService>();
 builder.Services.AddSingleton<EnemyService>();
 builder.Services.AddSingleton<RankingService>();
+builder.Services.AddSingleton<PlayerProfileService>();
 
 builder.Services.AddCors(options =>
 {
@@ -66,6 +67,8 @@ using (var scope = app.Services.CreateScope())
     var messageService = scope.ServiceProvider.GetRequiredService<MessageService>();
     var playerStateService = scope.ServiceProvider.GetRequiredService<PlayerStateService>();
     var rankingService = scope.ServiceProvider.GetRequiredService<RankingService>();
+    // Load player profile (creates it if missing, syncs SkinConfig)
+    scope.ServiceProvider.GetRequiredService<PlayerProfileService>();
 
     await rankingService.InitializeAsync();
 
