@@ -3,11 +3,12 @@
 @inject GalaxyService GalaxyService
 @inject NavigationManager Navigation
 
+
 <PageTitle>Galaxy</PageTitle>
 
 <div class="ogame-container">
     <!-- Banner -->
-    <div class="ogame-banner" style="background-image: url('assets/banners/tech-banner.jpg');">
+    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/tech-banner.jpg")');">
         <h2>Galaxy View</h2>
         <p>Explore the universe and launch missions</p>
     </div>
@@ -62,7 +63,7 @@
                                 <strong>@planet.Position</strong>
                             </td>
                             <td style="padding: 10px 15px; vertical-align: middle;">
-                                <img src="@planet.Image" alt="Planet"
+                                <img src="@SkinConfig.Url(planet.Image)" alt="Planet"
                                      style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid var(--color-border-medium);" />
                             </td>
                             <td style="padding: 10px 15px; vertical-align: middle;">

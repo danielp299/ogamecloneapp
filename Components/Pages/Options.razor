@@ -10,7 +10,7 @@
 <PageTitle>Options</PageTitle>
 
 <div class="ogame-container">
-    <div class="ogame-banner" style="background-image: url('assets/banners/buildings-banner.jpg');">
+    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/buildings-banner.jpg")');">
         <h2>Options</h2>
         <p>Game settings and data management</p>
     </div>
@@ -30,6 +30,23 @@
                         @onclick="ToggleDevMode">
                     @(DevModeService.IsEnabled ? "Disable" : "Enable")
                 </button>
+            </div>
+        </div>
+
+        <!-- Skin Selector -->
+        <div class="ogame-card">
+            <h3>Visual Skin</h3>
+            <p style="margin-bottom: 1rem;">
+                Select the asset pack to use for all game images.
+            </p>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                @foreach (var skin in new[] { "skin1" })
+                {
+                    <button class="ogame-btn @(SkinConfig.CurrentSkin == skin ? "btn-primary" : "btn-secondary")"
+                            @onclick="() => SetSkin(skin)">
+                        @skin @(SkinConfig.CurrentSkin == skin ? "✓" : "")
+                    </button>
+                }
             </div>
         </div>
 
@@ -206,6 +223,12 @@
         {
             ShowStatus($"Error resetting game: {ex.Message}", true);
         }
+    }
+
+    private void SetSkin(string skin)
+    {
+        SkinConfig.CurrentSkin = skin;
+        ShowStatus($"Skin changed to {skin}", false);
     }
 
     private void ShowStatus(string message, bool isError)

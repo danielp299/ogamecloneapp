@@ -5,13 +5,14 @@
 @inject ResourceService ResourceService
 @inject BuildingService BuildingService
 @inject RequirementService RequirementService
+
 @implements IDisposable
 
 <PageTitle>Buildings</PageTitle>
 
 <div class="ogame-container">
     <!-- Banner -->
-    <div class="ogame-banner" style="background-image: url('assets/banners/buildings-banner.jpg');">
+    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/buildings-banner.jpg")');">
         <h2>Buildings</h2>
         <p>Construct and upgrade planetary infrastructure</p>
     </div>
@@ -50,7 +51,7 @@
                 <div class="ogame-badge">Level @building.Level</div>
 
                 <!-- Building Image -->
-                <img src="@building.Image" alt="@building.Title" />
+                <img src="@SkinConfig.Url(building.Image)" alt="@building.Title" />
 
                 <!-- Building Info -->
                 <h3>@building.Title</h3>
@@ -59,15 +60,15 @@
                 <!-- Costs -->
                 <div class="ogame-cost-section">
                     <div class="ogame-cost-item">
-                        <img src="assets/common/metal-icon.png" alt="Metal" />
+                        <img src="@SkinConfig.Url("common/metal-icon.png")" alt="Metal" />
                         Metal: @building.MetalCost.ToString("N0")
                     </div>
                     <div class="ogame-cost-item">
-                        <img src="assets/common/crystal-icon.png" alt="Crystal" />
+                        <img src="@SkinConfig.Url("common/crystal-icon.png")" alt="Crystal" />
                         Crystal: @building.CrystalCost.ToString("N0")
                     </div>
                     <div class="ogame-cost-item">
-                        <img src="assets/common/deuterium-icon.png" alt="Deuterium" />
+                        <img src="@SkinConfig.Url("common/deuterium-icon.png")" alt="Deuterium" />
                         Deuterium: @building.DeuteriumCost.ToString("N0")
                     </div>
                     <div class="text-muted" style="margin-top: 8px; font-size: 0.85em;">

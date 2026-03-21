@@ -122,7 +122,7 @@ public class GameInitializationService
                 System = gameState.HomeSystem,
                 Position = gameState.HomePosition,
                 Name = "Homeworld",
-                Image = "assets/planets/planet_home.jpg",
+                Image = "planets/planet_home.jpg",
                 IsHomeworld = true
             });
             await _dbContext.SaveChangesAsync();
@@ -220,7 +220,7 @@ public class GameInitializationService
             System = homeSystem,
             Position = homePosition,
             Name = "Homeworld",
-            Image = "assets/planets/planet_home.jpg",
+            Image = "planets/planet_home.jpg",
             IsHomeworld = true
         });
         await _dbContext.SaveChangesAsync();

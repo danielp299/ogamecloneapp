@@ -5,13 +5,14 @@
 @inject BuildingService BuildingService
 @inject RequirementService RequirementService
 @inject TechnologyService TechnologyService
+
 @implements IDisposable
 
 <PageTitle>Defense</PageTitle>
 
 <div class="ogame-container">
     <!-- Banner -->
-    <div class="ogame-banner" style="background-image: url('assets/banners/defense-banner.jpg');">
+    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/defense-banner.jpg")');">
         <h2>Defense Systems</h2>
         <p>Protect your planet from attacks</p>
     </div>
@@ -52,7 +53,7 @@
                 <div class="ogame-badge">Built: @currentCount</div>
 
                 <!-- Unit Image -->
-                <img src="@unit.Image" alt="@unit.Name" />
+                <img src="@SkinConfig.Url(unit.Image)" alt="@unit.Name" />
 
                 <!-- Unit Info -->
                 <h3>@unit.Name</h3>
@@ -65,17 +66,17 @@
                 <!-- Stats & Costs -->
                 <div class="ogame-cost-section">
                     <div class="ogame-cost-item">
-                        <img src="assets/common/metal-icon.png" alt="Metal" />
+                        <img src="@SkinConfig.Url("common/metal-icon.png")" alt="Metal" />
                         Metal: @unit.MetalCost.ToString("N0")
                     </div>
                     <div class="ogame-cost-item">
-                        <img src="assets/common/crystal-icon.png" alt="Crystal" />
+                        <img src="@SkinConfig.Url("common/crystal-icon.png")" alt="Crystal" />
                         Crystal: @unit.CrystalCost.ToString("N0")
                     </div>
                     @if(unit.DeuteriumCost > 0)
                     {
                         <div class="ogame-cost-item">
-                            <img src="assets/common/deuterium-icon.png" alt="Deuterium" />
+                            <img src="@SkinConfig.Url("common/deuterium-icon.png")" alt="Deuterium" />
                             Deuterium: @unit.DeuteriumCost.ToString("N0")
                         </div>
                     }

@@ -23,7 +23,7 @@ public class GalaxyPlanet
     public bool HasDebris { get; set; }
     public long DebrisMetal { get; set; }
     public long DebrisCrystal { get; set; }
-    public string Image { get; set; } = "assets/planets/planet_placeholder.png"; // Default
+    public string Image { get; set; } = "planets/planet_placeholder.png"; // Default
 }
 
 public class GalaxyService
@@ -191,7 +191,7 @@ public class GalaxyService
                 planet.IsHomeworld = true;
                 planet.Name = storedHomeworld?.Name ?? "Homeworld";
                 planet.PlayerName = "Commander";
-                planet.Image = storedHomeworld?.Image ?? "assets/planets/planet_home.jpg";
+                planet.Image = storedHomeworld?.Image ?? "planets/planet_home.jpg";
             }
             // 2. Check if it's a Player's Colony
             else if (PlayerPlanets.Any(p => p.Galaxy == galaxy && p.System == system && p.Position == i))
@@ -277,11 +277,11 @@ public class GalaxyService
     private string GetRandomPlanetImage(int position)
     {
         // Simple logic: hotter planets closer to star (1-3), colder further away (13-15)
-        if (position <= 3) return "assets/planets/planet_hot.jpg";
-        if (position >= 13) return "assets/planets/planet_ice.jpg";
+        if (position <= 3) return "planets/planet_hot.jpg";
+        if (position >= 13) return "planets/planet_ice.jpg";
 
         // Random variation for habitable zone
-        string[] types = { "assets/planets/planet_gas.jpg", "assets/planets/planet_water.png", "assets/planets/planet_desert.png", "assets/planets/planet_forest.png" };
+        string[] types = { "planets/planet_gas.jpg", "planets/planet_water.png", "planets/planet_desert.png", "planets/planet_forest.png" };
         return types[_random.Next(types.Length)];
     }
 

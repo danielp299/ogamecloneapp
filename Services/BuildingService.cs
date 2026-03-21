@@ -377,7 +377,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 15,
             BaseDeuteriumCost = 0,
             ConstructionDuration = TimeSpan.FromSeconds(10),
-             Image = "assets/buildings/building1.jpg",
+             Image = "buildings/building1.jpg",
             EnergyConsumption = 10
         });
         Buildings.Add(new Building
@@ -388,7 +388,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 24,
             BaseDeuteriumCost = 0,
             ConstructionDuration = TimeSpan.FromSeconds(15),
-             Image = "assets/buildings/building2.jpg",
+             Image = "buildings/building2.jpg",
             EnergyConsumption = 8
         });
         Buildings.Add(new Building
@@ -399,7 +399,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 75,
             BaseDeuteriumCost = 0,   
             ConstructionDuration = TimeSpan.Parse("00:00:30"),
-             Image = "assets/buildings/building3.jpg",
+             Image = "buildings/building3.jpg",
             EnergyConsumption = 15
         });
         Buildings.Add(new Building
@@ -410,7 +410,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 30,
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:20"),
-             Image = "assets/buildings/building4.jpg",
+             Image = "buildings/building4.jpg",
             EnergyConsumption = -20
         });
         Buildings.Add(new Building
@@ -421,7 +421,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 120,
             BaseDeuteriumCost = 200,    
             ConstructionDuration = TimeSpan.Parse("00:01:00"),
-             Image = "assets/buildings/building5.jpg",
+             Image = "buildings/building5.jpg",
             EnergyConsumption = 30
         });
 
@@ -433,7 +433,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 360,
             BaseDeuteriumCost = 180,    
             ConstructionDuration = TimeSpan.Parse("00:00:45"),
-             Image = "assets/buildings/building14.jpg",
+             Image = "buildings/building14.jpg",
             EnergyConsumption = 0 // Special handling: Produces Energy, Consumes Deuterium
         });
 
@@ -445,7 +445,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 40000,
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:10:00"),
-             Image = "assets/buildings/building15.jpg",
+             Image = "buildings/building15.jpg",
             EnergyConsumption = 0
         });
 
@@ -457,7 +457,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 200,
             BaseDeuteriumCost = 100,    
             ConstructionDuration = TimeSpan.Parse("00:01:30"),
-             Image = "assets/buildings/building6.jpg",
+             Image = "buildings/building6.jpg",
             EnergyConsumption = 0 // Shipyard does not consume energy continuously in OGame logic usually, unless active? Let's keep 0 for base.
         });
         Buildings.Add(new Building
@@ -468,7 +468,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 0,
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:45"),
-             Image = "assets/buildings/building7.jpg",
+             Image = "buildings/building7.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -479,7 +479,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 500, // Updated
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:50"),
-             Image = "assets/buildings/building8.jpg",
+             Image = "buildings/building8.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -490,7 +490,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 1000, // Updated
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:55"),
-             Image = "assets/buildings/building9.jpg",
+             Image = "buildings/building9.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -501,7 +501,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 400, // Updated
             BaseDeuteriumCost = 200,    
             ConstructionDuration = TimeSpan.Parse("00:01:15"),
-             Image = "assets/buildings/building10.jpg",
+             Image = "buildings/building10.jpg",
             EnergyConsumption = 0 // Lab doesn't consume energy passively usually
         });
 
@@ -513,7 +513,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 50000, // Updated
             BaseDeuteriumCost = 100000, // Updated
             ConstructionDuration = TimeSpan.Parse("01:00:00"),
-             Image = "assets/buildings/building11.jpg",
+             Image = "buildings/building11.jpg",
             EnergyConsumption = 0 // Consumes energy only for BUILD cost usually? Or passive? OGame Terraformer cost includes Energy!
             // Note: Building cost logic needs to handle Energy cost if we want to be strict.
         });
@@ -526,7 +526,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 20000,
             BaseDeuteriumCost = 1000,    
             ConstructionDuration = TimeSpan.Parse("00:05:00"),
-             Image = "assets/buildings/building12.jpg",
+             Image = "buildings/building12.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -537,7 +537,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 500000,
             BaseDeuteriumCost = 100000,    
             ConstructionDuration = TimeSpan.Parse("02:00:00"),
-             Image = "assets/buildings/building13.jpg",
+             Image = "buildings/building13.jpg",
             EnergyConsumption = 0 // Nanite doesn't consume energy
         });
     }

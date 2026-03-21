@@ -21,4 +21,5 @@ public class GameState
     public int HomeGalaxy { get; set; } = 0;
     public int HomeSystem { get; set; } = 0;
     public int HomePosition { get; set; } = 0;
+
 }

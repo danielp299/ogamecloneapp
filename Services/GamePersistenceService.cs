@@ -50,7 +50,7 @@ public class GamePersistenceService
 
         // Initialize home planet state and buildings
         await InitializePlanetAsync(gameState.HomeGalaxy, gameState.HomeSystem, gameState.HomePosition);
-        await AddOrUpdatePlayerPlanetAsync(gameState.HomeGalaxy, gameState.HomeSystem, gameState.HomePosition, "Homeworld", "assets/planets/planet_home.jpg", true);
+        await AddOrUpdatePlayerPlanetAsync(gameState.HomeGalaxy, gameState.HomeSystem, gameState.HomePosition, "Homeworld", "planets/planet_home.jpg", true);
 
         _logger.LogInformation("Game state initialized");
         return gameState;

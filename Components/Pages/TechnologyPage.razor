@@ -4,13 +4,14 @@
 @inject TechnologyService TechnologyService
 @inject RequirementService RequirementService
 @inject DevModeService DevModeService
+
 @implements IDisposable
 
 <PageTitle>Technologies</PageTitle>
 
 <div class="ogame-container">
     <!-- Banner -->
-    <div class="ogame-banner" style="background-image: url('assets/banners/tech-banner.jpg');">
+    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/tech-banner.jpg")');">
         <h2>Technologies</h2>
         <p>Research to unlock new capabilities</p>
     </div>
@@ -46,7 +47,7 @@
                 <div class="ogame-badge">Level @tech.Level</div>
 
                 <!-- Technology Image -->
-                <img src="@tech.Image" alt="@tech.Title" />
+                <img src="@SkinConfig.Url(tech.Image)" alt="@tech.Title" />
 
                 <!-- Technology Info -->
                 <h3>@tech.Title</h3>
@@ -57,28 +58,28 @@
                     @if(tech.MetalCost > 0)
                     {
                         <div class="ogame-cost-item">
-                            <img src="assets/common/metal-icon.png" alt="Metal" />
+                            <img src="@SkinConfig.Url("common/metal-icon.png")" alt="Metal" />
                             Metal: @tech.MetalCost.ToString("N0")
                         </div>
                     }
                     @if(tech.CrystalCost > 0)
                     {
                         <div class="ogame-cost-item">
-                            <img src="assets/common/crystal-icon.png" alt="Crystal" />
+                            <img src="@SkinConfig.Url("common/crystal-icon.png")" alt="Crystal" />
                             Crystal: @tech.CrystalCost.ToString("N0")
                         </div>
                     }
                     @if(tech.DeuteriumCost > 0)
                     {
                         <div class="ogame-cost-item">
-                            <img src="assets/common/deuterium-icon.png" alt="Deuterium" />
+                            <img src="@SkinConfig.Url("common/deuterium-icon.png")" alt="Deuterium" />
                             Deuterium: @tech.DeuteriumCost.ToString("N0")
                         </div>
                     }
                     @if(tech.EnergyCost > 0)
                     {
                         <div class="ogame-cost-item">
-                            <img src="assets/common/energy-icon.png" alt="Energy" />
+                            <img src="@SkinConfig.Url("common/energy-icon.png")" alt="Energy" />
                             Energy: @tech.EnergyCost.ToString("N0")
                         </div>
                     }

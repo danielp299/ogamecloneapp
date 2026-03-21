@@ -405,7 +405,7 @@
             {
                 <div class="planet-card-wrapper">
                     <div class="planet-card" @onclick="() => NavigateToPlanet(planet)">
-                        <img src="@planet.Image" alt="@planet.Name" />
+                        <img src="@SkinConfig.Url(planet.Image)" alt="@planet.Name" />
                         <div><strong>@planet.Name</strong></div>
                         <div style="font-size:0.9em; color:#aaa;">[@planet.Galaxy:@planet.System:@planet.Position]</div>
                     </div>

@@ -5,13 +5,14 @@
 @inject ResourceService ResourceService
 @inject FleetService FleetService
 @inject GalaxyService GalaxyService
+
 @implements IDisposable
 
 <PageTitle>Fleet</PageTitle>
 
 <div class="ogame-container">
     <!-- Banner -->
-    <div class="ogame-banner" style="background-image: url('assets/banners/fleet-banner.jpg');">
+    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/fleet-banner.jpg")');">
         <h2>Fleet Command</h2>
         <p>Manage your ships and launch missions</p>
     </div>
@@ -153,7 +154,7 @@
                     <div class="ogame-card" style="width: 100%; box-sizing: border-box;">
                         <div class="ogame-badge">@count available</div>
 
-                        <img src="@ship.Image" alt="@ship.Name" style="object-fit: contain;" />
+                        <img src="@SkinConfig.Url(ship.Image)" alt="@ship.Name" style="object-fit: contain;" />
 
                         <h3>@ship.Name</h3>
 
