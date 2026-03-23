@@ -573,6 +573,24 @@ namespace myapp.Data.Migrations
                     b.ToTable("Technologies");
                 });
 
+            modelBuilder.Entity("myapp.Data.Entities.PlayerProfileEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PlayerName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrentSkin")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PlayerProfiles");
+                });
+
             modelBuilder.Entity("myapp.Data.Entities.FleetMissionShipEntity", b =>
                 {
                     b.HasOne("myapp.Data.Entities.FleetMissionEntity", "FleetMission")
