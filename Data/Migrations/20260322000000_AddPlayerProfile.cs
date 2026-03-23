@@ -11,18 +11,14 @@ namespace myapp.Data.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "PlayerProfiles",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false),
-                    PlayerName = table.Column<string>(type: "TEXT", nullable: false),
-                    CurrentSkin = table.Column<string>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PlayerProfiles", x => x.Id);
-                });
+            // Use raw SQL with IF NOT EXISTS to handle cases where the table
+            // was already created outside of migrations.
+            migrationBuilder.Sql(@"
+CREATE TABLE IF NOT EXISTS ""PlayerProfiles"" (
+    ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_PlayerProfiles"" PRIMARY KEY,
+    ""PlayerName"" TEXT NOT NULL,
+    ""CurrentSkin"" TEXT NOT NULL
+)");
 
             // Fix planet image paths stored before the skin system was introduced.
             // Old format: "assets/planets/planet_home.jpg"
