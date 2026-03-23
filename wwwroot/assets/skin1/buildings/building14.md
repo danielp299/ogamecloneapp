@@ -1,0 +1,3 @@
+# building14 — Missile Silo
+
+Una instalación subterránea con tapas de concreto gruesas que se abren para revelar misiles apuntando al cielo. Dos o tres misiles verticales con ojiva cónica visibles emergiendo de los silos abiertos. Una estructura de control semienterrada con antenas de rastreo y comunicación en la superficie. Paredes externas de concreto reforzado con grosor visible. Sistemas de ventilación en la superficie integrados con la estructura. Torres de detección y seguimiento de blancos con radares giratorios. Cables y tuberías de abastecimiento de combustible corriendo entre los silos. Puerta de acceso blindada en el flanco de la colina o terraplén que rodea la instalación.

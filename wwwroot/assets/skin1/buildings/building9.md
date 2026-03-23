@@ -1,0 +1,3 @@
+# building9 — Crystal Storage
+
+Un almacén sellado herméticamente con paredes de vidrio blindado que muestran el interior lleno de cristales apilados en estantes. Mecanismos de clasificación automática con brazos que mueven los cristales. Sistemas de suspensión anti-vibración en los anclajes del edificio para evitar fractura de cristales. Puertas de acceso con compartimento de descompresión doble. Sensores de integridad estructural montados en las paredes. Rieles internos con vagones automáticos para el transporte interno de cristales. Un techo de doble capa con cámara de aire. Indicadores de capacidad de almacenamiento en un panel externo frontal.

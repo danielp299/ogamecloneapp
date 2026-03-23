@@ -1,0 +1,3 @@
+# tech-banner — Banner de Tecnología
+
+Un laboratorio de investigación espacial de alta tecnología con múltiples científicos trabajando en estaciones de trabajo holográficas. Pantallas gigantes mostrando diagramas de tecnologías avanzadas: motores, escudos, armamento y física cuántica. Un acelerador de partículas circular dominando el centro de la imagen. Experimentos en cámaras selladas visibles a través de ventanas de observación. Robots de laboratorio asistiendo a los científicos. Hologramas tridimensionales de moléculas y esquemas de naves flotando en el aire. Una sensación de descubrimiento científico y avance tecnológico constante.

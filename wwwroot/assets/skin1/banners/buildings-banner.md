@@ -1,0 +1,3 @@
+# buildings-banner — Banner de Edificios
+
+Una panorámica amplia de una ciudad colonial planetaria en construcción. Grúas y andamios rodeando estructuras en distintas etapas de edificación. Edificios industriales de diferentes tamaños y funciones distribuidos por el terreno. En primer plano, trabajadores con trajes de construcción supervisando la obra. Maquinaria pesada moviéndose entre las estructuras. El horizonte muestra más edificios ya terminados de la colonia. Una atmósfera de expansión y progreso industrial. Escombros y materiales de construcción esparcidos ordenadamente en zonas de trabajo.

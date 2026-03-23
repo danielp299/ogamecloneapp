@@ -1,0 +1,3 @@
+# tech_hyperspace — Tecnología Hiperespacio
+
+Una representación visual de la curvatura del espacio-tiempo con un embudo de singularidad en el centro. Un portal de hiperespacio abierto mostrando otro sector galáctico a través de él. Científicos con instrumentos midiendo las distorsiones del tejido espacio-temporal. Ecuaciones de relatividad y geometría diferencial en pizarrones. Un modelo a escala de una nave entrando al portal de hiperespacio. Visualizaciones de dimensiones adicionales como capas translúcidas superpuestas. Detectores de materia oscura y energía del vacío alrededor del portal experimental.

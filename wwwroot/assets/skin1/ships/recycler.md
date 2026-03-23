@@ -1,0 +1,3 @@
+# recycler — Nave Recicladora
+
+Una nave industrial con brazos articulados de recolección extendidos hacia adelante, con garras magnéticas en los extremos. Una boca de succión grande en la proa que aspira restos de naves destruidas. Bodega central transparente donde se ven fragmentos de metal y escombros siendo compactados. Compactadoras y trituradoras visibles a través de paneles de inspección. Motores de maniobra en múltiples puntos del casco para posicionarse en campos de escombros. Brazos auxiliares con cortadores de plasma para fragmentar restos grandes. Una tolva de expulsión de escoria en la popa. Diseño robusto y funcional propio de maquinaria industrial.

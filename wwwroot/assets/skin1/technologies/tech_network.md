@@ -1,0 +1,3 @@
+# tech_network — Red de Investigación Intergaláctica
+
+Un centro de comunicaciones con múltiples antenas parabólicas gigantes apuntando al espacio transmitiendo datos. Una sala de operaciones con pantallas que muestran múltiples laboratorios en distintos planetas conectados en red. Haces de luz que representan enlaces de datos viajando entre planetas en un mapa galáctico holográfico. Científicos en distintas ubicaciones colaborando simultáneamente vía hologramas. Servidores de sincronización de datos de investigación con indicadores de transmisión activa. Un diagrama de red que muestra los nodos de laboratorio conectados. La imagen transmite colaboración científica a escala intergaláctica.

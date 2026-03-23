@@ -1,0 +1,3 @@
+# building8 — Metal Storage
+
+Un complejo de silos cilíndricos de gran diámetro y altura, agrupados en batería de cuatro o seis unidades. Cada silo tiene una tapa hemisférica en la cima con válvulas de alivio de presión. Tuberías de transferencia horizontal en la base que conectan todos los silos entre sí. Escaleras de acceso en espiral en el exterior de cada silo con barandas. Medidores de nivel de llenado con indicadores visibles en la parte exterior. Una plataforma de descarga con tolva y compuerta en la base. Sensores de peso en los pies de apoyo de cada silo. Estructura metálica de refuerzo con costillas visibles en las paredes cilíndricas.

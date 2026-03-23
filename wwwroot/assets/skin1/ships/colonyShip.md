@@ -1,0 +1,3 @@
+# colonyShip — Nave Colonizadora
+
+Una nave de gran tamaño diseñada para largas travesías y establecimiento de colonias. Sección frontal con módulos habitacionales para cientos de pasajeros, con ventanas de cabinas visibles. Sección central con módulos de suministros, equipamiento colonial y semillas/animales en contenedores criogénicos. Sección trasera con motores de largo alcance de gran envergadura. Módulos de aterrizaje y despegue planetario acoplados en el exterior, como cápsulas separables. Antenas de comunicación de largo alcance en el mástil superior. Paneles solares desplegados para energía auxiliar durante el viaje. Una sensación de viaje épico y nuevo comienzo en su diseño.

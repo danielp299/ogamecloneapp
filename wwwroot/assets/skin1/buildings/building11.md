@@ -1,0 +1,3 @@
+# building11 — Research Lab
+
+Un edificio de diseño avanzado de cuatro pisos con formas angulares y asimétrico. Antenas parabólicas y telescopios en la azotea orientados al cielo. Ventanas largas y estrechas en cada piso con iluminación interior intensa. Una cúpula transparente en la parte superior que contiene un laboratorio de observación. Paneles de equipamiento científico visibles a través de las ventanas: pantallas holográficas, microscopios gigantes y aceleradores de partículas en miniatura. Una entrada principal con rampa de acceso y puertas automáticas de cristal. Servidores de cómputo con luces parpadeantes visibles en la planta baja. Torres de antenas de comunicación con señales transmitiendo al espacio.

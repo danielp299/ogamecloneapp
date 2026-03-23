@@ -1,0 +1,3 @@
+# tech_hyperspacedrive — Motor de Hiperespacio
+
+Un motor de hiperespacio de gran tamaño instalado en el taller de ingeniería con bobinas de campo de distorsión visibles en la carcasa externa. Las bobinas generan un campo de burbujeante distorsión espacial alrededor del motor cuando está activo. Brazos de ingeniería robóticos calibrando los parámetros del campo. Un portal de prueba miniaturizado frente al motor mostrando el efecto de salto. Pantallas con cálculos de coordenadas de salto y estabilidad del campo. El motor tiene una apertura central donde el espacio mismo parece curvarse. Técnicos con trajes de campo trabajando en las proximidades.

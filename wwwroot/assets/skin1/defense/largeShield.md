@@ -1,0 +1,3 @@
+# largeShield — Cúpula de Escudo Grande
+
+Un generador de escudo masivo con una cúpula de energía que cubre toda la instalación planetaria. El generador es una torre alta con múltiples emisores de campo en distintas alturas. La cúpula proyectada es enorme, con patrones geométricos de energía en su superficie. Cuatro generadores auxiliares en los puntos cardinales conectados al generador central por conductos de energía subterráneos. Panel de control con indicadores de cobertura total del escudo. La cúpula muestra marcas de impactos anteriores como deformaciones energéticas. La escala del escudo hace que los edificios protegidos dentro parezcan pequeños.

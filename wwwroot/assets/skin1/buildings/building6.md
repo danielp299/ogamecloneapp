@@ -1,0 +1,3 @@
+# building6 — Robotics Factory
+
+Una fábrica de tres pisos con paredes de vidrio que permiten ver el interior desde afuera. En el interior, brazos robóticos articulados de múltiples segmentos trabajan en líneas de ensamblaje. Robots de manufactura con pinzas, soldadores y taladros montados en rieles de techo. Una plataforma elevada desde donde un técnico supervisa las líneas. Puertas industriales dobles de altura generosa en la fachada principal. Chimeneas de ventilación industrial en el techo. Una rampa de carga en el lateral para entrada y salida de materiales. Robots marchando en fila hacia la salida de producción.

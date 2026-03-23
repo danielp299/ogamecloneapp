@@ -1,0 +1,3 @@
+# building7 — Shipyard
+
+Un hangar espacial de grandes dimensiones con una estructura de arco parabólico que cubre naves en construcción. Grúas de puente elevadas que sostienen secciones del casco de una nave incompleta. Andamios modulares rodeando el casco en construcción. Soldadores robóticos con chispas visibles trabajando sobre las juntas del casco. Plataformas de lanzamiento con rieles que se extienden hacia el exterior. Dos naves en distintas etapas de ensamblaje simultáneamente. Puertas corredizas gigantes abiertas en la fachada que permiten ver la nave más avanzada. Depósitos de materiales apilados en el piso del hangar.

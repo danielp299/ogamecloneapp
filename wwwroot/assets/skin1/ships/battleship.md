@@ -1,0 +1,3 @@
+# battleship — Acorazado
+
+Una nave de guerra masiva con forma trapezoidal y proa cuadrada intimidante. Múltiples torretas de cañón de gran calibre distribuidas en cubierta superior, inferior y laterales. Blindaje masivo con costillas de refuerzo visibles en todo el casco. Seis motores de propulsión traseros de gran potencia. Torres de comando elevadas en el centro del casco con ventanas de observación. Hangares de cazas con puertas abiertas en los laterales. Cañones de largo alcance apuntando hacia adelante integrados en la proa. Escudos generadores visibles como protuberancias en el casco superior.

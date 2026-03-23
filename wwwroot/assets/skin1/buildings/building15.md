@@ -1,0 +1,3 @@
+# building15 — Nanite Factory
+
+Una fábrica compacta y hermética de aspecto futurista con superficies lisas y sin costuras visibles. En el interior visible a través de paneles transparentes, nubes de nanobots en movimiento ensamblando componentes a escala microscópica. Múltiples salidas de producto donde estructuras completamente formadas emergen a velocidad elevada. Tuberías de alimentación de materia prima ultra-finas que entran por la base. Un sistema de control centralizado con pantallas que muestran mapas de ensamblaje molecular. Cámaras de contención selladas donde los nanobots realizan el trabajo. Una interfaz de programación de construcción con teclado holográfico en el panel frontal. Ventiladores de disipación térmica de alta velocidad integrados en las paredes.

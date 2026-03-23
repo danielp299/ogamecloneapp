@@ -1,0 +1,3 @@
+# building10 — Deuterium Tank
+
+Un tanque esférico gigante montado sobre cuatro patas de soporte con refuerzos triangulares. Válvulas criogénicas en la base y en la cima con indicadores de temperatura visibles. Tuberías de llenado y vaciado con acoplamientos rápidos. Capas de aislamiento térmico visibles en los bordes donde hay juntas de mantenimiento. Una escotilla de inspección circular en la parte superior con escalera de acceso vertical. Manómetros y termómetros montados en soportes en la base del tanque. Válvulas de seguridad con disco de ruptura en múltiples puntos. Plataforma de trabajo elevada con barandas alrededor del ecuador del tanque esférico.

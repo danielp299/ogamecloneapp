@@ -1,0 +1,3 @@
+# tech_combustion — Motor de Combustión
+
+Un banco de pruebas de motores con un motor cohete de combustión convencional en pleno encendido. Llamas y gases de escape saliendo de las toberas de propulsión en el banco de pruebas. Ingenieros con trajes ignífugos tomando medidas a distancia segura. Pantallas mostrando gráficas de empuje, consumo de combustible y eficiencia. Un motor desmontado con sus componentes internos visibles: cámara de combustión, tobera e inyectores. Tanques de combustible y oxidante conectados al motor de prueba. Comparativas de diseños de tobera en planos técnicos en la pared.

@@ -1,0 +1,3 @@
+# tech_graviton — Tecnología Gravitón
+
+Una instalación de investigación masiva construida alrededor de un objeto de gravedad extrema contenido artificialmente. El centro de la imagen muestra una singularidad gravitacional miniaturizada con el espacio visible curvándose a su alrededor. Objetos de distintos tamaños siendo atraídos y orbitar la singularidad en cámara lenta. Sistemas de contención gravitacional de enorme potencia rodeando el experimento. Científicos trabajando a distancia segura vía robots controlados remotamente. Indicadores de energía consumida llegando a valores extremos en los medidores. El experimento requiere una cantidad visible y masiva de generadores de energía conectados. La escala del aparato es mayor que cualquier otro en el juego.

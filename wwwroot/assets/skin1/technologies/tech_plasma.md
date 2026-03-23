@@ -1,0 +1,3 @@
+# tech_plasma — Tecnología de Plasma
+
+Una cámara de plasma con una bola de plasma incandescente contenida por campos magnéticos en el centro. Los campos magnéticos son visibles como líneas de fuerza de luz azul que rodean el plasma. Un cañón de plasma en banco de pruebas disparando hacia un blanco refractario. La bola de plasma deja una estela de gas ionizado tras el disparo. Científicos con visores de protección monitoreando la estabilidad del plasma. Indicadores de temperatura del plasma en el rango de millones de grados. Electroimanes superconductores generando los campos de confinamiento alrededor de la cámara.

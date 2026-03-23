@@ -26,6 +26,8 @@ public class PlayerProfileService
 
     private void Load()
     {
+        EnsurePlayerProfileTable();
+
         var profile = _db.PlayerProfiles.FirstOrDefault();
         if (profile == null)
         {
@@ -39,6 +41,17 @@ public class PlayerProfileService
 
         // Sync static helper used by Razor pages
         SkinConfig.CurrentSkin = CurrentSkin;
+    }
+
+    private void EnsurePlayerProfileTable()
+    {
+        _db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "PlayerProfiles" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_PlayerProfiles" PRIMARY KEY,
+                "PlayerName" TEXT NOT NULL,
+                "CurrentSkin" TEXT NOT NULL
+            );
+            """);
     }
 
     public async Task SetSkinAsync(string skin)

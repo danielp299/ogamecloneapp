@@ -1,0 +1,3 @@
+# largeCargo — Nave de Carga Grande
+
+Una nave de transporte masiva dominada por su bodega rectangular de gran volumen que ocupa la mayor parte del casco. Múltiples compuertas de carga laterales e inferiores con rampas de acceso desplegadas. Cuatro motores traseros de gran tamaño para mover la masa de carga. Cabina de tripulación pequeña en la proa con capacidad para 3-4 personas. Grúas de carga integradas en el techo de la bodega visibles desde exterior. Contenedores estándar apilados visibles a través de compuertas abiertas. Refuerzos estructurales en el casco para soportar el peso de la carga. Escasa o nula armamento, diseño puramente logístico.

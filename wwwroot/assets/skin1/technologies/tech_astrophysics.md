@@ -1,0 +1,3 @@
+# tech_astrophysics — Astrofísica
+
+Un observatorio espacial con telescopios de gran apertura apuntando a nebulosas y sistemas estelares distantes. Pantallas con mapas de galaxias marcando planetas habitables y rutas de colonización. Científicos analizando espectros de estrellas y composición atmosférica de planetas remotos. Un modelo holográfico de sistema solar con planetas habitables resaltados. Imágenes de planetas candidatos a colonización con sus características mostradas. Sondas autónomas de exploración siendo programadas para misiones de reconocimiento. Un mapa de rutas de expansión colonial trazado sobre el mapa galáctico.

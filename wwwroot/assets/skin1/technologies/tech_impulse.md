@@ -1,0 +1,3 @@
+# tech_impulse — Motor de Impulso
+
+Una sala de propulsión con un motor de impulso iónico en funcionamiento emitiendo un penacho de plasma azul intenso. Anillos aceleradores de iones alrededor del cuerpo del motor generando el campo de aceleración. Ingenieros monitoreando la estabilidad del plasma en consolas de control. Un modelo de nave con el motor de impulso instalado mostrando la integración en el casco. Comparativa de velocidad teórica entre motor de combustión e impulso en pantalla. Células de energía alimentando los aceleradores con indicadores de flujo de energía. Cámaras de ionización con ventanas de visualización en el laboratorio.

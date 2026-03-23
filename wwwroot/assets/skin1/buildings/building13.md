@@ -1,0 +1,3 @@
+# building13 — Alliance Depot
+
+Un centro de logística con múltiples bahías de atraque para naves de transporte, con rampas de acceso extendidas. Un edificio central de dos pisos con torre de control en la cima y ventanales panorámicos. Depósitos modulares de suministros apilados visibles en las bahías abiertas. Grúas de carga en el techo del edificio con rieles horizontales. Vehículos terrestres de carga en el patio frente al edificio. Pantallas de información en el exterior mostrando inventario y estado de las misiones. Entrada principal con múltiples puertas para acceso de personal y vehículos simultáneamente. Banderas o emblemas de alianza en mástiles frente al edificio.

@@ -1,0 +1,3 @@
+# deathstar — Estrella de la Muerte
+
+Una nave del tamaño de una luna pequeña con forma esférica perfecta o casi perfecta. En la superficie visible, un supercañón de energía central de boca circular enorme apuntando hacia adelante. La superficie cubierta de estructuras, torretas, hangares y paneles de blindaje en capas. Miles de ventanas de iluminación distribuidas por toda la esfera. Múltiples bahías de aterrizaje de gran tamaño en el ecuador. Torres de mando gigantes en el hemisferio superior. Generadores de escudo visibles como protuberancias simétricas. El tamaño eclipsa cualquier otra estructura en la imagen.

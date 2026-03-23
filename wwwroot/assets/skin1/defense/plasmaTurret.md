@@ -1,0 +1,3 @@
+# plasmaTurret — Torreta de Plasma
+
+La torreta más poderosa con un cañón de plasma de boca ancha que contiene plasma incandescente en su interior. Confinadores magnéticos en forma de anillo alrededor de la boca del cañón para contener el plasma. Generadores de plasma a ambos lados del cañón con tuberías de alimentación. Una carcasa de blindaje pesado completo que rodea toda la torreta. Sistema de refrigeración con circuitos de enfriamiento por líquido visibles en el exterior. Base rotatoria de gran masa con amortiguadores hidráulicos. Sensor de targeting de largo alcance en una torrecilla secundaria sobre el cañón principal.

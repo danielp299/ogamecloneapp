@@ -1,0 +1,3 @@
+# building12 — Terraformer
+
+Una máquina colosal con forma de walker (caminante) de cuatro patas que se desplaza sobre el terreno. En su parte central hay un emisor de campo circular apuntando hacia abajo que transforma el suelo. Tuberías que transportan nutrientes y minerales desde depósitos dorsales hacia el suelo. Drones auxiliares voladores que salen de compartimentos laterales para recolectar muestras. Una plataforma de control en la parte superior con cabina presurizada para operadores. Brazos laterales con herramientas de perforación y siembra. Sensores de suelo montados en los extremos de las patas. Chimeneas de expulsión de gases procesados en la parte trasera del cuerpo central.

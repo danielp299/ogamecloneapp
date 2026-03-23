@@ -1,0 +1,3 @@
+# building5 — Fusion Reactor
+
+Un reactor de fusión compacto con una cámara toroidal (forma de dona) en el centro rodeada de electroimanes superconductores. Tuberías de deuterio que alimentan la cámara desde los costados. Un sistema de refrigeración con aletas disipadores de calor alrededor del toro. Paneles de blindaje de protección con cerrojos y sellos de seguridad. Indicadores de plasma visible a través de ventanillas reforzadas en la cámara. Generadores de campo magnético cilíndricos posicionados simétricamente alrededor del reactor. Cables de salida de energía gruesos que parten hacia una subestación adyacente.
