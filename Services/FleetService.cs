@@ -1,9 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using myapp.Data;
+using myapp.Data.Entities;
 
 namespace myapp.Services;
+
+// Refer to wiki/business-rules/Fleet.md for business rules documentation
+// Refer to wiki/business-rules/Combat.md for combat mechanics
+// Refer to wiki/business-rules/Factory.md for shipyard and ship construction rules
 
 public enum FleetStatus
 {
@@ -15,8 +18,9 @@ public enum FleetStatus
 public class FleetMission
 {
     public Guid Id { get; set; }
-    public string MissionType { get; set; }
-    public string TargetCoordinates { get; set; }
+    public string MissionType { get; set; } = "";
+    public string OriginCoordinates { get; set; } = "";
+    public string TargetCoordinates { get; set; } = "";
     public Dictionary<string, int> Ships { get; set; } = new();
     public DateTime StartTime { get; set; }
     public DateTime ArrivalTime { get; set; }
@@ -24,9 +28,19 @@ public class FleetMission
     public FleetStatus Status { get; set; }
     public long FuelConsumed { get; set; }
     public Dictionary<string, long> Cargo { get; set; } = new();
+    public bool IsIncomingAttack { get; set; }
+    
+    // Calculated properties for countdown
+    public TimeSpan TimeToArrival => Status == FleetStatus.Flight && ArrivalTime > DateTime.Now 
+        ? ArrivalTime - DateTime.Now 
+        : TimeSpan.Zero;
+    
+    public TimeSpan TimeToReturn => Status == FleetStatus.Return && ReturnTime > DateTime.Now 
+        ? ReturnTime - DateTime.Now 
+        : TimeSpan.Zero;
 }
 
-public class Ship
+    public class Ship
 {
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
@@ -51,25 +65,42 @@ public class Ship
     
     // Requirements (Simplified names for matching)
     public Dictionary<string, int> Requirements { get; set; } = new();
+    
+    // Mission Capabilities
+    public bool IsEspionageCapable { get; set; }
+    public bool IsColonizationCapable { get; set; }
+    public bool IsRecyclingCapable { get; set; }
 }
 
 public class ShipyardItem
 {
-    public Ship Ship { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Ship Ship { get; set; } = null!;
     public int Quantity { get; set; }
+    public int QuantityCompleted { get; set; }
     public TimeSpan DurationPerUnit { get; set; }
     public TimeSpan TimeRemaining { get; set; } // For the current unit being built
+    public int Galaxy { get; set; }
+    public int System { get; set; }
+    public int Position { get; set; }
 }
+
+// Refer to wiki/business-rules/Fleet.md for business rules documentation (includes combat logic)
 
 public class FleetService
 {
+    private readonly GameDbContext _dbContext;
     private readonly ResourceService _resourceService;
     private readonly BuildingService _buildingService;
     private readonly TechnologyService _technologyService;
     private readonly GalaxyService _galaxyService;
+    private readonly GamePersistenceService _persistenceService;
+    private readonly PlayerStateService _playerStateService;
     private readonly MessageService _messageService;
     private readonly DefenseService _defenseService;
     private readonly DevModeService _devModeService;
+    private readonly EnemyService _enemyService;
+    private readonly RankingService _rankingService;
 
     public List<Ship> ShipDefinitions { get; private set; } = new();
     
@@ -77,30 +108,204 @@ public class FleetService
     public Dictionary<string, int> DockedShips { get; private set; } = new();
     
     // Shipyard Queue
-    public List<ShipyardItem> ConstructionQueue { get; private set; } = new();
+    private List<ShipyardItem> _allConstructionQueue = new();
+    public List<ShipyardItem> ConstructionQueue => _allConstructionQueue
+        .Where(i => i.Galaxy == _playerStateService.ActiveGalaxy && i.System == _playerStateService.ActiveSystem && i.Position == _playerStateService.ActivePosition)
+        .ToList();
 
     // Active Fleets (Missions)
     public List<FleetMission> ActiveFleets { get; private set; } = new();
 
-    public event Action OnChange;
+    public event Action? OnChange;
 
     private bool _isProcessingQueue = false;
+    private bool _isInitialized = false;
+    
+    // Maximum number of planets a player can have (colonization limit)
+    public const int MaxPlanets = 4;
+    public double CombatDefenseLossMinPercentage { get; private set; } = 0.10;
+    public double CombatDefenseLossMaxPercentage { get; private set; } = 0.25;
 
-    public FleetService(ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, MessageService messageService, DefenseService defenseService, DevModeService devModeService)
+    public FleetService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, TechnologyService technologyService, GalaxyService galaxyService, GamePersistenceService persistenceService, MessageService messageService, DefenseService defenseService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService, RankingService? rankingService = null)
     {
+        _dbContext = dbContext;
         _resourceService = resourceService;
         _buildingService = buildingService;
         _technologyService = technologyService;
         _galaxyService = galaxyService;
+        _persistenceService = persistenceService;
         _messageService = messageService;
         _defenseService = defenseService;
         _devModeService = devModeService;
+        _enemyService = enemyService;
+        _playerStateService = playerStateService;
+        _rankingService = rankingService;
         
         InitializeShips();
+
+        _playerStateService.OnChange += async () => 
+        {
+            await LoadFromDatabaseAsync();
+            await LoadConstructionQueueAsync();
+            NotifyStateChanged();
+        };
+
+        _enemyService.OnEnemyAttackLaunched += HandleEnemyAttackLaunched;
+        
+        // DevMode: Add 10 ships of each type
+        if (_devModeService.IsEnabled)
+        {
+            AddDevModeShips();
+        }
         
         // Start loops
         _ = ProcessQueueLoop();
         _ = ProcessFleetLoop();
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+
+        await LoadFromDatabaseAsync();
+        await LoadConstructionQueueAsync();
+        _isInitialized = true;
+    }
+
+    public void SetCombatDefenseLossPercentage(double percentage)
+    {
+        double clamped = Math.Clamp(percentage, 0.0, 1.0);
+        CombatDefenseLossMinPercentage = clamped;
+        CombatDefenseLossMaxPercentage = clamped;
+    }
+
+    public void SetCombatDefenseLossRange(double minPercentage, double maxPercentage)
+    {
+        double clampedMin = Math.Clamp(minPercentage, 0.0, 1.0);
+        double clampedMax = Math.Clamp(maxPercentage, 0.0, 1.0);
+
+        if (clampedMax < clampedMin)
+        {
+            (clampedMin, clampedMax) = (clampedMax, clampedMin);
+        }
+
+        CombatDefenseLossMinPercentage = clampedMin;
+        CombatDefenseLossMaxPercentage = clampedMax;
+    }
+
+    public bool HasAttackInProgress()
+    {
+        return ActiveFleets.Any(m => m.MissionType == "Attack" && m.Status == FleetStatus.Flight && !m.IsIncomingAttack);
+    }
+
+    public bool HasIncomingAttack()
+    {
+        return ActiveFleets.Any(m => m.MissionType == "Attack" && m.Status == FleetStatus.Flight && m.IsIncomingAttack);
+    }
+
+    private async Task LoadFromDatabaseAsync()
+    {
+        int g = _playerStateService.ActiveGalaxy;
+        int s = _playerStateService.ActiveSystem;
+        int p = _playerStateService.ActivePosition;
+
+        var dbShips = await _dbContext.Ships
+            .Where(sh => sh.Galaxy == g && sh.System == s && sh.Position == p)
+            .ToListAsync();
+        
+        // Reset counts
+        foreach (var ship in ShipDefinitions) DockedShips[ship.Id] = 0;
+
+        foreach (var dbShip in dbShips)
+        {
+            DockedShips[dbShip.ShipType] = dbShip.Quantity;
+        }
+    }
+
+    private async Task LoadConstructionQueueAsync()
+    {
+        var dbQueue = await _dbContext.ShipyardQueue
+            .OrderBy(q => q.Galaxy)
+            .ThenBy(q => q.System)
+            .ThenBy(q => q.Position)
+            .ThenBy(q => q.StartTime)
+            .ThenBy(q => q.Id)
+            .ToListAsync();
+
+        _allConstructionQueue = dbQueue
+            .Select(q =>
+            {
+                var ship = ShipDefinitions.FirstOrDefault(s => s.Id == q.ShipType);
+                if (ship == null) return null;
+
+                int remainingQuantity = q.Quantity - q.QuantityCompleted;
+                if (remainingQuantity <= 0) return null;
+
+                var durationPerUnit = q.EndTime - q.StartTime;
+                if (durationPerUnit <= TimeSpan.Zero)
+                {
+                    durationPerUnit = _devModeService.GetDuration(CalculateShipConstructionDuration(ship), 1);
+                }
+
+                return new ShipyardItem
+                {
+                    Id = q.Id,
+                    Ship = ship,
+                    Quantity = remainingQuantity,
+                    QuantityCompleted = q.QuantityCompleted,
+                    DurationPerUnit = durationPerUnit,
+                    TimeRemaining = q.IsProcessing && !q.IsCompleted ? q.TimeRemaining : durationPerUnit,
+                    Galaxy = q.Galaxy,
+                    System = q.System,
+                    Position = q.Position
+                };
+            })
+            .Where(q => q != null)
+            .Cast<ShipyardItem>()
+            .ToList();
+    }
+
+    private async Task SaveToDatabaseAsync()
+    {
+        int g = _playerStateService.ActiveGalaxy;
+        int s = _playerStateService.ActiveSystem;
+        int p = _playerStateService.ActivePosition;
+
+        foreach (var kvp in DockedShips)
+        {
+            var dbShip = await _dbContext.Ships.FirstOrDefaultAsync(sh => 
+                sh.ShipType == kvp.Key && sh.Galaxy == g && sh.System == s && sh.Position == p);
+            
+            if (dbShip != null)
+            {
+                dbShip.Quantity = kvp.Value;
+            }
+        }
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SaveShipsToPlanetAsync(int g, int s, int p, Dictionary<string, int> ships)
+    {
+        foreach (var kvp in ships)
+        {
+            var dbShip = await _dbContext.Ships.FirstOrDefaultAsync(sh => sh.ShipType == kvp.Key && sh.Galaxy == g && sh.System == s && sh.Position == p);
+            if (dbShip != null)
+            {
+                dbShip.Quantity += kvp.Value;
+            }
+            else
+            {
+                _dbContext.Ships.Add(new ShipEntity
+                {
+                    ShipType = kvp.Key,
+                    Quantity = kvp.Value,
+                    Galaxy = g,
+                    System = s,
+                    Position = p
+                });
+            }
+        }
+        await _dbContext.SaveChangesAsync();
     }
 
     private void InitializeShips()
@@ -108,7 +313,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "SC", Name = "Small Cargo", Description = "An agile transporter.",
-            Image = "assets/ships/smallCargo.jpg",
+            Image = "ships/smallCargo.jpg",
             MetalCost = 2000, CrystalCost = 2000, DeuteriumCost = 0,
             Structure = 4000, Shield = 10, Attack = 5, Capacity = 5000, BaseSpeed = 5000, FuelConsumption = 10,
             BaseDuration = TimeSpan.FromSeconds(20),
@@ -118,7 +323,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "LC", Name = "Large Cargo", Description = "A heavy transporter with huge capacity.",
-            Image = "assets/ships/largeCargo.jpg",
+            Image = "ships/largeCargo.jpg",
             MetalCost = 6000, CrystalCost = 6000, DeuteriumCost = 0,
             Structure = 12000, Shield = 25, Attack = 5, Capacity = 25000, BaseSpeed = 7500, FuelConsumption = 50,
             BaseDuration = TimeSpan.FromSeconds(50),
@@ -128,7 +333,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "LF", Name = "Light Fighter", Description = "The backbone of any fleet.",
-            Image = "assets/ships/lightFighter.jpg",
+            Image = "ships/lightFighter.jpg",
             MetalCost = 3000, CrystalCost = 1000, DeuteriumCost = 0,
             Structure = 4000, Shield = 10, Attack = 50, Capacity = 50, BaseSpeed = 12500, FuelConsumption = 20,
             BaseDuration = TimeSpan.FromSeconds(15),
@@ -138,7 +343,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "HF", Name = "Heavy Fighter", Description = "Better armored than the light fighter.",
-            Image = "assets/ships/heavyFighter.jpg",
+            Image = "ships/heavyFighter.jpg",
             MetalCost = 6000, CrystalCost = 4000, DeuteriumCost = 0,
             Structure = 10000, Shield = 25, Attack = 150, Capacity = 100, BaseSpeed = 10000, FuelConsumption = 75,
             BaseDuration = TimeSpan.FromSeconds(40),
@@ -148,7 +353,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "CR", Name = "Cruiser", Description = "Fast and dangerous to fighters.",
-            Image = "assets/ships/cruiser.jpg",
+            Image = "ships/cruiser.jpg",
             MetalCost = 20000, CrystalCost = 7000, DeuteriumCost = 2000,
             Structure = 27000, Shield = 50, Attack = 400, Capacity = 800, BaseSpeed = 15000, FuelConsumption = 300,
             BaseDuration = TimeSpan.FromMinutes(2),
@@ -158,7 +363,7 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "BS", Name = "Battleship", Description = "The ruler of the battlefield.",
-            Image = "assets/ships/battleship.jpg",
+            Image = "ships/battleship.jpg",
             MetalCost = 45000, CrystalCost = 15000, DeuteriumCost = 0,
             Structure = 60000, Shield = 200, Attack = 1000, Capacity = 1500, BaseSpeed = 10000, FuelConsumption = 500,
             BaseDuration = TimeSpan.FromMinutes(4),
@@ -168,37 +373,40 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "CS", Name = "Colony Ship", Description = "Used to colonize new planets.",
-            Image = "assets/ships/colonyShip.jpg",
+            Image = "ships/colonyShip.jpg",
             MetalCost = 10000, CrystalCost = 20000, DeuteriumCost = 10000,
             Structure = 30000, Shield = 100, Attack = 50, Capacity = 7500, BaseSpeed = 2500, FuelConsumption = 1000,
             BaseDuration = TimeSpan.FromMinutes(5),
-            Requirements = new() { { "Shipyard", 4 }, { "Impulse Drive", 3 } }
+            Requirements = new() { { "Shipyard", 4 }, { "Impulse Drive", 3 } },
+            IsColonizationCapable = true
         });
         
         ShipDefinitions.Add(new Ship
         {
             Id = "REC", Name = "Recycler", Description = "Harvests debris fields.",
-            Image = "assets/ships/recycler.jpg",
+            Image = "ships/recycler.jpg",
             MetalCost = 10000, CrystalCost = 6000, DeuteriumCost = 2000,
             Structure = 16000, Shield = 10, Attack = 1, Capacity = 20000, BaseSpeed = 2000, FuelConsumption = 300,
             BaseDuration = TimeSpan.FromMinutes(3),
-            Requirements = new() { { "Shipyard", 4 }, { "Combustion Drive", 6 }, { "Shielding Technology", 2 } }
+            Requirements = new() { { "Shipyard", 4 }, { "Combustion Drive", 6 }, { "Shielding Technology", 2 } },
+            IsRecyclingCapable = true
         });
 
         ShipDefinitions.Add(new Ship
         {
             Id = "ESP", Name = "Espionage Probe", Description = "Fast drone for spying.",
-            Image = "assets/ships/probe.jpg",
+            Image = "ships/probe.jpg",
             MetalCost = 0, CrystalCost = 1000, DeuteriumCost = 0,
             Structure = 1000, Shield = 0, Attack = 0, Capacity = 5, BaseSpeed = 100000000, FuelConsumption = 1,
             BaseDuration = TimeSpan.FromSeconds(5),
-            Requirements = new() { { "Shipyard", 3 }, { "Combustion Drive", 3 }, { "Espionage Technology", 2 } }
+            Requirements = new() { { "Shipyard", 3 }, { "Combustion Drive", 3 }, { "Espionage Technology", 2 } },
+            IsEspionageCapable = true
         });
 
         ShipDefinitions.Add(new Ship
         {
             Id = "DST", Name = "Destroyer", Description = "Anti-Deathstar specialized ship.",
-             Image = "assets/ships/destroyer.jpg",
+             Image = "ships/destroyer.jpg",
             MetalCost = 60000, CrystalCost = 50000, DeuteriumCost = 15000,
             Structure = 110000, Shield = 500, Attack = 2000, Capacity = 2000, BaseSpeed = 5000, FuelConsumption = 1000,
             BaseDuration = TimeSpan.FromMinutes(10),
@@ -208,12 +416,28 @@ public class FleetService
         ShipDefinitions.Add(new Ship
         {
             Id = "RIP", Name = "Death Star", Description = "The ultimate weapon.",
-            Image = "assets/ships/deathstar.jpg",
+            Image = "ships/deathstar.jpg",
             MetalCost = 5000000, CrystalCost = 4000000, DeuteriumCost = 1000000,
             Structure = 9000000, Shield = 50000, Attack = 200000, Capacity = 1000000, BaseSpeed = 100, FuelConsumption = 1,
             BaseDuration = TimeSpan.FromHours(5),
             Requirements = new() { { "Shipyard", 12 }, { "Hyperspace Drive", 7 }, { "Graviton Technology", 1 } }
         });
+    }
+
+    private void AddDevModeShips()
+    {
+        foreach (var ship in ShipDefinitions)
+        {
+            if (DockedShips.ContainsKey(ship.Id))
+            {
+                DockedShips[ship.Id] += 10;
+            }
+            else
+            {
+                DockedShips[ship.Id] = 10;
+            }
+        }
+        NotifyStateChanged();
     }
 
     public int GetShipCount(string shipId)
@@ -226,8 +450,10 @@ public class FleetService
     public long CalculateFuelConsumption(Dictionary<string, int> shipsToSend, int targetGalaxy, int targetSystem, int targetPosition)
     {
         // Placeholder distance: 1 System = 1000 units, 1 Galaxy = 20000 units
-        // Current coordinates assumed 1:1:1 for simplicity
-        long distance = Math.Abs(targetGalaxy - 1) * 20000 + Math.Abs(targetSystem - 1) * 1000 + Math.Abs(targetPosition - 1) * 5 + 1000;
+        // Calculate distance from Home Planet
+        long distance = Math.Abs(targetGalaxy - _galaxyService.HomeGalaxy) * 20000 + 
+                        Math.Abs(targetSystem - _galaxyService.HomeSystem) * 1000 + 
+                        Math.Abs(targetPosition - _galaxyService.HomePosition) * 5 + 1000;
         
         long totalFuel = 0;
         foreach(var kvp in shipsToSend)
@@ -253,7 +479,9 @@ public class FleetService
         }
         
         // Distance
-        long distance = Math.Abs(targetGalaxy - 1) * 20000 + Math.Abs(targetSystem - 1) * 1000 + Math.Abs(targetPosition - 1) * 5 + 1000;
+        long distance = Math.Abs(targetGalaxy - _galaxyService.HomeGalaxy) * 20000 + 
+                        Math.Abs(targetSystem - _galaxyService.HomeSystem) * 1000 + 
+                        Math.Abs(targetPosition - _galaxyService.HomePosition) * 5 + 1000;
         
         // Time = Distance / Speed * Factor (e.g. 100)
         // With x100 speed universe, we divide result by 100
@@ -268,35 +496,41 @@ public class FleetService
         return TimeSpan.FromSeconds(seconds);
     }
 
-    public string SendFleet(Dictionary<string, int> shipsToSend, int g, int s, int p, string missionType)
+    public async Task<string?> SendFleet(Dictionary<string, int> shipsToSend, int g, int s, int p, string missionType)
     {
         if (!shipsToSend.Any()) return "No ships selected.";
-        
+
+        // Validate mission requirements
+        var validationError = ValidateMission(missionType, g, s, p, shipsToSend);
+        if (validationError != null) return validationError;
+
         // 1. Check Ship Availability
         foreach(var kvp in shipsToSend)
         {
             if (GetShipCount(kvp.Key) < kvp.Value) return $"Not enough {kvp.Key}.";
         }
-        
+
         // 2. Calculate Fuel & Check Deuterium
         long fuel = CalculateFuelConsumption(shipsToSend, g, s, p);
-        if (!_resourceService.HasResources(0,0, fuel)) return "Not enough Deuterium for fuel.";
-        
+        if (!await _resourceService.HasResourcesAsync(0, 0, fuel)) return "Not enough Deuterium for fuel.";
+
         // 3. Deduct Resources and Ships
-        _resourceService.ConsumeResources(0,0, fuel);
+        await _resourceService.ConsumeResourcesAsync(0, 0, fuel);
         foreach(var kvp in shipsToSend)
         {
             DockedShips[kvp.Key] -= kvp.Value;
         }
-        
+        await SaveToDatabaseAsync();
+
         // 4. Create Mission
         var flightTime = CalculateFlightTime(shipsToSend, g, s, p);
-        flightTime = _devModeService.GetDuration(flightTime, 0); // Dev mode override
+        flightTime = _devModeService.GetDuration(flightTime, 10); // Dev mode override
 
         var mission = new FleetMission
         {
             Id = Guid.NewGuid(),
             MissionType = missionType,
+            OriginCoordinates = $"{_playerStateService.ActiveGalaxy}:{_playerStateService.ActiveSystem}:{_playerStateService.ActivePosition}",
             TargetCoordinates = $"{g}:{s}:{p}",
             Ships = new Dictionary<string, int>(shipsToSend),
             StartTime = DateTime.Now,
@@ -305,11 +539,68 @@ public class FleetService
             Status = FleetStatus.Flight,
             FuelConsumed = fuel
         };
-        
+
         ActiveFleets.Add(mission);
         NotifyStateChanged();
-        
+
         return null; // Success
+    }
+
+    private string? ValidateMission(string missionType, int g, int s, int p, Dictionary<string, int> shipsToSend)
+    {
+        var planet = _galaxyService.GetPlanet(g, s, p);
+
+        return missionType switch
+        {
+            "Attack" or "Transport" or "Espionage" or "Deploy" => planet?.IsOccupied == true 
+                ? null 
+                : $"Target [{g}:{s}:{p}] does not exist. Cannot perform {missionType.ToLower()} mission.",
+            "Recycle" => planet?.HasDebris == true 
+                ? null 
+                : $"No debris field at [{g}:{s}:{p}]. Cannot perform recycle mission.",
+            "Colonize" => ValidateColonize(g, s, p, planet, shipsToSend),
+            "Expedition" => ValidateExpedition(shipsToSend),
+            _ => null
+        };
+    }
+
+    private string? ValidateColonize(int g, int s, int p, GalaxyPlanet? planet, Dictionary<string, int> shipsToSend)
+    {
+        // 1. Check if planet exists and is unoccupied
+        if (planet == null)
+            return $"Target [{g}:{s}:{p}] does not exist. Cannot colonize.";
+        
+        if (planet.IsOccupied)
+            return $"Planet [{g}:{s}:{p}] is already occupied. Cannot colonize.";
+
+        // 2. Check Astrophysics requirement
+        int astroLevel = _technologyService.GetTechLevel(TechType.Astrophysics);
+        if (astroLevel < 1)
+            return "Colonization requires Astrophysics Technology Level 1. Research Astrophysics first.";
+
+        // 3. Check planet limit (using global constant MaxPlanets = 4)
+        int currentPlanetCount = _galaxyService.PlayerPlanets.Count;
+        if (currentPlanetCount >= MaxPlanets)
+            return $"You have reached the maximum number of planets ({currentPlanetCount}/{MaxPlanets}). You cannot colonize more planets.";
+
+        // 4. Check for Colony Ship
+        if (!shipsToSend.ContainsKey("CS") || shipsToSend["CS"] < 1)
+            return "A Colony Ship (CS) is required to colonize a new planet.";
+
+        // All validations passed
+        return null;
+    }
+
+    private string? ValidateExpedition(Dictionary<string, int> shipsToSend)
+    {
+        // Expedition requires at least one ship
+        if (!shipsToSend.Any())
+            return "Expedition requires at least one ship.";
+
+        // Check for Pathfinder (optional but recommended)
+        // In Espacial, Pathfinders give bonuses but aren't strictly required
+        // We'll allow any ship for expedition
+        return null;
     }
 
     private async Task ProcessFleetLoop()
@@ -326,8 +617,16 @@ public class FleetService
                 {
                     if (now >= mission.ArrivalTime)
                     {
+                        if (mission.IsIncomingAttack)
+                        {
+                            HandleIncomingAttack(mission);
+                            completedMissions.Add(mission);
+                            NotifyStateChanged();
+                            continue;
+                        }
+
                         // Arrived!
-                        ProcessMissionArrival(mission);
+                        await ProcessMissionArrival(mission);
                         
                         // Turn around
                         mission.Status = FleetStatus.Return;
@@ -339,11 +638,12 @@ public class FleetService
                     if (now >= mission.ReturnTime)
                     {
                         // Returned to base
-                        foreach(var kvp in mission.Ships)
-                        {
-                            if (!DockedShips.ContainsKey(kvp.Key)) DockedShips[kvp.Key] = 0;
-                            DockedShips[kvp.Key] += kvp.Value;
-                        }
+                        var originParts = mission.OriginCoordinates.Split(':');
+                        int og = int.Parse(originParts[0]);
+                        int os = int.Parse(originParts[1]);
+                        int op = int.Parse(originParts[2]);
+
+                        await SaveShipsToPlanetAsync(og, os, op, mission.Ships);
 
                         // Unload Cargo
                         if (mission.Cargo.Count > 0)
@@ -351,11 +651,17 @@ public class FleetService
                             long m = mission.Cargo.ContainsKey("Metal") ? mission.Cargo["Metal"] : 0;
                             long c = mission.Cargo.ContainsKey("Crystal") ? mission.Cargo["Crystal"] : 0;
                             long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
-                            _resourceService.AddResources(m, c, d);
+                            await _resourceService.AddResourcesToPlanetAsync(og, os, op, m, c, d);
+                        }
+                        
+                        // We also need to reload active view if we are on that planet
+                        if (_playerStateService.ActiveGalaxy == og && _playerStateService.ActiveSystem == os && _playerStateService.ActivePosition == op)
+                        {
+                            await LoadFromDatabaseAsync();
                         }
                         
                         _messageService.AddMessage("Fleet Return", 
-                            $"Your fleet from {mission.TargetCoordinates} has returned to base.", 
+                            $"Your fleet from {mission.TargetCoordinates} has returned to {mission.OriginCoordinates}.", 
                             "General");
                         
                         completedMissions.Add(mission);
@@ -374,7 +680,7 @@ public class FleetService
         }
     }
 
-    private void ProcessMissionArrival(FleetMission mission)
+    private async Task ProcessMissionArrival(FleetMission mission)
     {
         // Parse coords
         var parts = mission.TargetCoordinates.Split(':');
@@ -395,14 +701,20 @@ public class FleetService
             case "Attack":
                 HandleCombat(mission, planet);
                 break;
+            case "Transport":
+                await HandleTransport(mission, planet);
+                break;
+            case "Deploy":
+                await HandleDeploy(mission, planet);
+                break;
             case "Colonize":
-                HandleColonization(mission, planet);
+                await HandleColonization(mission, planet);
                 break;
             case "Recycle":
                 HandleRecycle(mission, planet);
                 break;
             case "Expedition":
-                HandleExpedition(mission);
+                await HandleExpedition(mission);
                 break;
             default:
                  _messageService.AddMessage("Fleet Reached Destination", 
@@ -411,25 +723,14 @@ public class FleetService
         }
     }
 
-    private void HandleExpedition(FleetMission mission)
+    private async Task HandleExpedition(FleetMission mission)
     {
         var random = new Random();
         
         // Influence outcomes with Astrophysics (small bonus to finding things vs nothing)
         int astroLevel = _technologyService.GetTechLevel(TechType.Astrophysics);
-        // Base weight modifier (e.g. +1% chance to find something per level)
-        // This is simplified. True OGame logic is very complex.
         
         int roll = random.Next(1, 1000); 
-
-        // Weighted Outcomes:
-        // 0-10: Black Hole (1%) - Total Loss
-        // 11-100: Pirates/Aliens (9%) - Combat
-        // 101-400: Nothing (30%) - Delay or Empty
-        // 401-700: Resources (30%) - Metal/Crystal/Deut
-        // 701-900: Ships (20%) - Find fleet
-        // 901-990: Dark Matter (9%)
-        // 991-1000: Item/Merchant (1%) - Not implemented yet, treat as Dark Matter
 
         // Determine Fleet Capacity & Strength
         long totalCapacity = 0;
@@ -459,8 +760,6 @@ public class FleetService
             bool aliens = random.Next(0, 2) == 0;
             string enemyName = aliens ? "Aliens" : "Pirates";
             
-            // Simplified Combat: Lose percentage of fleet based on enemy strength
-            // Aliens are stronger.
             double damagePercent = aliens ? 0.3 : 0.1; // 30% or 10% loss
             
             var report = $"Your fleet was ambushed by {enemyName}!<br/>";
@@ -488,11 +787,7 @@ public class FleetService
             bool delay = random.Next(0, 2) == 0;
             if (delay)
             {
-                 // Add delay to return time
-                 var delayTime = _devModeService.GetDuration(TimeSpan.FromMinutes(random.Next(30, 120)), 0); // Minutes
-                 // Adjust return time? Since ArrivalTime is passed, we modify ReturnTime logic?
-                 // The mission loop handles ReturnTime after arrival.
-                 // We need to modify mission.ReturnTime effectively.
+                 var delayTime = TimeSpan.FromMinutes(random.Next(30, 120)); // Minutes
                  mission.ReturnTime = mission.ReturnTime.Add(delayTime);
                  
                  _messageService.AddMessage("Expedition Result", 
@@ -526,10 +821,7 @@ public class FleetService
             if (sizeRoll > 90) { multiplier = 5.0; sizeDesc = "Huge"; }
             else if (sizeRoll > 50) { multiplier = 2.0; sizeDesc = "Medium"; }
 
-            // Base amount related to fleet structure (heuristic for "fleet points")
-            // Cap base at 10% of fleet structure or similar?
             long baseAmount = (long)(totalStructure * 0.05 * multiplier); 
-            // Clamp min/max
             baseAmount = Math.Clamp(baseAmount, 1000, 2000000);
 
             long m = 0, c = 0, d = 0;
@@ -560,18 +852,14 @@ public class FleetService
         }
         else if (roll <= 900) // 20% Ships
         {
-            // Find ships based on fleet size
-            // Heuristic: Find 5-10% of own fleet points in ships
             long pointsFound = (long)(totalStructure * random.NextDouble() * 0.1);
             if (pointsFound < 1000) pointsFound = 1000;
 
-            // Possible ships to find (limit to smaller than Destroyer usually)
             var possibleShips = ShipDefinitions.Where(s => s.Id != "RIP" && s.Id != "DST" && s.Id != "CS").ToList();
             if (!possibleShips.Any()) return;
 
             string report = "We found abandoned ships drifting in space:<br/>";
             
-            // Try to spend points
             int safetyBreak = 0;
             while (pointsFound > 2000 && safetyBreak < 10)
             {
@@ -579,7 +867,6 @@ public class FleetService
                 if (ship.Structure <= pointsFound)
                 {
                     int count = random.Next(1, (int)(pointsFound / ship.Structure) + 1);
-                    // Cap count reasonably
                     if (count > 10) count = 10;
                     
                     if (!mission.Ships.ContainsKey(ship.Id)) mission.Ships[ship.Id] = 0;
@@ -596,14 +883,14 @@ public class FleetService
         else // 10% Dark Matter
         {
             int dm = random.Next(100, 1000) * (1 + astroLevel/5);
-            _resourceService.AddDarkMatter(dm);
+            await _resourceService.AddDarkMatterAsync(dm);
             
             _messageService.AddMessage("Expedition Result", 
                 $"We found a pocket of Dark Matter! Obtained {dm} Dark Matter.", "Expedition");
         }
     }
 
-    private void HandleEspionage(FleetMission mission, GalaxyPlanet planet)
+    private void HandleEspionage(FleetMission mission, GalaxyPlanet? planet)
     {
         if (planet == null || !planet.IsOccupied)
         {
@@ -614,15 +901,13 @@ public class FleetService
 
         // 1. Get Tech Levels
         int attackerSpyTech = _technologyService.GetTechLevel(TechType.Espionage);
-        var (resources, defenses, ships, defenderSpyTech) = GeneratePlanetState(planet);
+        
+        var (resources, defenses, ships, defenderSpyTech, buildings, techs) = GetPlanetActualState(planet);
         
         // 2. Counter-Espionage Calculation
         int probesCount = mission.Ships.ContainsKey("ESP") ? mission.Ships["ESP"] : 0;
         int defenderFleetCount = ships.Values.Sum(); // Total ships on planet
         
-        // Chance: (DefenderFleet * 1%) + (Probes * 10%)? 
-        // Heuristic: More ships = higher detection. More probes = higher detection.
-        // Cap at 100%
         double chance = Math.Min(100.0, (defenderFleetCount * 0.05) + (probesCount * 2.0));
         
         bool detected = new Random().NextDouble() * 100.0 < chance;
@@ -637,8 +922,6 @@ public class FleetService
             
             // Destroy Probes
             mission.Ships.Clear(); // Fleet destroyed
-            // Usually this means the fleet doesn't return.
-            // In OGame you usually get the report even if destroyed (transmitted before destruction).
         }
 
         // 3. Report Generation based on Level Difference
@@ -679,63 +962,60 @@ public class FleetService
         // Level >= 3: Buildings
         if (levelDiff >= 3)
         {
-             var buildings = GeneratePlanetBuildings(planet);
              string bRows = "";
              foreach(var b in buildings) if(b.Value > 0) bRows += $"{b.Key}: {b.Value}<br/>";
+             if (string.IsNullOrEmpty(bRows)) bRows = "No buildings detected";
              content += $"<strong>Buildings:</strong><br/>{bRows}<br/><br/>";
         }
 
         // Level >= 4: Technology
         if (levelDiff >= 4)
         {
-             var techs = GeneratePlanetTechs(planet);
              string tRows = "";
              foreach(var t in techs) if(t.Value > 0) tRows += $"{t.Key}: {t.Value}<br/>";
+             if (string.IsNullOrEmpty(tRows)) tRows = "No research detected";
              content += $"<strong>Research:</strong><br/>{tRows}<br/><br/>";
         }
         
         _messageService.AddMessage($"Spy Report [{mission.TargetCoordinates}]", content, "Espionage");
     }
 
-    private void HandleCombat(FleetMission mission, GalaxyPlanet planet)
+    private void HandleCombat(FleetMission mission, GalaxyPlanet? planet)
     {
-        if (!planet.IsOccupied)
+        if (planet == null || !planet.IsOccupied)
         {
             _messageService.AddMessage("Combat Report", "Planet is uninhabited. No combat occurred.", "Combat");
             return;
         }
-        
+
         if (planet.IsMyPlanet)
         {
              _messageService.AddMessage("Combat Report", "You cannot attack your own planet.", "Combat");
              return;
         }
 
-        // 1. Attacker Power
         long attackerAttack = 0;
         long attackerStructure = 0;
         long attackerShield = 0;
 
-        foreach(var s in mission.Ships)
+        foreach (var shipEntry in mission.Ships)
         {
-             var def = ShipDefinitions.FirstOrDefault(x => x.Id == s.Key);
-             if(def != null) 
+             var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key);
+             if (def != null)
              {
-                 attackerAttack += def.Attack * s.Value;
-                 attackerStructure += def.Structure * s.Value;
-                 attackerShield += def.Shield * s.Value;
+                 attackerAttack += def.Attack * shipEntry.Value;
+                 attackerStructure += def.Structure * shipEntry.Value;
+                 attackerShield += def.Shield * shipEntry.Value;
              }
         }
-        
-        // 2. Defender Power (Generated)
-        var (resources, defenses, ships, spyTech) = GeneratePlanetState(planet);
-        
+
+        var (resources, defenses, ships, spyTech, buildings, techs) = GetPlanetActualState(planet);
+
         long defenderAttack = 0;
         long defenderStructure = 0;
         long defenderShield = 0;
-        
-        // Add Defenses
-        foreach(var d in defenses)
+
+        foreach (var d in defenses)
         {
             var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Name == d.Key);
             if (defUnit != null)
@@ -744,62 +1024,57 @@ public class FleetService
                  defenderStructure += defUnit.Structure * d.Value;
                  defenderShield += defUnit.Shield * d.Value;
             }
-            else
-            {
-                if(d.Key.Contains("Rocket")) { defenderAttack += 80 * d.Value; defenderStructure += 2000 * d.Value; defenderShield += 20 * d.Value; }
-                else if(d.Key.Contains("Laser")) { defenderAttack += 100 * d.Value; defenderStructure += 2000 * d.Value; defenderShield += 25 * d.Value; }
-                else if(d.Key.Contains("Heavy") || d.Key.Contains("Cannon")) { defenderAttack += 250 * d.Value; defenderStructure += 8000 * d.Value; defenderShield += 100 * d.Value; }
-                else { defenderAttack += 50 * d.Value; defenderStructure += 1000 * d.Value; defenderShield += 10 * d.Value; }
-            }
         }
-        
-        // Add Ships to Defender
-        foreach(var s in ships)
+
+        foreach (var shipEntry in ships)
         {
-             // We need to match ship names to IDs or vice versa. The generator uses Names ("Light Fighter"), ShipDefinitions uses IDs ("LF") and Names ("Light Fighter").
-             // We'll search by Name.
-             var def = ShipDefinitions.FirstOrDefault(x => x.Name == s.Key);
-             if(def != null) 
+             var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key || x.Name == shipEntry.Key);
+             if (def != null)
              {
-                 defenderAttack += def.Attack * s.Value;
-                 defenderStructure += def.Structure * s.Value;
-                 defenderShield += def.Shield * s.Value;
+                 defenderAttack += def.Attack * shipEntry.Value;
+                 defenderStructure += def.Structure * shipEntry.Value;
+                 defenderShield += def.Shield * shipEntry.Value;
              }
         }
 
-        // 3. Battle Resolution (Simplified)
-        // Total Health = Structure + Shield
         long attackerHealth = attackerStructure + attackerShield;
         long defenderHealth = defenderStructure + defenderShield;
-        
-        // Avoid div by zero
-        if(attackerHealth <= 0) attackerHealth = 1;
-        if(defenderHealth <= 0) defenderHealth = 1;
 
-        // Rounds? Or simple comparison?
-        // Simple: Higher damage output relative to enemy health wins.
-        // Score = Attack / EnemyHealth
+        if (attackerHealth <= 0) attackerHealth = 1;
+        if (defenderHealth <= 0) defenderHealth = 1;
+
         double attackerScore = (double)attackerAttack / defenderHealth;
         double defenderScore = (double)defenderAttack / attackerHealth;
-        
-        string result = "";
-        
-        if (attackerScore > defenderScore)
+
+        var initialAttackerShips = mission.Ships.ToDictionary(x => x.Key, x => x.Value);
+        var initialDefenses = defenses.ToDictionary(x => x.Key, x => x.Value);
+        var initialDefenderShips = ships.ToDictionary(x => x.Key, x => x.Value);
+
+        var attackerLosses = new Dictionary<string, int>();
+        var defenderDefenseLosses = new Dictionary<string, int>();
+        var defenderShipLosses = new Dictionary<string, int>();
+
+        long debrisM = 0;
+        long debrisC = 0;
+        bool attackerWon = attackerScore > defenderScore;
+
+        string result;
+
+        if (attackerWon)
         {
-            // WIN
-            long lootM = Math.Min(resources["Metal"] / 2, mission.Cargo.ContainsKey("Metal") ? 0 : 1000000); // 50% loot
+            long lootM = Math.Min(resources["Metal"] / 2, mission.Cargo.ContainsKey("Metal") ? 0 : 1000000);
             long lootC = Math.Min(resources["Crystal"] / 2, 1000000);
             long lootD = Math.Min(resources["Deuterium"] / 2, 1000000);
-            
-            // Cap by capacity
+
             long totalCapacity = 0;
-            foreach(var s in mission.Ships) {
-                 var def = ShipDefinitions.FirstOrDefault(x => x.Id == s.Key);
-                 if(def!=null) totalCapacity += def.Capacity * s.Value;
+            foreach (var shipEntry in mission.Ships)
+            {
+                 var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key);
+                 if (def != null) totalCapacity += def.Capacity * shipEntry.Value;
             }
-            
+
             long totalLoot = lootM + lootC + lootD;
-            if(totalLoot > totalCapacity)
+            if (totalLoot > totalCapacity)
             {
                 double ratio = (double)totalCapacity / totalLoot;
                 lootM = (long)(lootM * ratio);
@@ -807,23 +1082,19 @@ public class FleetService
                 lootD = (long)(lootD * ratio);
             }
 
-            // Add to Cargo
             if (!mission.Cargo.ContainsKey("Metal")) mission.Cargo["Metal"] = 0;
             mission.Cargo["Metal"] += lootM;
 
             if (!mission.Cargo.ContainsKey("Crystal")) mission.Cargo["Crystal"] = 0;
             mission.Cargo["Crystal"] += lootC;
-            
+
             if (!mission.Cargo.ContainsKey("Deuterium")) mission.Cargo["Deuterium"] = 0;
             mission.Cargo["Deuterium"] += lootD;
 
-            // Generate Debris from destroyed Defenses (30% of cost)
-            long debrisM = 0;
-            long debrisC = 0;
-            foreach(var d in defenses)
+            foreach (var d in defenses)
             {
                 var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Name == d.Key);
-                
+
                 long unitMetal = 0;
                 long unitCrystal = 0;
 
@@ -834,159 +1105,597 @@ public class FleetService
                 }
                 else
                 {
-                     if(d.Key.Contains("Rocket")) { unitMetal = 2000; }
-                     else if(d.Key.Contains("Laser")) { unitMetal = 1500; unitCrystal = 500; }
+                     if (d.Key.Contains("Rocket")) { unitMetal = 2000; }
+                     else if (d.Key.Contains("Laser")) { unitMetal = 1500; unitCrystal = 500; }
                      else { unitMetal = 1000; }
                 }
 
                 debrisM += (long)(unitMetal * d.Value * 0.3);
                 debrisC += (long)(unitCrystal * d.Value * 0.3);
             }
-            
-            // Also debris from destroyed Defender Ships (30%)
-            foreach(var s in ships)
+
+            foreach (var shipEntry in ships)
             {
-                 var def = ShipDefinitions.FirstOrDefault(x => x.Name == s.Key);
+                 var def = ShipDefinitions.FirstOrDefault(x => x.Name == shipEntry.Key);
                  if (def != null)
                  {
-                     debrisM += (long)(def.MetalCost * s.Value * 0.3);
-                     debrisC += (long)(def.CrystalCost * s.Value * 0.3);
+                     debrisM += (long)(def.MetalCost * shipEntry.Value * 0.3);
+                     debrisC += (long)(def.CrystalCost * shipEntry.Value * 0.3);
+                     defenderShipLosses[shipEntry.Key] = shipEntry.Value;
                  }
             }
-            
+
             if (debrisM > 0 || debrisC > 0)
             {
                 planet.DebrisMetal += debrisM;
                 planet.DebrisCrystal += debrisC;
                 planet.HasDebris = true;
             }
-            
-            result = $"<span style='color:green'>VICTORY!</span><br/>" +
-                     $"Your Fleet: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                     $"Enemy Def: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                     $"Loot captured: <br/>" +
-                     $"Metal: {lootM:N0}<br/>" +
-                     $"Crystal: {lootC:N0}<br/>" +
-                     $"Deuterium: {lootD:N0}<br/><br/>" +
-                     $"Debris Field Created:<br/>" +
-                     $"Metal: {debrisM:N0}, Crystal: {debrisC:N0}";
+
+            ApplyDefenseCombatLosses(defenses);
+
+            foreach (var defense in initialDefenses)
+            {
+                int remaining = defenses.GetValueOrDefault(defense.Key, 0);
+                int lost = Math.Max(0, defense.Value - remaining);
+                if (lost > 0) defenderDefenseLosses[defense.Key] = lost;
+            }
+
+            result = BuildCombatReportHtml(
+                isOutgoingAttack: true,
+                playerWon: true,
+                battleCoordinates: mission.TargetCoordinates,
+                attackerShips: ToNamedShipDict(initialAttackerShips),
+                defenderShips: ToNamedShipDict(initialDefenderShips),
+                defenderDefenses: initialDefenses,
+                attackerAttackPower: attackerAttack, attackerHealth: attackerHealth,
+                defenderAttackPower: defenderAttack, defenderHealth: defenderHealth,
+                attackerLosses: attackerLosses,
+                defenderShipLosses: defenderShipLosses,
+                defenderDefenseLosses: defenderDefenseLosses,
+                lootMetal: lootM, lootCrystal: lootC, lootDeuterium: lootD,
+                debrisMetal: debrisM, debrisCrystal: debrisC);
         }
         else
         {
-            // DEFEAT
-             
-             // Destroy 50% of ships
-             long debrisM = 0;
-             long debrisC = 0;
-             
-             foreach(var key in mission.Ships.Keys.ToList())
-             {
+            foreach (var key in mission.Ships.Keys.ToList())
+            {
                  int original = mission.Ships[key];
-                 int lost = original / 2; // Lose half
-                 mission.Ships[key] -= lost; // Update fleet
-                 
+                 int lost = original / 2;
+                 mission.Ships[key] -= lost;
+                 if (lost > 0) attackerLosses[MapShipIdToName(key)] = lost;
+
                  var ship = ShipDefinitions.FirstOrDefault(s => s.Id == key);
                  if (ship != null)
                  {
                      debrisM += (long)(ship.MetalCost * lost * 0.3);
                      debrisC += (long)(ship.CrystalCost * lost * 0.3);
                  }
-             }
+            }
 
-             if (debrisM > 0 || debrisC > 0)
-             {
+            if (debrisM > 0 || debrisC > 0)
+            {
                 planet.DebrisMetal += debrisM;
                 planet.DebrisCrystal += debrisC;
                 planet.HasDebris = true;
-             }
+            }
 
-             result = $"<span style='color:red'>DEFEAT!</span><br/>" +
-                     $"Your Fleet: {attackerAttack:N0} Atk / {attackerHealth:N0} HP<br/>" +
-                     $"Enemy Def: {defenderAttack:N0} Atk / {defenderHealth:N0} HP<br/><br/>" +
-                     $"Your fleet was forced to retreat with heavy losses.<br/><br/>" +
-                     $"Debris Field Created:<br/>" +
-                     $"Metal: {debrisM:N0}, Crystal: {debrisC:N0}";
+            ApplyDefenseCombatLosses(defenses);
+
+            foreach (var defense in initialDefenses)
+            {
+                int remaining = defenses.GetValueOrDefault(defense.Key, 0);
+                int lost = Math.Max(0, defense.Value - remaining);
+                if (lost > 0) defenderDefenseLosses[defense.Key] = lost;
+            }
+
+            result = BuildCombatReportHtml(
+                isOutgoingAttack: true,
+                playerWon: false,
+                battleCoordinates: mission.TargetCoordinates,
+                attackerShips: ToNamedShipDict(initialAttackerShips),
+                defenderShips: ToNamedShipDict(initialDefenderShips),
+                defenderDefenses: initialDefenses,
+                attackerAttackPower: attackerAttack, attackerHealth: attackerHealth,
+                defenderAttackPower: defenderAttack, defenderHealth: defenderHealth,
+                attackerLosses: attackerLosses,
+                defenderShipLosses: defenderShipLosses,
+                defenderDefenseLosses: defenderDefenseLosses,
+                lootMetal: 0, lootCrystal: 0, lootDeuterium: 0,
+                debrisMetal: debrisM, debrisCrystal: debrisC);
         }
-        
+
         _messageService.AddMessage($"Combat Report [{mission.TargetCoordinates}]", result, "Combat");
+
+        var parts = mission.TargetCoordinates.Split(':');
+        if (parts.Length == 3 &&
+            int.TryParse(parts[0], out int g) &&
+            int.TryParse(parts[1], out int s) &&
+            int.TryParse(parts[2], out int p))
+        {
+            _ = _enemyService.OnPlayerAttack(g, s, p, attackerWon);
+
+            // Ranking: calcular valores de unidades destruidas
+            var botEnemy = _enemyService.GetEnemy(g, s, p);
+            string botKey = botEnemy != null ? botEnemy.EmpireId.ToString() : mission.TargetCoordinates;
+            string botName = botEnemy != null ? (_enemyService.GetHomeworldName(botEnemy.EmpireId) ?? botEnemy.Name) : mission.TargetCoordinates;
+
+            double defShipPts = 0;
+            foreach (var loss in defenderShipLosses)
+            {
+                var def = ShipDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) defShipPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            double defDefPts = 0;
+            foreach (var loss in defenderDefenseLosses)
+            {
+                var def = _defenseService.DefenseDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) defDefPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            double atkShipPts = 0;
+            foreach (var loss in attackerLosses)
+            {
+                var def = ShipDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) atkShipPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            _rankingService?.RecordCombat(
+                RankingService.PlayerKey, RankingService.PlayerName, false,
+                botKey, botName, true,
+                attackerWon,
+                defShipPts, defDefPts, atkShipPts);
+        }
     }
 
-    // Helper to generate consistent state for a planet based on its coordinate
-    private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses, Dictionary<string, int> Ships, int SpyTech) GeneratePlanetState(GalaxyPlanet planet)
+    private string FormatShipDictionary(Dictionary<string, int> ships)
     {
-        // Seed random with position to get same result for same planet
-        int seed = planet.Position * 1000 + planet.Name.Length * 7; 
-        var r = new Random(seed);
+        var rows = new List<string>();
+
+        foreach (var item in ships.Where(x => x.Value > 0))
+        {
+            var shipDefinition = ShipDefinitions.FirstOrDefault(s => s.Id == item.Key);
+            string label = shipDefinition?.Name ?? item.Key;
+            rows.Add($"{label}: {item.Value:N0}");
+        }
+
+        if (!rows.Any()) return "None";
+        return string.Join("<br/>", rows);
+    }
+
+    private string FormatUnitDictionary(Dictionary<string, int> units)
+    {
+        var rows = new List<string>();
+        foreach (var item in units.Where(x => x.Value > 0))
+        {
+            rows.Add($"{item.Key}: {item.Value:N0}");
+        }
+
+        if (!rows.Any()) return "None";
+        return string.Join("<br/>", rows);
+    }
+    // Helper to get real state for a planet
+    private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses, Dictionary<string, int> Ships, int SpyTech, Dictionary<string, int> Buildings, Dictionary<string, int> Techs) GetPlanetActualState(GalaxyPlanet planet)
+    {
+        var enemy = _enemyService.GetEnemy(planet.Galaxy, planet.System, planet.Position);
         
+        if (enemy != null)
+        {
+            return (
+                new Dictionary<string, long> { { "Metal", enemy.Metal }, { "Crystal", enemy.Crystal }, { "Deuterium", enemy.Deuterium } },
+                enemy.Defenses,
+                enemy.Ships,
+                enemy.Technologies.GetValueOrDefault("Espionage Technology", 0),
+                enemy.Buildings,
+                enemy.Technologies
+            );
+        }
+
+        // Fallback for non-enemy (or if not found), e.g. player planets handled elsewhere or empty
+        return (new(), new(), new(), 0, new(), new());
+    }
+
+    private void ApplyDefenseCombatLosses(Dictionary<string, int> defenses)
+    {
+        double minLossPercentage = Math.Clamp(CombatDefenseLossMinPercentage, 0.0, 1.0);
+        double maxLossPercentage = Math.Clamp(CombatDefenseLossMaxPercentage, 0.0, 1.0);
+        if (maxLossPercentage < minLossPercentage)
+        {
+            (minLossPercentage, maxLossPercentage) = (maxLossPercentage, minLossPercentage);
+        }
+        if (maxLossPercentage <= 0 || defenses.Count == 0) return;
+
+        double lossPercentage = minLossPercentage == maxLossPercentage
+            ? minLossPercentage
+            : minLossPercentage + (Random.Shared.NextDouble() * (maxLossPercentage - minLossPercentage));
+
+        foreach (var defenseType in defenses.Keys.ToList())
+        {
+            int currentTotal = defenses[defenseType];
+            if (currentTotal <= 0) continue;
+
+            int lostAmount = (int)Math.Floor(currentTotal * lossPercentage);
+            int updatedTotal = Math.Max(0, currentTotal - lostAmount);
+            defenses[defenseType] = updatedTotal;
+        }
+    }
+
+    private void HandleEnemyAttackLaunched(string originCoordinates, string targetCoordinates, Dictionary<string, int> ships)
+    {
+        var attackShips = ships.Where(s => s.Value > 0).ToDictionary(s => s.Key, s => s.Value);
+        if (!attackShips.Any()) return;
+
+        var targetParts = targetCoordinates.Split(':');
+        if (targetParts.Length != 3 ||
+            !int.TryParse(targetParts[0], out int tg) ||
+            !int.TryParse(targetParts[1], out int ts) ||
+            !int.TryParse(targetParts[2], out int tp))
+        {
+            return;
+        }
+
+        var targetPlanet = _galaxyService.GetPlanet(tg, ts, tp);
+        if (targetPlanet == null || !targetPlanet.IsMyPlanet) return;
+
+        if (!TryParseCoordinates(originCoordinates, out int og, out int os, out int op)) return;
+
+        TimeSpan flightTime = CalculateFlightTimeFromCoordinates(attackShips, og, os, op, tg, ts, tp);
+        if (flightTime <= TimeSpan.Zero) flightTime = TimeSpan.FromSeconds(30);
+
+        var incomingMission = new FleetMission
+        {
+            Id = Guid.NewGuid(),
+            MissionType = "Attack",
+            OriginCoordinates = originCoordinates,
+            TargetCoordinates = targetCoordinates,
+            Ships = new Dictionary<string, int>(attackShips),
+            StartTime = DateTime.Now,
+            ArrivalTime = DateTime.Now.Add(flightTime),
+            ReturnTime = DateTime.Now.Add(flightTime),
+            Status = FleetStatus.Flight,
+            IsIncomingAttack = true
+        };
+
+        ActiveFleets.Add(incomingMission);
+        _messageService.AddMessage("Incoming Attack Warning", $"Enemy fleet detected from {originCoordinates} to {targetCoordinates}.", "Combat");
+        NotifyStateChanged();
+    }
+
+    private TimeSpan CalculateFlightTimeFromCoordinates(Dictionary<string, int> shipsToSend, int originGalaxy, int originSystem, int originPosition, int targetGalaxy, int targetSystem, int targetPosition)
+    {
+        if (!shipsToSend.Any()) return TimeSpan.Zero;
+
+        int minSpeed = int.MaxValue;
+        foreach (var kvp in shipsToSend)
+        {
+            var ship = ShipDefinitions.FirstOrDefault(s => s.Id == kvp.Key);
+            if (ship != null && ship.BaseSpeed < minSpeed) minSpeed = ship.BaseSpeed;
+        }
+        if (minSpeed == int.MaxValue) return TimeSpan.Zero;
+
+        long distance = Math.Abs(targetGalaxy - originGalaxy) * 20000 +
+                        Math.Abs(targetSystem - originSystem) * 1000 +
+                        Math.Abs(targetPosition - originPosition) * 5 + 1000;
+
+        double hours = (double)distance / minSpeed;
+        double seconds = hours * 3600 / 100.0;
+        seconds = seconds * 0.1;
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    private static bool TryParseCoordinates(string coordinates, out int galaxy, out int system, out int position)
+    {
+        galaxy = 0;
+        system = 0;
+        position = 0;
+
+        var parts = coordinates.Split(':');
+        return parts.Length == 3 &&
+               int.TryParse(parts[0], out galaxy) &&
+               int.TryParse(parts[1], out system) &&
+               int.TryParse(parts[2], out position);
+    }
+
+    private void HandleIncomingAttack(FleetMission mission)
+    {
+        if (!TryParseCoordinates(mission.TargetCoordinates, out int tg, out int ts, out int tp))
+        {
+            _messageService.AddMessage("Planet Under Attack", $"Enemy attack reached {mission.TargetCoordinates}.", "Combat");
+            return;
+        }
+
+        var planet = _galaxyService.GetPlanet(tg, ts, tp);
+        if (planet == null || !planet.IsMyPlanet)
+        {
+            _messageService.AddMessage("Planet Under Attack", $"Enemy attack reached {mission.TargetCoordinates}.", "Combat");
+            return;
+        }
+
+        var playerPlanetState = GetPlayerPlanetCombatState(tg, ts, tp);
+
+        long attackerAttack = 0;
+        long attackerStructure = 0;
+        long attackerShield = 0;
+        foreach (var shipEntry in mission.Ships)
+        {
+            var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key || x.Name == shipEntry.Key);
+            if (def == null) continue;
+
+            attackerAttack += def.Attack * shipEntry.Value;
+            attackerStructure += def.Structure * shipEntry.Value;
+            attackerShield += def.Shield * shipEntry.Value;
+        }
+
+        long defenderAttack = 0;
+        long defenderStructure = 0;
+        long defenderShield = 0;
+
+        foreach (var d in playerPlanetState.Defenses)
+        {
+            var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Id == d.Key);
+            if (defUnit == null) continue;
+
+            defenderAttack += defUnit.Attack * d.Value;
+            defenderStructure += defUnit.Structure * d.Value;
+            defenderShield += defUnit.Shield * d.Value;
+        }
+
+        foreach (var shipEntry in playerPlanetState.Ships)
+        {
+            var def = ShipDefinitions.FirstOrDefault(x => x.Id == shipEntry.Key || x.Name == shipEntry.Key);
+            if (def == null) continue;
+
+            defenderAttack += def.Attack * shipEntry.Value;
+            defenderStructure += def.Structure * shipEntry.Value;
+            defenderShield += def.Shield * shipEntry.Value;
+        }
+
+        long attackerHealth = attackerStructure + attackerShield;
+        long defenderHealth = defenderStructure + defenderShield;
+        if (attackerHealth <= 0) attackerHealth = 1;
+        if (defenderHealth <= 0) defenderHealth = 1;
+
+        double attackerScore = (double)attackerAttack / defenderHealth;
+        double defenderScore = (double)defenderAttack / attackerHealth;
+        bool attackerWon = attackerScore > defenderScore;
+
+        var initialAttackerShips = mission.Ships.ToDictionary(x => x.Key, x => x.Value);
+        var initialDefenderDefenses = playerPlanetState.Defenses.ToDictionary(x => x.Key, x => x.Value);
+        var initialDefenderShips = playerPlanetState.Ships.ToDictionary(x => x.Key, x => x.Value);
+
+        var attackerLosses = new Dictionary<string, int>();
+        var defenderLossesDefenses = new Dictionary<string, int>();
+        var defenderLossesShips = new Dictionary<string, int>();
+
+        long debrisM = 0;
+        long debrisC = 0;
+
+        if (attackerWon)
+        {
+            foreach (var defense in initialDefenderDefenses)
+            {
+                int lost = (int)Math.Floor(defense.Value * CombatDefenseLossMaxPercentage);
+                if (lost <= 0) continue;
+                defenderLossesDefenses[MapDefenseIdToName(defense.Key)] = lost;
+
+                var defUnit = _defenseService.DefenseDefinitions.FirstOrDefault(u => u.Id == defense.Key);
+                if (defUnit != null)
+                {
+                    debrisM += (long)(defUnit.MetalCost * lost * 0.3);
+                    debrisC += (long)(defUnit.CrystalCost * lost * 0.3);
+                }
+            }
+
+            foreach (var ship in initialDefenderShips)
+            {
+                int lost = ship.Value / 2;
+                if (lost <= 0) continue;
+                defenderLossesShips[MapShipIdToName(ship.Key)] = lost;
+
+                var shipDef = ShipDefinitions.FirstOrDefault(s => s.Id == ship.Key || s.Name == ship.Key);
+                if (shipDef != null)
+                {
+                    debrisM += (long)(shipDef.MetalCost * lost * 0.3);
+                    debrisC += (long)(shipDef.CrystalCost * lost * 0.3);
+                }
+            }
+        }
+        else
+        {
+            foreach (var ship in initialAttackerShips)
+            {
+                int lost = ship.Value / 2;
+                if (lost <= 0) continue;
+                attackerLosses[MapShipIdToName(ship.Key)] = lost;
+
+                var shipDef = ShipDefinitions.FirstOrDefault(s => s.Id == ship.Key || s.Name == ship.Key);
+                if (shipDef != null)
+                {
+                    debrisM += (long)(shipDef.MetalCost * lost * 0.3);
+                    debrisC += (long)(shipDef.CrystalCost * lost * 0.3);
+                }
+            }
+        }
+
+        if (debrisM > 0 || debrisC > 0)
+        {
+            planet.DebrisMetal += debrisM;
+            planet.DebrisCrystal += debrisC;
+            planet.HasDebris = true;
+        }
+
+        var namedDefenderDefenses = initialDefenderDefenses.ToDictionary(x => MapDefenseIdToName(x.Key), x => x.Value);
+        long incomingLootM = attackerWon ? playerPlanetState.Resources["Metal"] / 2 : 0;
+        long incomingLootC = attackerWon ? playerPlanetState.Resources["Crystal"] / 2 : 0;
+        long incomingLootD = attackerWon ? playerPlanetState.Resources["Deuterium"] / 2 : 0;
+
+        string result = BuildCombatReportHtml(
+            isOutgoingAttack: false,
+            playerWon: !attackerWon,
+            battleCoordinates: mission.TargetCoordinates,
+            attackerShips: ToNamedShipDict(initialAttackerShips),
+            defenderShips: ToNamedShipDict(initialDefenderShips),
+            defenderDefenses: namedDefenderDefenses,
+            attackerAttackPower: attackerAttack, attackerHealth: attackerHealth,
+            defenderAttackPower: defenderAttack, defenderHealth: defenderHealth,
+            attackerLosses: attackerLosses,
+            defenderShipLosses: defenderLossesShips,
+            defenderDefenseLosses: defenderLossesDefenses,
+            lootMetal: incomingLootM, lootCrystal: incomingLootC, lootDeuterium: incomingLootD,
+            debrisMetal: debrisM, debrisCrystal: debrisC);
+
+        _messageService.AddMessage($"Combat Report [{mission.TargetCoordinates}]", result, "Combat");
+
+        // Ranking: incoming attack combat result
+        if (TryParseCoordinates(mission.OriginCoordinates, out int og, out int os, out int op))
+        {
+            var botEnemyIncoming = _enemyService.GetEnemy(og, os, op);
+            string botKey = botEnemyIncoming != null ? botEnemyIncoming.EmpireId.ToString() : mission.OriginCoordinates;
+            string botName = botEnemyIncoming != null ? (_enemyService.GetHomeworldName(botEnemyIncoming.EmpireId) ?? botEnemyIncoming.Name) : mission.OriginCoordinates;
+
+            double defShipPts = 0;
+            foreach (var loss in defenderLossesShips)
+            {
+                var def = ShipDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) defShipPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            double defDefPts = 0;
+            foreach (var loss in defenderLossesDefenses)
+            {
+                var def = _defenseService.DefenseDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) defDefPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            double atkShipPts = 0;
+            foreach (var loss in attackerLosses)
+            {
+                var def = ShipDefinitions.FirstOrDefault(x => x.Id == loss.Key || x.Name == loss.Key);
+                if (def != null) atkShipPts += RankingService.CalcPoints(def.MetalCost * loss.Value, def.CrystalCost * loss.Value, def.DeuteriumCost * loss.Value);
+            }
+
+            // In incoming attack: bot is attacker, player is defender
+            _rankingService?.RecordCombat(
+                botKey, botName, true,
+                RankingService.PlayerKey, RankingService.PlayerName, false,
+                attackerWon,
+                defShipPts, defDefPts, atkShipPts);
+        }
+    }
+
+    private (Dictionary<string, long> Resources, Dictionary<string, int> Defenses, Dictionary<string, int> Ships) GetPlayerPlanetCombatState(int g, int s, int p)
+    {
+        var planetState = _dbContext.PlanetStates.FirstOrDefault(x => x.Galaxy == g && x.System == s && x.Position == p);
         var resources = new Dictionary<string, long>
         {
-            { "Metal", r.Next(5000, 100000) },
-            { "Crystal", r.Next(2000, 50000) },
-            { "Deuterium", r.Next(0, 20000) }
+            { "Metal", (long)(planetState?.Metal ?? 0) },
+            { "Crystal", (long)(planetState?.Crystal ?? 0) },
+            { "Deuterium", (long)(planetState?.Deuterium ?? 0) }
         };
 
-        var defenses = new Dictionary<string, int>
+        var defenses = _dbContext.Defenses
+            .Where(d => d.Galaxy == g && d.System == s && d.Position == p)
+            .ToDictionary(d => d.DefenseType, d => d.Quantity);
+
+        var ships = _dbContext.Ships
+            .Where(sh => sh.Galaxy == g && sh.System == s && sh.Position == p)
+            .ToDictionary(sh => sh.ShipType, sh => sh.Quantity);
+
+        return (resources, defenses, ships);
+    }
+
+    private string MapDefenseIdToName(string defenseId)
+    {
+        var def = _defenseService.DefenseDefinitions.FirstOrDefault(x => x.Id == defenseId);
+        return def?.Name ?? defenseId;
+    }
+
+    private string MapShipIdToName(string shipId)
+    {
+        var ship = ShipDefinitions.FirstOrDefault(x => x.Id == shipId);
+        return ship?.Name ?? shipId;
+    }
+
+    private async Task HandleTransport(FleetMission mission, GalaxyPlanet? planet)
+    {
+        if (planet == null || !planet.IsOccupied)
         {
-            { "Rocket Launcher", r.Next(0, 50) },
-            { "Light Laser", r.Next(0, 30) },
-            { "Heavy Cannon", r.Next(0, 10) }
-        };
-        
-        var ships = new Dictionary<string, int>
+            _messageService.AddMessage("Transport Failed", "Destination is empty.", "General");
+            return;
+        }
+
+        long m = mission.Cargo.ContainsKey("Metal") ? mission.Cargo["Metal"] : 0;
+        long c = mission.Cargo.ContainsKey("Crystal") ? mission.Cargo["Crystal"] : 0;
+        long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
+
+        if (planet.IsMyPlanet)
         {
-            { "Small Cargo", r.Next(0, 15) },
-            { "Light Fighter", r.Next(0, 40) },
-            { "Cruiser", r.Next(0, 5) }
-        };
+            await _resourceService.AddResourcesToPlanetAsync(planet.Galaxy, planet.System, planet.Position, m, c, d);
+        }
+        else
+        {
+            _messageService.AddMessage("Transport", "Resources delivered to target.", "General");
+        }
+
+        mission.Cargo.Clear();
+        _messageService.AddMessage("Transport Successful", $"Resources delivered to {mission.TargetCoordinates}.", "General");
+    }
+
+    private async Task HandleDeploy(FleetMission mission, GalaxyPlanet? planet)
+    {
+        if (planet == null || !planet.IsMyPlanet)
+        {
+            _messageService.AddMessage("Deployment Failed", "You can only deploy to your own planets.", "General");
+            return;
+        }
+
+        // Unload Cargo
+        long m = mission.Cargo.ContainsKey("Metal") ? mission.Cargo["Metal"] : 0;
+        long c = mission.Cargo.ContainsKey("Crystal") ? mission.Cargo["Crystal"] : 0;
+        long d = mission.Cargo.ContainsKey("Deuterium") ? mission.Cargo["Deuterium"] : 0;
+        await _resourceService.AddResourcesToPlanetAsync(planet.Galaxy, planet.System, planet.Position, m, c, d);
+        mission.Cargo.Clear();
+
+        // Transfer ships to the planet's docked ships
+        await SaveShipsToPlanetAsync(planet.Galaxy, planet.System, planet.Position, mission.Ships);
         
-        int spyTech = r.Next(0, 10);
+        // If we are on that planet, reload
+        if (_playerStateService.ActiveGalaxy == planet.Galaxy && _playerStateService.ActiveSystem == planet.System && _playerStateService.ActivePosition == planet.Position)
+        {
+            await LoadFromDatabaseAsync();
+        }
 
-        return (resources, defenses, ships, spyTech);
-    }
-    
-    private Dictionary<string, int> GeneratePlanetBuildings(GalaxyPlanet planet)
-    {
-        int seed = planet.Position * 2000; 
-        var r = new Random(seed);
-        return new Dictionary<string, int> {
-            { "Metal Mine", r.Next(1, 20) },
-            { "Crystal Mine", r.Next(1, 15) },
-            { "Deuterium Synthesizer", r.Next(1, 10) },
-            { "Solar Plant", r.Next(1, 20) },
-            { "Shipyard", r.Next(1, 10) }
-        };
+        _messageService.AddMessage("Deployment successful", $"Fleet deployed to {mission.TargetCoordinates}.", "General");
+        
+        // Deployment doesn't return
+        mission.Ships.Clear(); // They stay at target
+        // Logic to add them to target planet's inventory needed here.
     }
 
-    private Dictionary<string, int> GeneratePlanetTechs(GalaxyPlanet planet)
+    private async Task HandleColonization(FleetMission mission, GalaxyPlanet? planet)
     {
-        int seed = planet.Position * 3000; 
-        var r = new Random(seed);
-        return new Dictionary<string, int> {
-            { "Espionage Technology", r.Next(0, 10) },
-            { "Computer Technology", r.Next(0, 10) },
-            { "Weapons Technology", r.Next(0, 10) },
-            { "Shielding Technology", r.Next(0, 10) },
-            { "Armour Technology", r.Next(0, 10) }
-        };
-    }
-
-    private void HandleColonization(FleetMission mission, GalaxyPlanet planet)
-    {
-        if (planet.IsOccupied)
+        if (planet == null || planet.IsOccupied)
         {
             _messageService.AddMessage("Colonization Failed", 
                  $"Planet {mission.TargetCoordinates} is already occupied!", "General");
              return;
         }
 
-        // Check Astrophysics Limit
+        // Check Astrophysics requirement
         int astroLevel = _technologyService.GetTechLevel(TechType.Astrophysics);
-        int maxPlanets = 1 + (astroLevel + 1) / 2;
-
-        if (_galaxyService.PlayerPlanets.Count >= maxPlanets)
+        if (astroLevel < 1)
         {
             _messageService.AddMessage("Colonization Failed", 
-                 $"Astrophysics Level {astroLevel} allows only {maxPlanets} planets. Upgrade Astrophysics to colonize more.", "General");
+                 "Colonization requires Astrophysics Technology Level 1.", "General");
+             return;
+        }
+
+        // Check Astrophysics Limit (using global constant MaxPlanets = 4)
+        if (_galaxyService.PlayerPlanets.Count >= MaxPlanets)
+        {
+            _messageService.AddMessage("Colonization Failed", 
+                 $"You have reached the maximum number of planets ({_galaxyService.PlayerPlanets.Count}/{MaxPlanets}). You cannot colonize more.", "General");
              return;
         }
 
@@ -1007,17 +1716,21 @@ public class FleetService
         planet.IsMyPlanet = true;
         planet.Name = "Colony";
         planet.PlayerName = "Commander";
-        planet.Image = "planet_colony.jpg";
+        planet.Image = "planets/planet_colony.jpg";
         
         _galaxyService.RegisterPlanet(planet);
+
+        // Initialize new planet state (Resources, Buildings, etc.)
+        await _persistenceService.InitializePlanetAsync(planet.Galaxy, planet.System, planet.Position, true);
+        await _persistenceService.AddOrUpdatePlayerPlanetAsync(planet.Galaxy, planet.System, planet.Position, planet.Name, planet.Image, false);
 
         _messageService.AddMessage("Colonization Successful", 
             $"You have successfully colonized position {mission.TargetCoordinates}!", "General");
     }
 
-    private void HandleRecycle(FleetMission mission, GalaxyPlanet planet)
+    private void HandleRecycle(FleetMission mission, GalaxyPlanet? planet)
     {
-        if (!planet.HasDebris)
+        if (planet == null || !planet.HasDebris)
         {
             _messageService.AddMessage("Recycle Report", 
                  $"No debris found at {mission.TargetCoordinates}.", "General");
@@ -1060,7 +1773,25 @@ public class FleetService
             $"Harvested {gatheredMetal:N0} Metal and {gatheredCrystal:N0} Crystal from debris field.", "General");
     }
 
-    public void AddToQueue(Ship ship, int quantity)
+    public TimeSpan CalculateShipConstructionDuration(Ship ship)
+    {
+        int shipyardLevel = _buildingService.GetBuildingLevel("Shipyard");
+        int naniteLevel = _buildingService.GetBuildingLevel("Nanite Factory");
+        
+        long metalCost = ship.MetalCost;
+        long crystalCost = ship.CrystalCost;
+        
+        // Formula: Time(hours) = (Metal + Crystal) / (5000 * (1 + Shipyard) * 2^Nanite * UniverseSpeed)
+        double universeSpeed = 1.0;
+        double divisor = 5000.0 * (1.0 + shipyardLevel) * Math.Pow(2, naniteLevel) * universeSpeed;
+        
+        double hours = (metalCost + crystalCost) / divisor;
+        double seconds = hours * 3600.0;
+        
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    public async Task AddToQueueAsync(Ship ship, int quantity)
     {
         if (quantity <= 0) return;
 
@@ -1068,78 +1799,342 @@ public class FleetService
         long totalCrystal = ship.CrystalCost * quantity;
         long totalDeuterium = ship.DeuteriumCost * quantity;
 
-        if (_resourceService.HasResources(totalMetal, totalCrystal, totalDeuterium))
+        if (await _resourceService.HasResourcesAsync(totalMetal, totalCrystal, totalDeuterium))
         {
-            _resourceService.ConsumeResources(totalMetal, totalCrystal, totalDeuterium);
-            
-            // Calculate duration based on Shipyard and Nanite levels
-            // Formula: Duration = Base / (1 + Shipyard) * 2^Nanite * SpeedFactor
-            var shipyardLevel = _buildingService.GetBuildingLevel("Shipyard");
-            var naniteLevel = _buildingService.GetBuildingLevel("Nanite Factory");
-            
-            // Avoid division by zero if shipyard is somehow 0 (though requirements check should prevent this)
-            double divisor = (1 + shipyardLevel) * Math.Pow(2, naniteLevel);
-            if (divisor < 1) divisor = 1;
+            await _resourceService.ConsumeResourcesAsync(totalMetal, totalCrystal, totalDeuterium);
+            _rankingService?.AddSpendingPoints(RankingService.PlayerKey, RankingService.PlayerName, false, totalMetal, totalCrystal, totalDeuterium);
 
-            // Apply building speed multiplier from BuildingService for consistency/testing
-            double durationSeconds = ship.BaseDuration.TotalSeconds / divisor / 100.0; // Keeping x100 speed
-            if (durationSeconds < 1) durationSeconds = 1; // Minimum 1 second
+            var calculatedDuration = CalculateShipConstructionDuration(ship);
+            var finalDuration = _devModeService.GetDuration(calculatedDuration, 1);
 
-            var finalDuration = TimeSpan.FromSeconds(durationSeconds);
-            finalDuration = _devModeService.GetDuration(finalDuration, 0); // Dev override
+            int g = _playerStateService.ActiveGalaxy;
+            int s = _playerStateService.ActiveSystem;
+            int p = _playerStateService.ActivePosition;
 
-            ConstructionQueue.Add(new ShipyardItem
+            _allConstructionQueue.Add(new ShipyardItem
             {
                 Ship = ship,
                 Quantity = quantity,
+                QuantityCompleted = 0,
                 DurationPerUnit = finalDuration,
-                TimeRemaining = finalDuration
+                TimeRemaining = finalDuration,
+                Galaxy = g,
+                System = s,
+                Position = p
             });
+            
+            await PersistQueueForPlanetAsync(g, s, p);
+
+            // Notify enemy service that player is building ships
+            _ = _enemyService.OnPlayerShipBuilt(ship.Id, quantity);
             
             NotifyStateChanged();
         }
     }
     
+
+    public async Task CancelQueueItemAsync(ShipyardItem item)
+    {
+        if (!_allConstructionQueue.Contains(item)) return;
+
+        long refundMetal = item.Ship.MetalCost * item.Quantity;
+        long refundCrystal = item.Ship.CrystalCost * item.Quantity;
+        long refundDeuterium = item.Ship.DeuteriumCost * item.Quantity;
+
+        await _resourceService.RefundResourcesAsync(refundMetal, refundCrystal, refundDeuterium);
+        _allConstructionQueue.Remove(item);
+        await PersistQueueForPlanetAsync(item.Galaxy, item.System, item.Position);
+        NotifyStateChanged();
+    }
     private async Task ProcessQueueLoop()
     {
         while (true)
         {
-            if (ConstructionQueue.Any())
+            foreach (var queueGroup in _allConstructionQueue.GroupBy(i => $"{i.Galaxy}:{i.System}:{i.Position}").ToList())
             {
-                var currentItem = ConstructionQueue.First();
-                
-                // Process current unit
+                var currentItem = queueGroup.FirstOrDefault();
+                if (currentItem == null) continue;
+
                 currentItem.TimeRemaining = currentItem.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
 
                 if (currentItem.TimeRemaining <= TimeSpan.Zero)
                 {
-                    // Unit complete
-                    if (!DockedShips.ContainsKey(currentItem.Ship.Id))
-                        DockedShips[currentItem.Ship.Id] = 0;
-                    
-                    DockedShips[currentItem.Ship.Id]++;
-                    
+                    await AddBuiltShipToPlanetAsync(currentItem.Ship.Id, currentItem.Galaxy, currentItem.System, currentItem.Position);
+
                     currentItem.Quantity--;
-                    
+                    currentItem.QuantityCompleted++;
+
                     if (currentItem.Quantity > 0)
                     {
-                        // Reset timer for next unit
                         currentItem.TimeRemaining = currentItem.DurationPerUnit;
                     }
                     else
                     {
-                        // Batch complete
-                        ConstructionQueue.RemoveAt(0);
+                        _allConstructionQueue.Remove(currentItem);
                     }
-                    
+
+                    await PersistQueueForPlanetAsync(currentItem.Galaxy, currentItem.System, currentItem.Position);
+
+                    if (currentItem.Galaxy == _playerStateService.ActiveGalaxy && currentItem.System == _playerStateService.ActiveSystem && currentItem.Position == _playerStateService.ActivePosition)
+                    {
+                        await LoadFromDatabaseAsync();
+                    }
+
                     NotifyStateChanged();
                 }
-                NotifyStateChanged(); // Update timer UI
             }
             
-            await Task.Delay(1000); // 1 second tick
+            NotifyStateChanged();
+            await Task.Delay(1000);
         }
     }
 
+
+    private async Task AddBuiltShipToPlanetAsync(string shipId, int g, int s, int p)
+    {
+        var dbShip = await _dbContext.Ships.FirstOrDefaultAsync(sh =>
+            sh.ShipType == shipId && sh.Galaxy == g && sh.System == s && sh.Position == p);
+
+        if (dbShip != null)
+        {
+            dbShip.Quantity++;
+        }
+        else
+        {
+            _dbContext.Ships.Add(new ShipEntity
+            {
+                ShipType = shipId,
+                Quantity = 1,
+                Galaxy = g,
+                System = s,
+                Position = p
+            });
+        }
+
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task PersistQueueForPlanetAsync(int g, int s, int p)
+    {
+        var planetQueue = _allConstructionQueue
+            .Where(i => i.Galaxy == g && i.System == s && i.Position == p)
+            .OrderBy(i => i.Id)
+            .ToList();
+
+        var existing = await _dbContext.ShipyardQueue
+            .Where(i => i.Galaxy == g && i.System == s && i.Position == p)
+            .ToListAsync();
+
+        if (existing.Any())
+        {
+            _dbContext.ShipyardQueue.RemoveRange(existing);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        if (!planetQueue.Any()) return;
+
+        DateTime nextJobStart = DateTime.UtcNow;
+        var entities = new List<ShipyardQueueEntity>();
+
+        for (int i = 0; i < planetQueue.Count; i++)
+        {
+            var item = planetQueue[i];
+            item.TimeRemaining = i == 0 ? GetRemainingDuration(item.TimeRemaining, item.DurationPerUnit) : item.DurationPerUnit;
+
+            DateTime currentUnitStart = nextJobStart;
+            DateTime currentUnitEnd = currentUnitStart.Add(item.TimeRemaining);
+            TimeSpan totalRemainingDuration = item.TimeRemaining + TimeSpan.FromTicks(item.DurationPerUnit.Ticks * Math.Max(0, item.Quantity - 1));
+            nextJobStart = currentUnitStart.Add(totalRemainingDuration);
+
+            entities.Add(new ShipyardQueueEntity
+            {
+                Id = item.Id,
+                ShipType = item.Ship.Id,
+                Quantity = item.Quantity + item.QuantityCompleted,
+                QuantityCompleted = item.QuantityCompleted,
+                Galaxy = g,
+                System = s,
+                Position = p,
+                StartTime = currentUnitStart,
+                EndTime = currentUnitEnd,
+                IsProcessing = i == 0
+            });
+        }
+
+        await _dbContext.ShipyardQueue.AddRangeAsync(entities);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private static TimeSpan GetRemainingDuration(TimeSpan remaining, TimeSpan fallback)
+    {
+        if (remaining <= TimeSpan.Zero) return fallback;
+        if (remaining > fallback) return fallback;
+        return remaining;
+    }
+
+    // ---- Combat Report HTML Builder ----
+
+    private Dictionary<string, int> ToNamedShipDict(Dictionary<string, int> ships)
+    {
+        var result = new Dictionary<string, int>();
+        foreach (var kvp in ships)
+        {
+            var def = ShipDefinitions.FirstOrDefault(x => x.Id == kvp.Key || x.Name == kvp.Key);
+            string name = def?.Name ?? kvp.Key;
+            result[name] = result.ContainsKey(name) ? result[name] + kvp.Value : kvp.Value;
+        }
+        return result;
+    }
+
+    private static string FormatUnitsHtml(Dictionary<string, int> units)
+    {
+        var filtered = units.Where(x => x.Value > 0).ToList();
+        if (!filtered.Any()) return "<span class='cr-none'>Ninguna</span>";
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var item in filtered)
+            sb.Append($"<div class='cr-unit-row'><span>{item.Key}</span><span class='cr-unit-count'>{item.Value:N0}</span></div>");
+        return sb.ToString();
+    }
+
+    private static string BuildCombatReportHtml(
+        bool isOutgoingAttack,
+        bool playerWon,
+        string battleCoordinates,
+        Dictionary<string, int> attackerShips,
+        Dictionary<string, int> defenderShips,
+        Dictionary<string, int> defenderDefenses,
+        long attackerAttackPower, long attackerHealth,
+        long defenderAttackPower, long defenderHealth,
+        Dictionary<string, int> attackerLosses,
+        Dictionary<string, int> defenderShipLosses,
+        Dictionary<string, int> defenderDefenseLosses,
+        long lootMetal, long lootCrystal, long lootDeuterium,
+        long debrisMetal, long debrisCrystal)
+    {
+        string headerClass   = isOutgoingAttack ? "cr-outgoing" : "cr-incoming";
+        string dirLabel      = isOutgoingAttack ? "⚔ ATAQUE ENVIADO" : "⚠ ATAQUE RECIBIDO";
+        string outcomeClass  = playerWon ? "cr-victory" : "cr-defeat";
+        string outcomeBadge  = playerWon ? "✓ VICTORIA" : "✗ DERROTA";
+        string outcomeSub    = isOutgoingAttack
+            ? (playerWon ? "Atacaste con éxito y saqueaste el planeta enemigo"
+                         : "Tu flota fue repelida por las defensas enemigas")
+            : (playerWon ? "Tus defensas resistieron el ataque enemigo"
+                         : "Tu planeta fue atacado y saqueado");
+        string atkLabel = isOutgoingAttack ? "Tu flota" : "Flota enemiga";
+        string defLabel = isOutgoingAttack ? "Planeta enemigo" : "Tu planeta";
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<div class='cr'>");
+
+        // ── Header ──
+        sb.Append($"<div class='cr-header {headerClass}'>");
+        sb.Append($"<span>{dirLabel}</span>");
+        sb.Append($"<span class='cr-coords'>[ {battleCoordinates} ]</span>");
+        sb.Append("</div>");
+
+        // ── Outcome ──
+        sb.Append($"<div class='cr-outcome {outcomeClass}'>");
+        sb.Append($"<span class='cr-outcome-badge'>{outcomeBadge}</span>");
+        sb.Append($"<span class='cr-outcome-sub'>{outcomeSub}</span>");
+        sb.Append("</div>");
+
+        // ── Fuerzas iniciales ──
+        sb.Append("<div class='cr-section'>");
+        sb.Append("<div class='cr-section-title'>⚔ Fuerzas iniciales</div>");
+        sb.Append("<div class='cr-two-col'>");
+
+        sb.Append($"<div class='cr-col cr-attacker'><div class='cr-col-label'>{atkLabel}</div>");
+        sb.Append(FormatUnitsHtml(attackerShips));
+        sb.Append("</div>");
+
+        sb.Append($"<div class='cr-col cr-defender'><div class='cr-col-label'>{defLabel}</div>");
+        bool hasDefShips = defenderShips.Any(x => x.Value > 0);
+        bool hasDefDef   = defenderDefenses.Any(x => x.Value > 0);
+        if (hasDefShips)
+        {
+            sb.Append("<div class='cr-subsection-label'>Naves</div>");
+            sb.Append(FormatUnitsHtml(defenderShips));
+        }
+        if (hasDefDef)
+        {
+            sb.Append("<div class='cr-subsection-label'>Defensas</div>");
+            sb.Append(FormatUnitsHtml(defenderDefenses));
+        }
+        if (!hasDefShips && !hasDefDef) sb.Append("<span class='cr-none'>Sin fuerzas</span>");
+        sb.Append("</div>");
+        sb.Append("</div></div>");
+
+        // ── Análisis de combate ──
+        sb.Append("<div class='cr-section'>");
+        sb.Append("<div class='cr-section-title'>📊 Análisis de combate</div>");
+        sb.Append("<div class='cr-power-row'>");
+        sb.Append($"<div class='cr-power-item'><div class='cr-power-label'>{atkLabel} — Ataque</div><div class='cr-power-value'>{attackerAttackPower:N0}</div></div>");
+        sb.Append($"<div class='cr-power-item'><div class='cr-power-label'>{atkLabel} — HP</div><div class='cr-power-value'>{attackerHealth:N0}</div></div>");
+        sb.Append($"<div class='cr-power-item'><div class='cr-power-label'>{defLabel} — Ataque</div><div class='cr-power-value'>{defenderAttackPower:N0}</div></div>");
+        sb.Append($"<div class='cr-power-item'><div class='cr-power-label'>{defLabel} — HP</div><div class='cr-power-value'>{defenderHealth:N0}</div></div>");
+        sb.Append("</div></div>");
+
+        // ── Bajas ──
+        sb.Append("<div class='cr-section'>");
+        sb.Append("<div class='cr-section-title'>💀 Bajas de combate</div>");
+        sb.Append("<div class='cr-losses-two-col'>");
+
+        sb.Append($"<div class='cr-col cr-attacker'><div class='cr-col-label'>{atkLabel}</div>");
+        sb.Append(FormatUnitsHtml(attackerLosses));
+        sb.Append("</div>");
+
+        sb.Append($"<div class='cr-col cr-defender'><div class='cr-col-label'>{defLabel}</div>");
+        var allDefLosses = new Dictionary<string, int>(defenderShipLosses);
+        foreach (var kvp in defenderDefenseLosses) allDefLosses[kvp.Key] = kvp.Value;
+        sb.Append(FormatUnitsHtml(allDefLosses));
+        sb.Append("</div>");
+        sb.Append("</div></div>");
+
+        // ── Botín / Recursos perdidos ──
+        if (lootMetal > 0 || lootCrystal > 0 || lootDeuterium > 0)
+        {
+            bool isLoot = isOutgoingAttack && playerWon;
+            string resClass = isLoot ? "cr-res-loot" : "cr-res-loss";
+            string lootTitle = isLoot ? "💰 Botín capturado" : "💸 Recursos saqueados";
+            sb.Append("<div class='cr-section'>");
+            sb.Append($"<div class='cr-section-title'>{lootTitle}</div>");
+            sb.Append("<div class='cr-loot-grid'>");
+            sb.Append($"<div class='cr-res-item {resClass}'><div class='cr-res-label'>Metal</div><div class='cr-res-metal'>{lootMetal:N0}</div></div>");
+            sb.Append($"<div class='cr-res-item {resClass}'><div class='cr-res-label'>Crystal</div><div class='cr-res-crystal'>{lootCrystal:N0}</div></div>");
+            sb.Append($"<div class='cr-res-item {resClass}'><div class='cr-res-label'>Deuterium</div><div class='cr-res-deuterium'>{lootDeuterium:N0}</div></div>");
+            sb.Append("</div></div>");
+        }
+
+        // ── Campo de escombros ──
+        if (debrisMetal > 0 || debrisCrystal > 0)
+        {
+            sb.Append("<div class='cr-section'>");
+            sb.Append("<div class='cr-section-title'>🌌 Campo de escombros generado</div>");
+            sb.Append("<div class='cr-debris-grid'>");
+            sb.Append($"<div class='cr-res-item cr-res-debris'><div class='cr-res-label'>Metal</div><div class='cr-res-metal'>{debrisMetal:N0}</div></div>");
+            sb.Append($"<div class='cr-res-item cr-res-debris'><div class='cr-res-label'>Crystal</div><div class='cr-res-crystal'>{debrisCrystal:N0}</div></div>");
+            sb.Append("</div></div>");
+        }
+
+        sb.Append("</div>"); // .cr
+        return sb.ToString();
+    }
+
     private void NotifyStateChanged() => OnChange?.Invoke();
+
+    public void ResetState()
+    {
+        DockedShips.Clear();
+        _allConstructionQueue.Clear();
+        ActiveFleets.Clear();
+        _isProcessingQueue = false;
+        InitializeShips();
+    }
 }
+
+
+
+
+
+

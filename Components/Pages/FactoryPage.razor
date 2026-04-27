@@ -7,147 +7,7 @@
 @inject TechnologyService TechnologyService
 @implements IDisposable
 
-<style>
-    .ogame-banner {
-        background-image: url('assets/banners/buildings-banner.jpg');
-        background-size: cover;
-        background-position: center;
-        color: white;
-        text-align: center;
-        padding: 100px 20px;
-        margin-bottom: 20px;
-    }
-
-    .ogame-banner h2 {
-        font-size: 3em;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    article {
-        background-color: #000000;
-        padding-top: 1.1rem;
-    }
-
-    article {
-        background-color: #000000;
-        padding-top: 1.1rem;
-    }
-
-    .ogame-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 20px;
-    }
-
-    .ogame-card {
-        background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
-        border-radius: 5px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #444;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        align-items: center;
-        position: relative;
-        width: 100%;
-        height: 100%;
-        gap: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }
-
-    .ogame-card img {
-        width: 177px;
-        height: 177px;
-        object-fit: cover;
-        border: 2px solid #777;
-        border-radius: 5px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .ogame-card h3 {
-        color: white;
-        margin: 10px 0;
-    }
-
-    .ogame-count-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(0,0,0,0.7);
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-weight: bold;
-        border: 1px solid #777;
-        z-index: 2;
-    }
-
-    .ogame-queue-container {
-        margin-bottom: 30px;
-        background-color: #222;
-        padding: 15px;
-        border-radius: 5px;
-        color: white;
-    }
-
-    .ogame-queue-item {
-        padding: 5px;
-        border-bottom: 1px solid #444;
-    }
-
-    .ogame-cost-section {
-        font-size: 0.9em; 
-        text-align: left; 
-        width: 100%; 
-        padding: 0 10px;
-    }
-
-    .ogame-cost-item {
-         margin: 2px 0;
-    }
-
-    .ogame-requirements-section {
-        margin-top: 10px; 
-        font-size: 0.85em; 
-        border-top: 1px solid #555; 
-        padding-top: 5px;
-    }
-
-    .ogame-quantity-selector {
-        display: flex;
-        justify-content: space-around;
-        width: 100%;
-        margin-bottom: 10px;
-    }
-
-    .ogame-quantity-button {
-        width: 30px;
-        height: 30px;
-        background-color: #555;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 5px;
-        cursor: pointer;
-    }
-
-    .ogame-input-quantity {
-         width: 80px;
-         text-align: center;
-    }
-
-    .ogame-card-actions {
-        display:flex;
-        flex-direction: row;
-        width: 100%;
-        justify-content: center;
-        gap: 10px;
-    }
-</style>
-
-<div class="ogame-banner" style="background-image: url('assets/banners/shipyard-banner.jpg'); position: relative;">
+<div class="espacial-banner" style="background-image: url('assets/banners/shipyard-banner.jpg'); position: relative;">
     <img src="assets/banners/shipyard-banner.jpg" alt="Shipyard Banner" style="width:100%; max-height:200px; object-fit:cover; opacity:0.1; position:absolute; top:0; left:0; z-index:0;" />
     <div style="position:relative; z-index:1;">
         <h2>Shipyard</h2>
@@ -157,11 +17,11 @@
 <!-- Shipyard Queue Display -->
 @if (FleetService.ConstructionQueue.Any())
 {
-    <div class="ogame-queue-container">
+    <div class="espacial-queue-container">
         <h3>Current Production</h3>
         @foreach (var item in FleetService.ConstructionQueue)
         {
-            <div class="ogame-queue-item">
+            <div class="espacial-queue-item">
                 <strong>@item.Ship.Name</strong>: @item.Quantity remaining. 
                 Next unit in: @item.TimeRemaining.ToString(@"hh\:mm\:ss")
             </div>
@@ -169,28 +29,28 @@
     </div>
 }
 
-<div class="ogame-grid">
+<div class="espacial-grid">
     @foreach (var ship in FleetService.ShipDefinitions)
     {
         // Local view model to track input
         var vm = GetViewModel(ship.Id);
         
-        <div class="ogame-card">
-            <div class="ogame-count-badge">Hangar: @FleetService.GetShipCount(ship.Id)</div>
+        <div class="espacial-card">
+            <div class="espacial-count-badge">Hangar: @FleetService.GetShipCount(ship.Id)</div>
             <img src="@ship.Image" alt="@ship.Name" />
             <h3>@ship.Name</h3>
             <p>@ship.Description</p>
             
-            <div class="ogame-cost-section">
-                <div class="ogame-cost-item"><img src="assets/common/metal-icon.png" alt="Metal" style="width:16px;height:16px;margin-right:4px;" /> Metal: @ship.MetalCost.ToString("N0")</div>
-                <div class="ogame-cost-item"><img src="assets/common/crystal-icon.png" alt="Crystal" style="width:16px;height:16px;margin-right:4px;" /> Crystal: @ship.CrystalCost.ToString("N0")</div>
-                @if(ship.DeuteriumCost > 0) { <div class="ogame-cost-item"><img src="assets/common/deuterium-icon.png" alt="Deuterium" style="width:16px;height:16px;margin-right:4px;" /> Deuterium: @ship.DeuteriumCost.ToString("N0")</div> }
-                <div class="ogame-cost-item">Structure: @ship.Structure.ToString("N0")</div>
-                <div class="ogame-cost-item">Base Time: @ship.BaseDuration.ToString()</div>
+            <div class="espacial-cost-section">
+                <div class="espacial-cost-item"><img src="assets/common/metal-icon.png" alt="Metal" style="width:16px;height:16px;margin-right:4px;" /> Metal: @ship.MetalCost.ToString("N0")</div>
+                <div class="espacial-cost-item"><img src="assets/common/crystal-icon.png" alt="Crystal" style="width:16px;height:16px;margin-right:4px;" /> Crystal: @ship.CrystalCost.ToString("N0")</div>
+                @if(ship.DeuteriumCost > 0) { <div class="espacial-cost-item"><img src="assets/common/deuterium-icon.png" alt="Deuterium" style="width:16px;height:16px;margin-right:4px;" /> Deuterium: @ship.DeuteriumCost.ToString("N0")</div> }
+                <div class="espacial-cost-item">Structure: @ship.Structure.ToString("N0")</div>
+                <div class="espacial-cost-item">Base Time: @ship.BaseDuration.ToString()</div>
 
                 @if (ship.Requirements != null && ship.Requirements.Any())
                 {
-                    <div class="ogame-requirements-section">
+                    <div class="espacial-requirements-section">
                         <strong>Requirements:</strong>
                         <ul style="list-style-type: none; padding-left: 0; margin: 5px 0;">
                             @foreach (var req in ship.Requirements)
@@ -209,18 +69,18 @@
                 }
             </div>
 
-            <div class="ogame-quantity-selector">
-                <button class="ogame-quantity-button" @onclick="() => AddToQuantityToBuild(vm, 10)">10</button>
-                <button class="ogame-quantity-button" @onclick="() => AddToQuantityToBuild(vm, 50)">50</button>
-                <button class="ogame-quantity-button" @onclick="() => AddToQuantityToBuild(vm, 100)">100</button>
+            <div class="espacial-quantity-selector">
+                <button class="espacial-quantity-button" @onclick="() => AddToQuantityToBuild(vm, 10)">10</button>
+                <button class="espacial-quantity-button" @onclick="() => AddToQuantityToBuild(vm, 50)">50</button>
+                <button class="espacial-quantity-button" @onclick="() => AddToQuantityToBuild(vm, 100)">100</button>
             </div>
             
-            <div class="ogame-card-actions">
-                <input type="number" class="ogame-input-quantity" @bind="vm.QuantityInput" min="0" max="9999"/>
+            <div class="espacial-card-actions">
+                <input type="number" class="espacial-input-quantity" @bind="vm.QuantityInput" min="0" max="9999"/>
                 
                 @if(CanBuild(ship))
                 {
-                     <button class="btn btn-primary" @onclick="() => BuildShip(ship, vm)">Build</button>
+                     <button class="espacial-btn espacial-btn-primary" @onclick="() => BuildShip(ship, vm)">Build</button>
                 }
                 else
                 {
@@ -270,10 +130,10 @@
         vm.QuantityInput += amount;
     }
 
-    private void BuildShip(Ship ship, ShipViewModel vm)
+    private async Task BuildShip(Ship ship, ShipViewModel vm)
     {
-        FleetService.AddToQueue(ship, vm.QuantityInput);
-        vm.QuantityInput = 0; // Reset after adding
+        await FleetService.AddToQueueAsync(ship, vm.QuantityInput);
+        vm.QuantityInput = 0;
     }
     
     private bool CanBuild(Ship ship)

@@ -4,9 +4,9 @@
 @implements IDisposable
 
 <div class="ranking-page">
-    <div class="banner">
+    <div class="ranking-banner">
         <img src="@SkinConfig.Url("banners/banner_galaxy.jpg")" alt="Ranking" onerror="this.style.display='none'" />
-        <div class="banner-title">Ranking</div>
+        <div class="ranking-banner-title">Ranking</div>
     </div>
 
     <div class="ranking-container">
@@ -80,7 +80,7 @@
             </tbody>
         </table>
 
-        <div class="legend">
+        <div class="ranking-legend">
             <h3>Reglas de puntuacion</h3>
             <ul>
                 <li>Cada 1.000 Metal gastado = <strong>1 pto</strong></li>
@@ -95,204 +95,6 @@
         </div>
     </div>
 </div>
-
-<style>
-    .ranking-page {
-        min-height: 100vh;
-        background: #000;
-        color: #eee;
-    }
-
-    .banner {
-        position: relative;
-        width: 100%;
-        height: 120px;
-        overflow: hidden;
-        background: linear-gradient(135deg, #0a0a1a, #1a1a3e);
-        display: flex;
-        align-items: center;
-    }
-
-    .banner img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        opacity: 0.4;
-        position: absolute;
-        top: 0; left: 0;
-    }
-
-    .banner-title {
-        position: relative;
-        z-index: 1;
-        font-size: 2rem;
-        font-weight: bold;
-        color: #ffd700;
-        text-shadow: 0 0 20px rgba(255,215,0,0.5);
-        padding: 0 2rem;
-        letter-spacing: 3px;
-        text-transform: uppercase;
-    }
-
-    .ranking-container {
-        padding: 2rem;
-        max-width: 1000px;
-        margin: 0 auto;
-    }
-
-    .ranking-table {
-        width: 100%;
-        border-collapse: collapse;
-        background: #111;
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    }
-
-    .ranking-table thead th {
-        background: #1a1a2e;
-        color: #ffd700;
-        padding: 12px 16px;
-        text-align: left;
-        font-weight: bold;
-        text-transform: uppercase;
-        font-size: 0.85rem;
-        letter-spacing: 1px;
-        border-bottom: 2px solid #333;
-    }
-
-    .ranking-table tbody tr {
-        border-bottom: 1px solid #222;
-        transition: background 0.2s;
-    }
-
-    .ranking-table tbody tr:hover {
-        background: #1a1a1a;
-    }
-
-    .row-player {
-        background: rgba(255, 215, 0, 0.05) !important;
-        border-left: 3px solid #ffd700;
-    }
-
-    .row-player:hover {
-        background: rgba(255, 215, 0, 0.1) !important;
-    }
-
-    .ranking-table td {
-        padding: 10px 16px;
-        color: #ccc;
-        font-size: 0.95rem;
-    }
-
-    .col-rank {
-        font-weight: bold;
-        color: #888;
-        width: 50px;
-        text-align: center;
-    }
-
-    .row-player .col-rank { color: #ffd700; }
-
-    .col-name {
-        font-weight: 600;
-    }
-
-    .player-name { color: #eee; }
-    .row-player .player-name { color: #ffd700; }
-
-    .coords {
-        font-size: 0.75rem;
-        color: #666;
-        margin-left: 8px;
-    }
-
-    .col-points {
-        font-family: monospace;
-        font-size: 1rem;
-        color: #4fc3f7;
-        font-weight: bold;
-    }
-
-    .badge-player {
-        background: #1a3a6e;
-        color: #4fc3f7;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 0.78rem;
-    }
-
-    .badge-bot {
-        background: #2a1a1a;
-        color: #e57373;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 0.78rem;
-    }
-
-    .star {
-        font-size: 1.2rem;
-        margin: 0 1px;
-    }
-
-    .star.filled { color: #ffd700; }
-    .star.empty  { color: #333; }
-
-    .defeat-mark {
-        color: #e57373;
-        font-weight: bold;
-        font-size: 1.1rem;
-        margin: 0 2px;
-    }
-
-    .defeat-empty {
-        color: #333;
-        font-size: 1.1rem;
-        margin: 0 2px;
-    }
-
-    .empty-msg {
-        text-align: center;
-        color: #555;
-        padding: 40px !important;
-        font-style: italic;
-    }
-
-    .legend {
-        margin-top: 2rem;
-        background: #111;
-        border: 1px solid #222;
-        border-radius: 8px;
-        padding: 1.5rem;
-    }
-
-    .legend h3 {
-        color: #ffd700;
-        margin: 0 0 1rem 0;
-        font-size: 1rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    .legend ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 6px;
-    }
-
-    .legend li {
-        color: #aaa;
-        font-size: 0.88rem;
-        padding: 4px 0;
-    }
-
-    .legend strong {
-        color: #eee;
-    }
-</style>
 
 @code {
     protected override void OnInitialized()

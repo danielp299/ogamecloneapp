@@ -1,0 +1,32 @@
+@*
+    Generic modal overlay using espacial-modal styles.
+    Visibility is controlled via the IsVisible parameter; OnClose fires when the user dismisses.
+*@
+
+@if (IsVisible)
+{
+    <div class="espacial-modal" @onclick="HandleOverlayClick">
+        <div class="espacial-modal-content" @onclick:stopPropagation="true">
+            @if (!string.IsNullOrEmpty(Title))
+            {
+                <h3>@Title</h3>
+            }
+            @ChildContent
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private async Task HandleOverlayClick()
+    {
+        if (OnClose.HasDelegate)
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+}

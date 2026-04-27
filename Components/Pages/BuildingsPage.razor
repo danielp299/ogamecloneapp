@@ -10,9 +10,9 @@
 
 <PageTitle>Buildings</PageTitle>
 
-<div class="ogame-container">
+<div class="espacial-container">
     <!-- Banner -->
-    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/buildings-banner.jpg")');">
+    <div class="espacial-banner" style="background-image: url('@SkinConfig.Url("banners/buildings-banner.jpg")');">
         <h2>Buildings</h2>
         <p>Construct and upgrade planetary infrastructure</p>
     </div>
@@ -20,22 +20,22 @@
     <!-- Construction Queue -->
     @if(BuildingService.ConstructionQueue.Count > 0)
     {
-        <div class="ogame-queue-container mb-lg">
+        <div class="espacial-queue-container mb-lg">
             <h3>Construction Queue</h3>
             @foreach (var item in BuildingService.ConstructionQueue)
             {
-                <div class="ogame-queue-item" @key="item">
+                <div class="espacial-queue-item" @key="item">
                     <div>
                         <strong>@item.Title</strong> - Level @(item.Level + 1)
                         <div class="text-muted" style="font-size: 0.9em;">Duration: @item.ConstructionDuration.ToString(@"hh\:mm\:ss")</div>
                     </div>
-                    <button class="ogame-btn ogame-btn-danger ogame-btn-sm"
+                    <button class="espacial-btn espacial-btn-danger espacial-btn-sm"
                             @onclick="async () => await BuildingService.CancelAsync(item)">
                         Cancel
                     </button>
                     @if (item.IsBuilding)
                     {
-                        <span class="ogame-queue-timer">@item.TimeRemaining.ToString(@"hh\:mm\:ss")</span>
+                        <span class="espacial-queue-timer">@item.TimeRemaining.ToString(@"hh\:mm\:ss")</span>
                     }
                 </div>
             }
@@ -43,12 +43,12 @@
     }
 
     <!-- Buildings Grid -->
-    <div class="ogame-grid-4">
+    <div class="espacial-grid-4">
         @foreach (var building in BuildingService.Buildings)
         {
-            <div class="ogame-card">
+            <div class="espacial-card">
                 <!-- Level Badge -->
-                <div class="ogame-badge">Level @building.Level</div>
+                <div class="espacial-badge">Level @building.Level</div>
 
                 <!-- Building Image -->
                 <img src="@SkinConfig.Url(building.Image)" alt="@building.Title" />
@@ -58,16 +58,16 @@
                 <p class="text-muted">@building.Description</p>
 
                 <!-- Costs -->
-                <div class="ogame-cost-section">
-                    <div class="ogame-cost-item">
+                <div class="espacial-cost-section">
+                    <div class="espacial-cost-item">
                         <img src="@SkinConfig.Url("common/metal-icon.png")" alt="Metal" />
                         Metal: @building.MetalCost.ToString("N0")
                     </div>
-                    <div class="ogame-cost-item">
+                    <div class="espacial-cost-item">
                         <img src="@SkinConfig.Url("common/crystal-icon.png")" alt="Crystal" />
                         Crystal: @building.CrystalCost.ToString("N0")
                     </div>
-                    <div class="ogame-cost-item">
+                    <div class="espacial-cost-item">
                         <img src="@SkinConfig.Url("common/deuterium-icon.png")" alt="Deuterium" />
                         Deuterium: @building.DeuteriumCost.ToString("N0")
                     </div>
@@ -91,14 +91,14 @@
                     {
                         @if (building.Level < 1)
                         {
-                            <button class="ogame-btn ogame-btn-primary ogame-btn-block"
+                            <button class="espacial-btn espacial-btn-primary espacial-btn-block"
                                     @onclick="async () => await BuildingService.AddToQueueAsync(building)">
                                 Construct
                             </button>
                         }
                         else
                         {
-                            <button class="ogame-btn ogame-btn-primary ogame-btn-block"
+                            <button class="espacial-btn espacial-btn-primary espacial-btn-block"
                                     @onclick="async () => await BuildingService.AddToQueueAsync(building)">
                                 Upgrade to Level @(building.Level + 1)
                             </button>
@@ -106,7 +106,7 @@
                     }
                     else
                     {
-                        <button class="ogame-btn ogame-btn-block" disabled>
+                        <button class="espacial-btn espacial-btn-block" disabled>
                             Locked
                         </button>
                     }
@@ -117,9 +117,9 @@
                     @if(queuedBuilding != null)
                     {
                         <div class="text-center mb-sm">
-                            <div class="ogame-queue-timer">@queuedBuilding.TimeRemaining.ToString(@"hh\:mm\:ss")</div>
+                            <div class="espacial-queue-timer">@queuedBuilding.TimeRemaining.ToString(@"hh\:mm\:ss")</div>
                         </div>
-                        <button class="ogame-btn ogame-btn-danger ogame-btn-block"
+                        <button class="espacial-btn espacial-btn-danger espacial-btn-block"
                                 @onclick="async () => await BuildingService.CancelAsync(queuedBuilding)">
                             Cancel
                         </button>

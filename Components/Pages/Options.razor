@@ -10,24 +10,24 @@
 
 <PageTitle>Options</PageTitle>
 
-<div class="ogame-container">
-    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/buildings-banner.jpg")');">
+<div class="espacial-container">
+    <div class="espacial-banner" style="background-image: url('@SkinConfig.Url("banners/buildings-banner.jpg")');">
         <h2>Options</h2>
         <p>Game settings and data management</p>
     </div>
 
-    <div class="ogame-grid-2">
+    <div class="espacial-grid-2">
         <!-- DevMode Toggle -->
-        <div class="ogame-card">
+        <div class="espacial-card">
             <h3>Developer Mode</h3>
             <p style="margin-bottom: 1rem;">
                 DevMode speeds up construction and research times for testing purposes.
             </p>
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <span class="ogame-badge @(DevModeService.IsEnabled ? "success" : "secondary")">
+                <span class="espacial-badge @(DevModeService.IsEnabled ? "success" : "secondary")">
                     @(DevModeService.IsEnabled ? "ENABLED" : "DISABLED")
                 </span>
-                <button class="ogame-btn @(DevModeService.IsEnabled ? "btn-danger" : "btn-primary")" 
+                <button class="espacial-btn @(DevModeService.IsEnabled ? "espacial-btn-danger" : "espacial-btn-primary")"
                         @onclick="ToggleDevMode">
                     @(DevModeService.IsEnabled ? "Disable" : "Enable")
                 </button>
@@ -35,7 +35,7 @@
         </div>
 
         <!-- Skin Selector -->
-        <div class="ogame-card">
+        <div class="espacial-card">
             <h3>Visual Skin</h3>
             <p style="margin-bottom: 1rem;">
                 Select the asset pack to use for all game images.
@@ -43,7 +43,7 @@
             <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                 @foreach (var skin in new[] { "skin1", "skin2" })
                 {
-                    <button class="ogame-btn @(PlayerProfileService.CurrentSkin == skin ? "btn-primary" : "btn-secondary")"
+                    <button class="espacial-btn @(PlayerProfileService.CurrentSkin == skin ? "espacial-btn-primary" : "espacial-btn-secondary")"
                             @onclick="async () => await SetSkinAsync(skin)">
                         @skin @(PlayerProfileService.CurrentSkin == skin ? "✓" : "")
                     </button>
@@ -52,21 +52,21 @@
         </div>
 
         <!-- Data Management -->
-        <div class="ogame-card">
+        <div class="espacial-card">
             <h3>Data Management</h3>
             <p style="margin-bottom: 1rem;">
                 Reset all game progress. This action cannot be undone!
             </p>
-            <button class="ogame-btn btn-danger" @onclick="ShowResetConfirmation">
+            <button class="espacial-btn espacial-btn-danger" @onclick="ShowResetConfirmation">
                 Reset Game Data
             </button>
         </div>
     </div>
 
     <!-- Game Statistics -->
-    <div class="ogame-panel" style="margin-top: 2rem;">
+    <div class="espacial-panel" style="margin-top: 2rem;">
         <h3>Game Statistics</h3>
-        <div class="ogame-grid-4" style="margin-top: 1rem;">
+        <div class="espacial-grid-4" style="margin-top: 1rem;">
             <div class="text-center">
                 <div class="text-muted">Buildings</div>
                 <strong>@buildingCount</strong>
@@ -86,75 +86,22 @@
         </div>
     </div>
 
-    @if (showResetConfirmation)
-    {
-        <div class="ogame-modal">
-            <div class="ogame-modal-content">
-                <h3>Confirm Reset</h3>
-                <p>Are you sure you want to reset all game data? This action cannot be undone!</p>
-                <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
-                    <button class="ogame-btn btn-secondary" @onclick="HideResetConfirmation">Cancel</button>
-                    <button class="ogame-btn btn-danger" @onclick="ResetGame">Reset</button>
-                </div>
-            </div>
+    <Modal IsVisible="showResetConfirmation" Title="Confirm Reset" OnClose="HideResetConfirmation">
+        <p>Are you sure you want to reset all game data? This action cannot be undone!</p>
+        <div class="espacial-modal-actions">
+            <button class="espacial-btn espacial-btn-secondary" @onclick="HideResetConfirmation">Cancel</button>
+            <button class="espacial-btn espacial-btn-danger" @onclick="ResetGame">Reset</button>
         </div>
-    }
+    </Modal>
 
     @if (!string.IsNullOrEmpty(statusMessage))
     {
-        <div class="ogame-alert @(statusIsError ? "alert-danger" : "alert-success")" 
-             style="margin-top: 1rem; padding: 1rem; border-radius: 4px;">
+        <div class="espacial-alert @(statusIsError ? "espacial-alert-danger" : "espacial-alert-success")"
+             style="margin-top: 1rem;">
             @statusMessage
         </div>
     }
 </div>
-
-<style>
-    .ogame-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-    }
-
-    .ogame-modal-content {
-        background: #1a1a2e;
-        padding: 2rem;
-        border-radius: 8px;
-        max-width: 400px;
-        width: 90%;
-        border: 1px solid #16213e;
-    }
-
-    .ogame-alert {
-        background: #1a1a2e;
-        border: 1px solid;
-    }
-
-    .alert-success {
-        border-color: #28a745;
-        color: #28a745;
-    }
-
-    .alert-danger {
-        border-color: #dc3545;
-        color: #dc3545;
-    }
-
-    .success {
-        background: #28a745;
-    }
-
-    .secondary {
-        background: #6c757d;
-    }
-</style>
 
 @code {
     private bool showResetConfirmation = false;

@@ -9,9 +9,9 @@
 
 <PageTitle>Technologies</PageTitle>
 
-<div class="ogame-container">
+<div class="espacial-container">
     <!-- Banner -->
-    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/tech-banner.jpg")');">
+    <div class="espacial-banner" style="background-image: url('@SkinConfig.Url("banners/tech-banner.jpg")');">
         <h2>Technologies</h2>
         <p>Research to unlock new capabilities</p>
     </div>
@@ -19,32 +19,32 @@
     <!-- Research Queue -->
     @if(TechnologyService.CurrentResearch != null)
     {
-        <div class="ogame-queue-container mb-lg">
+        <div class="espacial-queue-container mb-lg">
             <h3>Researching: @TechnologyService.CurrentResearch.Title</h3>
-            <div class="ogame-queue-item">
+            <div class="espacial-queue-item">
                 <div>
                     <div><strong>Level @(TechnologyService.CurrentResearch.Level + 1)</strong></div>
                     <div class="text-muted" style="font-size: 0.9em;">
                         Duration: @TechnologyService.CurrentResearch.ConstructionDuration.ToString(@"hh\:mm\:ss")
                     </div>
                 </div>
-                <span class="ogame-queue-timer">
+                <span class="espacial-queue-timer">
                     @TechnologyService.CurrentResearch.TimeRemaining.ToString(@"hh\:mm\:ss")
                 </span>
             </div>
-            <button class="ogame-btn ogame-btn-danger ogame-btn-sm mt-sm" @onclick="async () => await CancelResearch()">
+            <button class="espacial-btn espacial-btn-danger espacial-btn-sm mt-sm" @onclick="async () => await CancelResearch()">
                 Cancel Research
             </button>
         </div>
     }
 
     <!-- Technologies Grid -->
-    <div class="ogame-grid-4">
+    <div class="espacial-grid-4">
         @foreach (var tech in TechnologyService.Technologies)
         {
-            <div class="ogame-card">
+            <div class="espacial-card">
                 <!-- Level Badge -->
-                <div class="ogame-badge">Level @tech.Level</div>
+                <div class="espacial-badge">Level @tech.Level</div>
 
                 <!-- Technology Image -->
                 <img src="@SkinConfig.Url(tech.Image)" alt="@tech.Title" />
@@ -54,31 +54,31 @@
                 <p class="text-muted">@tech.Description</p>
 
                 <!-- Costs -->
-                <div class="ogame-cost-section">
+                <div class="espacial-cost-section">
                     @if(tech.MetalCost > 0)
                     {
-                        <div class="ogame-cost-item">
+                        <div class="espacial-cost-item">
                             <img src="@SkinConfig.Url("common/metal-icon.png")" alt="Metal" />
                             Metal: @tech.MetalCost.ToString("N0")
                         </div>
                     }
                     @if(tech.CrystalCost > 0)
                     {
-                        <div class="ogame-cost-item">
+                        <div class="espacial-cost-item">
                             <img src="@SkinConfig.Url("common/crystal-icon.png")" alt="Crystal" />
                             Crystal: @tech.CrystalCost.ToString("N0")
                         </div>
                     }
                     @if(tech.DeuteriumCost > 0)
                     {
-                        <div class="ogame-cost-item">
+                        <div class="espacial-cost-item">
                             <img src="@SkinConfig.Url("common/deuterium-icon.png")" alt="Deuterium" />
                             Deuterium: @tech.DeuteriumCost.ToString("N0")
                         </div>
                     }
                     @if(tech.EnergyCost > 0)
                     {
-                        <div class="ogame-cost-item">
+                        <div class="espacial-cost-item">
                             <img src="@SkinConfig.Url("common/energy-icon.png")" alt="Energy" />
                             Energy: @tech.EnergyCost.ToString("N0")
                         </div>
@@ -108,27 +108,27 @@
                 {
                     @if (TechnologyService.RequirementsMet(tech))
                     {
-                        <button class="ogame-btn ogame-btn-primary ogame-btn-block"
+                        <button class="espacial-btn espacial-btn-primary espacial-btn-block"
                                 @onclick="async () => await StartResearch(tech)">
                             Research Level @(tech.Level + 1)
                         </button>
                     }
                     else
                     {
-                        <button class="ogame-btn ogame-btn-block" disabled>
+                        <button class="espacial-btn espacial-btn-block" disabled>
                             Requirements Not Met
                         </button>
                     }
                 }
                 else if (TechnologyService.CurrentResearch == tech)
                 {
-                    <button class="ogame-btn ogame-btn-secondary ogame-btn-block" disabled>
+                    <button class="espacial-btn espacial-btn-secondary espacial-btn-block" disabled>
                         Researching...
                     </button>
                 }
                 else
                 {
-                    <button class="ogame-btn ogame-btn-block" disabled>
+                    <button class="espacial-btn espacial-btn-block" disabled>
                         Lab Busy
                     </button>
                 }

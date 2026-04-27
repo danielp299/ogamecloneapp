@@ -1,8 +1,29 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet run:*)",
-      "Bash(dotnet build:*)"
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git fetch *)",
+      "Bash(git reset *)",
+      "Bash(git rm *)",
+      "Bash(dotnet run *)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(curl *)",
+      "Bash(grep -rn \"#[0-9a-fA-F]\\\\{3,6\\\\}\" /Users/macbook/Documents/GitHub/ogamecloneapp/Components/Pages/)",
+      "Bash(dotnet build *)",
+      "Bash(export PATH=\"$PATH:/usr/local/share/dotnet\")",
+      "Bash(~/.dotnet/dotnet build *)",
+      "Bash(sed -n '270,280p' /Users/macbook/Documents/GitHub/ogamecloneapp/Components/Pages/FactoryPage.razor)",
+      "Bash(sed -n '305,315p' /Users/macbook/Documents/GitHub/ogamecloneapp/Components/Pages/FleetPage.razor)",
+      "Bash(sort grep *)",
+      "Bash(grep -rn 'style=\"[^\"]*#[0-9a-fA-F]\\\\{3,6\\\\}' /Users/macbook/Documents/GitHub/ogamecloneapp/Components/Pages --include=\"*.razor\")",
+      "Bash(git -C /Users/macbook/Documents/GitHub/ogamecloneapp show 75e0164 --stat)",
+      "Bash(git *)",
+      "Bash(grep -v \"^\\\\+\\\\s*$\")",
+      "Bash(grep -v \"^\\\\-\\\\s*$\")",
+      "Bash(grep -v \"^-$\")",
+      "Bash(grep -v \"^-\\\\s*$\")"
     ]
   }
 }

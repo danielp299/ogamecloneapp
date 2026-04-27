@@ -1,9 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using myapp.Data;
+using myapp.Data.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace myapp.Services;
+
+// Refer to wiki/business-rules/Technology.md for business rules documentation
 
 public enum TechType
 {
@@ -27,7 +29,7 @@ public enum TechType
 
 public class Requirement
 {
-    public string Name { get; set; } // Can be Building Title or Tech Title
+    public string Name { get; set; } = ""; // Can be Building Title or Tech Title
     public int Level { get; set; }
     public bool IsBuilding { get; set; }
 }
@@ -59,28 +61,70 @@ public class Technology
     public long DeuteriumCost => (long)(BaseDeuteriumCost * Math.Pow(Scaling, Level));
     public long EnergyCost => (long)(BaseEnergyCost * Math.Pow(Scaling, Level));
     
-    // Duration logic placeholder
-    public TimeSpan Duration => BaseDuration; 
+    public TimeSpan Duration { get; set; } 
 }
 
 public class TechnologyService
 {
+    private readonly GameDbContext _dbContext;
     private readonly ResourceService _resourceService;
     private readonly BuildingService _buildingService;
     private readonly DevModeService _devModeService;
+    private readonly EnemyService _enemyService;
+    private readonly RankingService _rankingService;
+    private readonly ILogger<TechnologyService> _logger;
 
     public List<Technology> Technologies { get; private set; } = new();
     public Technology? CurrentResearch { get; private set; }
 
-    public event Action OnChange;
+    public event Action? OnChange;
     private bool _isProcessingResearch = false;
+    private bool _isInitialized = false;
 
-    public TechnologyService(ResourceService resourceService, BuildingService buildingService, DevModeService devModeService)
+    public TechnologyService(GameDbContext dbContext, ResourceService resourceService, BuildingService buildingService, DevModeService devModeService, EnemyService enemyService, ILogger<TechnologyService> logger, RankingService? rankingService = null)
     {
+        _dbContext = dbContext;
         _resourceService = resourceService;
         _buildingService = buildingService;
         _devModeService = devModeService;
+        _enemyService = enemyService;
+        _logger = logger;
+        _rankingService = rankingService;
         InitializeTechnologies();
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+
+        await LoadFromDatabaseAsync();
+        _isInitialized = true;
+    }
+
+    private async Task LoadFromDatabaseAsync()
+    {
+        var dbTechs = await _dbContext.Technologies.ToListAsync();
+        foreach (var dbTech in dbTechs)
+        {
+            var tech = Technologies.FirstOrDefault(t => t.Title == dbTech.TechnologyType);
+            if (tech != null)
+            {
+                tech.Level = dbTech.Level;
+            }
+        }
+    }
+
+    private async Task SaveToDatabaseAsync()
+    {
+        foreach (var tech in Technologies)
+        {
+            var dbTech = await _dbContext.Technologies.FirstOrDefaultAsync(t => t.TechnologyType == tech.Title);
+            if (dbTech != null)
+            {
+                dbTech.Level = tech.Level;
+            }
+        }
+        await _dbContext.SaveChangesAsync();
     }
 
     private void InitializeTechnologies()
@@ -95,7 +139,7 @@ public class TechnologyService
             BaseCrystalCost = 1000,
             BaseDeuteriumCost = 200,
             BaseDuration = TimeSpan.FromMinutes(2),
-            Image = "assets/technologies/tech_espionage.jpg",
+            Image = "technologies/tech_espionage.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 3, IsBuilding = true }
             }
@@ -111,7 +155,7 @@ public class TechnologyService
             BaseCrystalCost = 400,
             BaseDeuteriumCost = 600,
             BaseDuration = TimeSpan.FromMinutes(5),
-            Image = "assets/technologies/tech_computer.jpg",
+            Image = "technologies/tech_computer.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 1, IsBuilding = true }
             }
@@ -127,7 +171,7 @@ public class TechnologyService
             BaseCrystalCost = 200,
             BaseDeuteriumCost = 0,
             BaseDuration = TimeSpan.FromMinutes(10),
-            Image = "assets/technologies/tech_weapons.jpg",
+            Image = "technologies/tech_weapons.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 4, IsBuilding = true }
             }
@@ -143,7 +187,7 @@ public class TechnologyService
             BaseCrystalCost = 600,
             BaseDeuteriumCost = 0,
             BaseDuration = TimeSpan.FromMinutes(10),
-            Image = "assets/technologies/tech_shielding.jpg",
+            Image = "technologies/tech_shielding.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 6, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 3, IsBuilding = false }
@@ -160,7 +204,7 @@ public class TechnologyService
             BaseCrystalCost = 0,
             BaseDeuteriumCost = 0,
             BaseDuration = TimeSpan.FromMinutes(10),
-            Image = "assets/technologies/tech_armour.jpg",
+            Image = "technologies/tech_armour.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 2, IsBuilding = true }
             }
@@ -176,7 +220,7 @@ public class TechnologyService
             BaseCrystalCost = 800,
             BaseDeuteriumCost = 400,
             BaseDuration = TimeSpan.FromMinutes(8),
-            Image = "assets/technologies/tech_energy.jpg",
+            Image = "technologies/tech_energy.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 1, IsBuilding = true }
             }
@@ -192,7 +236,7 @@ public class TechnologyService
             BaseCrystalCost = 4000,
             BaseDeuteriumCost = 2000,
             BaseDuration = TimeSpan.FromMinutes(20),
-            Image = "assets/technologies/tech_hyperspace.jpg",
+            Image = "technologies/tech_hyperspace.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 7, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 5, IsBuilding = false },
@@ -210,7 +254,7 @@ public class TechnologyService
             BaseCrystalCost = 0,
             BaseDeuteriumCost = 600,
             BaseDuration = TimeSpan.FromMinutes(4),
-            Image = "assets/technologies/tech_combustion.jpg",
+            Image = "technologies/tech_combustion.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 1, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 1, IsBuilding = false }
@@ -227,7 +271,7 @@ public class TechnologyService
             BaseCrystalCost = 4000,
             BaseDeuteriumCost = 600,
             BaseDuration = TimeSpan.FromMinutes(12),
-            Image = "assets/technologies/tech_impulse.jpg",
+            Image = "technologies/tech_impulse.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 2, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 1, IsBuilding = false }
@@ -244,7 +288,7 @@ public class TechnologyService
             BaseCrystalCost = 20000,
             BaseDeuteriumCost = 6000,
             BaseDuration = TimeSpan.FromMinutes(45),
-            Image = "assets/technologies/tech_hyperspacedrive.jpg",
+            Image = "technologies/tech_hyperspacedrive.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 7, IsBuilding = true },
                 new Requirement { Name = "Hyperspace Technology", Level = 3, IsBuilding = false }
@@ -261,7 +305,7 @@ public class TechnologyService
             BaseCrystalCost = 100,
             BaseDeuteriumCost = 0,
             BaseDuration = TimeSpan.FromMinutes(3),
-            Image = "assets/technologies/tech_laser.jpg",
+            Image = "technologies/tech_laser.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 1, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 2, IsBuilding = false }
@@ -278,7 +322,7 @@ public class TechnologyService
             BaseCrystalCost = 300,
             BaseDeuteriumCost = 100,
             BaseDuration = TimeSpan.FromMinutes(15),
-            Image = "assets/technologies/tech_ion.jpg",
+            Image = "technologies/tech_ion.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 4, IsBuilding = true },
                 new Requirement { Name = "Laser Technology", Level = 5, IsBuilding = false },
@@ -296,7 +340,7 @@ public class TechnologyService
             BaseCrystalCost = 4000,
             BaseDeuteriumCost = 1000,
             BaseDuration = TimeSpan.FromMinutes(30),
-            Image = "assets/technologies/tech_plasma.jpg",
+            Image = "technologies/tech_plasma.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 4, IsBuilding = true },
                 new Requirement { Name = "Energy Technology", Level = 8, IsBuilding = false },
@@ -315,7 +359,7 @@ public class TechnologyService
             BaseCrystalCost = 400000,
             BaseDeuteriumCost = 160000,
             BaseDuration = TimeSpan.FromHours(2),
-            Image = "assets/technologies/tech_network.jpg",
+            Image = "technologies/tech_network.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 10, IsBuilding = true },
                 new Requirement { Name = "Computer Technology", Level = 8, IsBuilding = false },
@@ -334,7 +378,7 @@ public class TechnologyService
             BaseDeuteriumCost = 4000,
             BaseDuration = TimeSpan.FromMinutes(40),
             Scaling = 1.75, // Special scaling
-            Image = "assets/technologies/tech_astrophysics.jpg",
+            Image = "technologies/tech_astrophysics.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 3, IsBuilding = true },
                 new Requirement { Name = "Espionage Technology", Level = 4, IsBuilding = false },
@@ -354,7 +398,7 @@ public class TechnologyService
             BaseEnergyCost = 300000,
             BaseDuration = TimeSpan.Zero, // Instant
             Scaling = 3.0, // Special scaling
-            Image = "assets/technologies/tech_graviton.jpg",
+            Image = "technologies/tech_graviton.jpg",
             Requirements = new() {
                 new Requirement { Name = "Research Lab", Level = 12, IsBuilding = true }
             }
@@ -372,7 +416,7 @@ public class TechnologyService
             else
             {
                 // Recursive tech check might be needed if tech tree is complex, 
-                // but usually checking the flat list of tech levels is enough for OGame.
+                // but usually checking the flat list of tech levels is enough for Espacial.
                 var requiredTech = Technologies.FirstOrDefault(t => t.Title == req.Name);
                 if (requiredTech == null || requiredTech.Level < req.Level) return false;
             }
@@ -380,7 +424,7 @@ public class TechnologyService
         return true;
     }
 
-    public void StartResearch(Technology tech)
+    public async Task StartResearchAsync(Technology tech)
     {
         // Check Requirements
         if (!RequirementsMet(tech)) return;
@@ -388,31 +432,37 @@ public class TechnologyService
         // Only one research at a time per user (simplified)
         if (CurrentResearch != null) return;
 
-        // Ensure resources update before check
-        _buildingService.UpdateProduction();
+        // Settle accumulated resources once at action time.
+        await _resourceService.SettleActivePlanetResourcesAsync();
 
         // Graviton Check (Energy instead of resources)
         if (tech.BaseEnergyCost > 0)
         {
-             if (_resourceService.Energy >= tech.EnergyCost)
+             if (await _resourceService.GetEnergyAsync() >= tech.EnergyCost)
              {
                  // Instant complete
                  tech.Level++;
+                 await SaveToDatabaseAsync();
                  NotifyStateChanged();
              }
              return;
         }
 
-        if (_resourceService.HasResources(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost))
+        if (await _resourceService.HasResourcesAsync(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost))
         {
-            _resourceService.ConsumeResources(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost);
+            await _resourceService.ConsumeResourcesAsync(tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost);
+            _rankingService?.AddSpendingPoints(RankingService.PlayerKey, RankingService.PlayerName, false, tech.MetalCost, tech.CrystalCost, tech.DeuteriumCost);
 
             CurrentResearch = tech;
             tech.IsResearching = true;
             
-            var duration = _devModeService.GetDuration(tech.Duration, 0);
+            var calculatedDuration = CalculateResearchDuration(tech);
+            var duration = _devModeService.GetDuration(calculatedDuration, 1);
             tech.ConstructionDuration = duration;
             tech.TimeRemaining = duration;
+            
+            _logger.LogInformation("StartResearch: {Tech}, DevMode={DevMode}, Duration={Duration}s", 
+                tech.Title, _devModeService.IsEnabled, duration.TotalSeconds);
             
             NotifyStateChanged();
             
@@ -423,13 +473,18 @@ public class TechnologyService
         }
     }
 
-    public void CancelResearch()
+    public async Task CancelResearchAsync()
     {
         if (CurrentResearch != null)
         {
+            // Refund resources based on CancelRefundPercentage setting
+            await _resourceService.RefundResourcesAsync(
+                CurrentResearch.MetalCost, 
+                CurrentResearch.CrystalCost, 
+                CurrentResearch.DeuteriumCost);
+            
             CurrentResearch.IsResearching = false;
             CurrentResearch.TimeRemaining = TimeSpan.Zero;
-            // Refund logic could go here
             CurrentResearch = null;
             NotifyStateChanged();
         }
@@ -438,32 +493,59 @@ public class TechnologyService
     private async Task ProcessResearchQueue()
     {
         _isProcessingResearch = true;
+        _logger.LogInformation("ProcessResearchQueue started");
 
-        while (CurrentResearch != null)
+        try
         {
-            NotifyStateChanged();
-
-            while (CurrentResearch.TimeRemaining > TimeSpan.Zero)
+            while (CurrentResearch != null)
             {
-                // Check cancellation
-                if (CurrentResearch == null || !CurrentResearch.IsResearching) break;
+                var tech = CurrentResearch;
+                tech.IsResearching = true;
+                NotifyStateChanged();
 
-                await Task.Delay(1000);
-                CurrentResearch.TimeRemaining = CurrentResearch.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
+                _logger.LogInformation("Processing research: {Tech}, TimeRemaining={Time}s", 
+                    tech.Title, tech.TimeRemaining.TotalSeconds);
+
+                while (tech.TimeRemaining > TimeSpan.Zero)
+                {
+                    // Check if this research was cancelled
+                    if (CurrentResearch != tech) break;
+
+                    await Task.Delay(1000);
+
+                    // Re-check after delay
+                    if (CurrentResearch != tech) break;
+
+                    tech.TimeRemaining = tech.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
+                    NotifyStateChanged();
+                }
+
+                // Check if cancelled (CurrentResearch changed or was nulled)
+                if (CurrentResearch != tech) continue;
+
+                // Complete
+                string researchedTechName = tech.Title;
+                _logger.LogInformation("Research completed: {Tech} -> Level {Level}", tech.Title, tech.Level + 1);
+                tech.IsResearching = false;
+                tech.Level++;
+                await SaveToDatabaseAsync();
+                CurrentResearch = null;
+
+                // Notify enemy service that player researched a technology
+                _ = _enemyService.OnPlayerTechnologyResearched(researchedTechName);
+
                 NotifyStateChanged();
             }
-
-            if (CurrentResearch == null || !CurrentResearch.IsResearching) continue;
-
-            // Complete
-            CurrentResearch.IsResearching = false;
-            CurrentResearch.Level++;
-            CurrentResearch = null; // Queue clear
-            
-            NotifyStateChanged();
         }
-
-        _isProcessingResearch = false;
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in ProcessResearchQueue: {Message}", ex.Message);
+        }
+        finally
+        {
+            _isProcessingResearch = false;
+            _logger.LogInformation("ProcessResearchQueue ended");
+        }
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
@@ -473,4 +555,38 @@ public class TechnologyService
         var tech = Technologies.FirstOrDefault(t => t.Type == type);
         return tech?.Level ?? 0;
     }
+
+    public TimeSpan CalculateResearchDuration(Technology tech)
+    {
+        int researchLabLevel = _buildingService.GetBuildingLevel("Research Lab");
+        
+        long metalCost = tech.MetalCost;
+        long crystalCost = tech.CrystalCost;
+        
+        // Formula: Time(hours) = (Metal + Crystal) / (1000 * (1 + Research Lab) * UniverseSpeed)
+        double universeSpeed = 1.0;
+        double divisor = 1000.0 * (1.0 + researchLabLevel) * universeSpeed;
+        
+        double hours = (metalCost + crystalCost) / divisor;
+        double seconds = hours * 3600.0;
+        
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    public TimeSpan GetResearchTime(Technology tech)
+    {
+        var calculatedDuration = CalculateResearchDuration(tech);
+        return _devModeService.GetDuration(calculatedDuration, 1);
+    }
+
+    public void ResetState()
+    {
+        Technologies.Clear();
+        CurrentResearch = null;
+        _isProcessingResearch = false;
+        InitializeTechnologies();
+    }
 }
+
+
+

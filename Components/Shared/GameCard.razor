@@ -1,0 +1,52 @@
+@*
+    Reusable card component using the espacial-* design system.
+    Shows an image, title, description, optional badge, costs and actions.
+*@
+
+<div class="espacial-card">
+    @if (!string.IsNullOrEmpty(BadgeText))
+    {
+        <div class="espacial-badge">@BadgeText</div>
+    }
+
+    @if (!string.IsNullOrEmpty(ImageUrl))
+    {
+        <img src="@ImageUrl" alt="@Title" />
+    }
+
+    @if (!string.IsNullOrEmpty(Title))
+    {
+        <h3>@Title</h3>
+    }
+
+    @if (!string.IsNullOrEmpty(Description))
+    {
+        <p>@Description</p>
+    }
+
+    @if (CostContent != null)
+    {
+        <div class="espacial-cost-section">
+            @CostContent
+        </div>
+    }
+
+    @ChildContent
+
+    @if (ActionsContent != null)
+    {
+        <div class="espacial-card-actions">
+            @ActionsContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? ImageUrl { get; set; }
+    [Parameter] public string? BadgeText { get; set; }
+    [Parameter] public RenderFragment? CostContent { get; set; }
+    [Parameter] public RenderFragment? ActionsContent { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

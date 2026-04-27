@@ -6,17 +6,17 @@
 
 <PageTitle>Galaxy</PageTitle>
 
-<div class="ogame-container">
+<div class="espacial-container">
     <!-- Banner -->
-    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/tech-banner.jpg")');">
+    <div class="espacial-banner" style="background-image: url('@SkinConfig.Url("banners/tech-banner.jpg")');">
         <h2>Galaxy View</h2>
         <p>Explore the universe and launch missions</p>
     </div>
 
     <!-- Navigation Panel -->
-    <div class="ogame-panel mb-lg">
+    <div class="espacial-panel mb-lg">
         <div style="display: flex; justify-content: center; align-items: center; gap: 20px; flex-wrap: wrap;">
-            <button class="ogame-btn ogame-btn-secondary" @onclick="PrevSystem">&lt; Previous</button>
+            <button class="espacial-btn espacial-btn-secondary" @onclick="PrevSystem">&lt; Previous</button>
 
             <div style="display: flex; align-items: center; gap: 15px;">
                 <div>
@@ -29,10 +29,10 @@
                     <input type="number" min="1" max="10" @bind="CurrentSystem"
                            style="width: 60px; padding: 5px; text-align: center; background-color: var(--color-bg-primary); color: white; border: 1px solid var(--color-border-medium); border-radius: 3px;" />
                 </div>
-                <button class="ogame-btn ogame-btn-primary" @onclick="LoadSystem">Go</button>
+                <button class="espacial-btn espacial-btn-primary" @onclick="LoadSystem">Go</button>
             </div>
 
-            <button class="ogame-btn ogame-btn-secondary" @onclick="NextSystem">Next &gt;</button>
+            <button class="espacial-btn espacial-btn-secondary" @onclick="NextSystem">Next &gt;</button>
         </div>
     </div>
 
@@ -74,7 +74,7 @@
                                     </span>
                                     @if (planet.IsHomeworld)
                                     {
-                                        <span class="ogame-badge ogame-badge-success" style="margin-left: 5px; font-size: 0.7em;">Home</span>
+                                        <span class="espacial-badge espacial-badge-success" style="margin-left: 5px; font-size: 0.7em;">Home</span>
                                     }
                                 }
                                 else
@@ -107,23 +107,23 @@
                                 <div style="display: flex; gap: 5px; flex-wrap: wrap;">
                                     @if (planet.IsOccupied && !planet.IsMyPlanet)
                                     {
-                                        <button class="ogame-btn ogame-btn-danger ogame-btn-sm" @onclick="() => SendFleet(planet.Position, 1)">
+                                        <button class="espacial-btn espacial-btn-danger espacial-btn-sm" @onclick="() => SendFleet(planet.Position, 1)">
                                             Attack
                                         </button>
-                                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => SendFleet(planet.Position, 2)">
+                                        <button class="espacial-btn espacial-btn-secondary espacial-btn-sm" @onclick="() => SendFleet(planet.Position, 2)">
                                             Spy
                                         </button>
                                     }
                                     else if (!planet.IsOccupied)
                                     {
-                                        <button class="ogame-btn ogame-btn-sm" style="background-color: var(--color-warning);" @onclick="() => SendFleet(planet.Position, 3)">
+                                        <button class="espacial-btn espacial-btn-sm" style="background-color: var(--color-warning);" @onclick="() => SendFleet(planet.Position, 3)">
                                             Colonize
                                         </button>
                                     }
 
                                     @if (planet.HasDebris)
                                     {
-                                        <button class="ogame-btn ogame-btn-sm" style="background-color: var(--color-info);" @onclick="() => SendFleet(planet.Position, 4)">
+                                        <button class="espacial-btn espacial-btn-sm" style="background-color: var(--color-info);" @onclick="() => SendFleet(planet.Position, 4)">
                                             Recycle
                                         </button>
                                     }

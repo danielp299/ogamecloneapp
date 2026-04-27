@@ -10,9 +10,9 @@
 
 <PageTitle>Defense</PageTitle>
 
-<div class="ogame-container">
+<div class="espacial-container">
     <!-- Banner -->
-    <div class="ogame-banner" style="background-image: url('@SkinConfig.Url("banners/defense-banner.jpg")');">
+    <div class="espacial-banner" style="background-image: url('@SkinConfig.Url("banners/defense-banner.jpg")');">
         <h2>Defense Systems</h2>
         <p>Protect your planet from attacks</p>
     </div>
@@ -20,20 +20,20 @@
     <!-- Production Queue -->
     @if (DefenseService.ConstructionQueue.Any())
     {
-        <div class="ogame-queue-container mb-lg">
+        <div class="espacial-queue-container mb-lg">
             <h3>Current Production</h3>
             @foreach (var item in DefenseService.ConstructionQueue)
             {
-                <div class="ogame-queue-item" @key="item">
+                <div class="espacial-queue-item" @key="item">
                     <div>
                         <strong>@item.Unit.Name</strong> - @item.Quantity units remaining
                         <div class="text-muted" style="font-size: 0.9em;">
                             Next unit: @item.Unit.BaseDuration.ToString(@"hh\:mm\:ss")
                         </div>
                     </div>
-                    <span class="ogame-queue-timer">@item.TimeRemaining.ToString(@"hh\:mm\:ss")</span>
+                    <span class="espacial-queue-timer">@item.TimeRemaining.ToString(@"hh\:mm\:ss")</span>
                 </div>
-                <button class="ogame-btn ogame-btn-danger ogame-btn-sm mt-sm"
+                <button class="espacial-btn espacial-btn-danger espacial-btn-sm mt-sm"
                         @onclick="async () => await CancelQueueItem(item)">
                     Cancel
                 </button>
@@ -42,15 +42,15 @@
     }
 
     <!-- Defense Grid -->
-    <div class="ogame-grid-4">
+    <div class="espacial-grid-4">
         @foreach (var unit in DefenseService.DefenseDefinitions)
         {
             var vm = GetViewModel(unit.Id);
             var currentCount = DefenseService.GetDefenseCount(unit.Id);
 
-            <div class="ogame-card">
+            <div class="espacial-card">
                 <!-- Count Badge -->
-                <div class="ogame-badge">Built: @currentCount</div>
+                <div class="espacial-badge">Built: @currentCount</div>
 
                 <!-- Unit Image -->
                 <img src="@SkinConfig.Url(unit.Image)" alt="@unit.Name" />
@@ -64,18 +64,18 @@
                 }
 
                 <!-- Stats & Costs -->
-                <div class="ogame-cost-section">
-                    <div class="ogame-cost-item">
+                <div class="espacial-cost-section">
+                    <div class="espacial-cost-item">
                         <img src="@SkinConfig.Url("common/metal-icon.png")" alt="Metal" />
                         Metal: @unit.MetalCost.ToString("N0")
                     </div>
-                    <div class="ogame-cost-item">
+                    <div class="espacial-cost-item">
                         <img src="@SkinConfig.Url("common/crystal-icon.png")" alt="Crystal" />
                         Crystal: @unit.CrystalCost.ToString("N0")
                     </div>
                     @if(unit.DeuteriumCost > 0)
                     {
-                        <div class="ogame-cost-item">
+                        <div class="espacial-cost-item">
                             <img src="@SkinConfig.Url("common/deuterium-icon.png")" alt="Deuterium" />
                             Deuterium: @unit.DeuteriumCost.ToString("N0")
                         </div>
@@ -111,12 +111,12 @@
 
                 <!-- Quantity Selector -->
                 <div style="display: flex; justify-content: space-around; width: 100%; margin: 10px 0; gap: 5px;">
-                    <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 1)">+1</button>
+                    <button class="espacial-btn espacial-btn-secondary espacial-btn-sm" @onclick="() => AddToQuantity(unit, vm, 1)">+1</button>
                     @if (!IsSingleInstanceDefense(unit))
                     {
-                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 10)">+10</button>
-                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 50)">+50</button>
-                        <button class="ogame-btn ogame-btn-secondary ogame-btn-sm" @onclick="() => AddToQuantity(unit, vm, 100)">+100</button>
+                        <button class="espacial-btn espacial-btn-secondary espacial-btn-sm" @onclick="() => AddToQuantity(unit, vm, 10)">+10</button>
+                        <button class="espacial-btn espacial-btn-secondary espacial-btn-sm" @onclick="() => AddToQuantity(unit, vm, 50)">+50</button>
+                        <button class="espacial-btn espacial-btn-secondary espacial-btn-sm" @onclick="() => AddToQuantity(unit, vm, 100)">+100</button>
                     }
                 </div>
 
@@ -127,13 +127,13 @@
 
                     @if(CanBuild(unit))
                     {
-                        <button class="ogame-btn ogame-btn-primary" style="flex: 1;" @onclick="async () => await BuildDefense(unit, vm)">
+                        <button class="espacial-btn espacial-btn-primary" style="flex: 1;" @onclick="async () => await BuildDefense(unit, vm)">
                             Build (@vm.QuantityInput)
                         </button>
                     }
                     else
                     {
-                        <button class="ogame-btn" style="flex: 1;" disabled>
+                        <button class="espacial-btn" style="flex: 1;" disabled>
                             Locked
                         </button>
                     }

@@ -1,0 +1,39 @@
+@*
+    Reusable resource cost display.
+    Shows metal / crystal / deuterium / energy with their respective icons.
+*@
+
+<div class="espacial-cost-section">
+    @if (Metal > 0)
+    {
+        <div class="espacial-cost-item">
+            <img src="@($"{SkinBase}/common/metal-icon.png")" alt="Metal" /> Metal: @Metal.ToString("N0")
+        </div>
+    }
+    @if (Crystal > 0)
+    {
+        <div class="espacial-cost-item">
+            <img src="@($"{SkinBase}/common/crystal-icon.png")" alt="Crystal" /> Crystal: @Crystal.ToString("N0")
+        </div>
+    }
+    @if (Deuterium > 0)
+    {
+        <div class="espacial-cost-item">
+            <img src="@($"{SkinBase}/common/deuterium-icon.png")" alt="Deuterium" /> Deuterium: @Deuterium.ToString("N0")
+        </div>
+    }
+    @if (Energy > 0)
+    {
+        <div class="espacial-cost-item">
+            Energy: @Energy.ToString("N0")
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public long Metal { get; set; }
+    [Parameter] public long Crystal { get; set; }
+    [Parameter] public long Deuterium { get; set; }
+    [Parameter] public long Energy { get; set; } = 0;
+    [Parameter] public string SkinBase { get; set; } = "assets/skin1";
+}

@@ -4,181 +4,18 @@
 
 <PageTitle>Messages</PageTitle>
 
-<style>
-    .messages-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 20px;
-        color: #eee;
-        background-color: #000000;
-        border-radius: 10px;
-    }
-
-    article {
-        background-color: #000000;
-    }
-
-    .header-actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        background-color: #222;
-        padding: 15px;
-        border-radius: 5px;
-    }
-
-    .btn-delete-all {
-        background-color: #800;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-
-    .btn-delete-all:hover {
-        background-color: #a00;
-    }
-
-    .messages-list {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-
-    .message-card {
-        background-color: #222;
-        border: 1px solid #333;
-        border-radius: 5px;
-        overflow: hidden;
-    }
-
-    .message-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 15px;
-        background-color: #2a2a2a;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-
-    .message-header:hover {
-        background-color: #333;
-    }
-
-    .message-header.unread {
-        border-left: 3px solid #00f;
-    }
-
-    .message-info {
-        display: flex;
-        gap: 15px;
-        align-items: center;
-    }
-
-    .message-type {
-        font-size: 0.8em;
-        padding: 2px 6px;
-        border-radius: 3px;
-        background-color: #444;
-        min-width: 80px;
-        text-align: center;
-    }
-
-    .type-combat { background-color: #800; }
-    .type-espionage { background-color: #860; }
-    .type-expedition { background-color: #006; }
-    .type-general { background-color: #444; }
-
-    .message-subject {
-        font-weight: bold;
-    }
-
-    .message-time {
-        font-size: 0.8em;
-        color: #aaa;
-    }
-
-    .message-body {
-        padding: 20px;
-        background-color: #1a1a1a;
-        border-top: 1px solid #333;
-        line-height: 1.5;
-    }
-
-    .btn-delete {
-        background-color: transparent;
-        color: #888;
-        border: 1px solid #444;
-        padding: 2px 8px;
-        border-radius: 3px;
-        cursor: pointer;
-        font-size: 0.8em;
-        margin-left: 10px;
-    }
-
-    .btn-delete:hover {
-        background-color: #800;
-        color: white;
-        border-color: #800;
-    }
-
-    /* ---- Combat Reports ---- */
-    .cr { overflow: hidden; }
-    .cr-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 0.78em; font-weight: 700; letter-spacing: 0.04em; }
-    .cr-outgoing { background: linear-gradient(90deg, #0d1e33 0%, #111827 100%); border-left: 4px solid #3a9af8; color: #7bc5f8; }
-    .cr-incoming { background: linear-gradient(90deg, #2d0f0f 0%, #1a1010 100%); border-left: 4px solid #f87c3a; color: #f8aa7c; }
-    .cr-coords { font-family: monospace; letter-spacing: 0.06em; opacity: 0.75; }
-    .cr-outcome { display: flex; align-items: center; gap: 14px; padding: 12px 16px; }
-    .cr-victory { background: linear-gradient(90deg, #071d07 0%, #0d160d 100%); border-bottom: 1px solid #1f4a1f; }
-    .cr-defeat  { background: linear-gradient(90deg, #1d0707 0%, #160d0d 100%); border-bottom: 1px solid #4a1f1f; }
-    .cr-outcome-badge { font-size: 1.25em; font-weight: 800; letter-spacing: 0.08em; }
-    .cr-victory .cr-outcome-badge { color: #3fdf3f; text-shadow: 0 0 10px #2a8; }
-    .cr-defeat  .cr-outcome-badge { color: #df3f3f; text-shadow: 0 0 10px #822; }
-    .cr-outcome-sub { font-size: 0.82em; color: #888; }
-    .cr-section { padding: 10px 14px; border-bottom: 1px solid #252525; }
-    .cr-section:last-child { border-bottom: none; }
-    .cr-section-title { font-size: 0.7em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: #555; margin-bottom: 8px; }
-    .cr-two-col, .cr-losses-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .cr-col { background: #111; border-radius: 4px; padding: 8px 10px; }
-    .cr-col-label { font-size: 0.7em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
-    .cr-attacker .cr-col-label { color: #5ab0ee; }
-    .cr-defender .cr-col-label { color: #ee8855; }
-    .cr-subsection-label { font-size: 0.67em; color: #555; text-transform: uppercase; letter-spacing: 0.07em; margin: 6px 0 3px; }
-    .cr-unit-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 0.87em; color: #aaa; border-bottom: 1px dotted #1e1e1e; }
-    .cr-unit-row:last-child { border-bottom: none; }
-    .cr-unit-count { font-weight: bold; color: #ddd; }
-    .cr-power-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .cr-power-item { background: #111; border-radius: 4px; padding: 6px 12px; min-width: 120px; }
-    .cr-power-label { font-size: 0.7em; color: #666; margin-bottom: 2px; }
-    .cr-power-value { font-size: 1em; font-weight: bold; color: #ddd; }
-    .cr-loot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .cr-debris-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .cr-res-item { border-radius: 4px; padding: 6px 10px; text-align: center; }
-    .cr-res-loot    { background: #0a180a; border: 1px solid #1a3a1a; }
-    .cr-res-loss    { background: #180a0a; border: 1px solid #3a1a1a; }
-    .cr-res-debris  { background: #0d0d1e; border: 1px solid #1a1a3a; }
-    .cr-res-label { font-size: 0.68em; color: #666; margin-bottom: 3px; }
-    .cr-res-metal    { font-size: 0.98em; font-weight: bold; color: #bbb; }
-    .cr-res-crystal  { font-size: 0.98em; font-weight: bold; color: #88aaff; }
-    .cr-res-deuterium{ font-size: 0.98em; font-weight: bold; color: #44ccee; }
-    .cr-none { color: #555; font-size: 0.84em; font-style: italic; }
-</style>
-
 <div class="messages-container">
-    <div class="header-actions">
+    <div class="messages-header-actions">
         <h2>Messages (@MessageService.Messages.Count)</h2>
         @if (MessageService.Messages.Any())
         {
-            <button class="btn-delete-all" @onclick="DeleteAll">Delete All</button>
+            <button class="messages-btn-delete-all" @onclick="DeleteAll">Delete All</button>
         }
     </div>
 
     @if (!MessageService.Messages.Any())
     {
-        <div style="text-align: center; color: #aaa; margin-top: 50px;">
+        <div class="messages-empty">
             <p>No messages.</p>
         </div>
     }
@@ -202,12 +39,12 @@
                             <span class="message-subject">@msg.Subject</span>
                             @if (!msg.IsRead)
                             {
-                                <span style="color: #00f; font-size: 0.7em;">(NEW)</span>
+                                <span style="color: var(--color-info); font-size: 0.7em;">(NEW)</span>
                             }
                         </div>
                         <div style="display: flex; align-items: center;">
                             <span class="message-time">@msg.Timestamp.ToString("yyyy-MM-dd HH:mm")</span>
-                            <button class="btn-delete" @onclick:stopPropagation="true" @onclick="() => DeleteMessage(msg)">✕</button>
+                            <button class="messages-btn-delete" @onclick:stopPropagation="true" @onclick="() => DeleteMessage(msg)">✕</button>
                         </div>
                     </div>
                     
