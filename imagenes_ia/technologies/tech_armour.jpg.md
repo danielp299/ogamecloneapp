@@ -1,0 +1,1 @@
+Close up of heavy metal plating, reinforced rivets, honeycomb structure, metallic texture, durability concept, OGame art style.

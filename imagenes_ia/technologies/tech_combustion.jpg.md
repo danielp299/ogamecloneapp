@@ -1,0 +1,1 @@
+Rocket engine nozzle firing, orange flame, mechanical pistons, retro-futuristic engine tech, OGame art style.

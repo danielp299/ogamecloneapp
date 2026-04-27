@@ -1,0 +1,1 @@
+A sci-fi image representing deuterium-icon, detailed, OGame art style.

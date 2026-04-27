@@ -1,0 +1,1 @@
+Interior of a massive orbital shipyard, sparks flying, construction drones, half-built capital ship, industrial sci-fi scene, OGame art style.

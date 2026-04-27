@@ -1,0 +1,1 @@
+Simple missile turret, hydraulic elevation system, dual missile pods, pointing skyward, planetary defense, OGame art style.

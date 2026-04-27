@@ -1,0 +1,1 @@
+Wide cinematic shot of a massive space fleet, destroyers and battleships in formation, deep space nebula background, epic scale, OGame art style.

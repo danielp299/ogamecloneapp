@@ -1,0 +1,1 @@
+A scorching lava planet, molten cracks on surface, dark volcanic rock, glowing red and orange, heat distortion, OGame art style.

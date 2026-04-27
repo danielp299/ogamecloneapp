@@ -1,0 +1,1 @@
+A small, unmanned espionage probe, high-tech sensors, antennas, stealthy design, dark colors, fast moving, lens flare from camera, OGame art style.

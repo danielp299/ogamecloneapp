@@ -1,0 +1,1 @@
+Heavy laser cannon, large capacitor banks, thick barrel, reinforced mount, powerful defensive weapon, OGame art style.

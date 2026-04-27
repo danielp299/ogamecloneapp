@@ -1,0 +1,1 @@
+A logistical hub, landing pads for supply ships, cargo crates stacked, military outpost look, fueling stations, OGame art style.

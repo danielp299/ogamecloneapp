@@ -1,0 +1,1 @@
+A large, formidable warship, heavy armor plating, massive main cannons, intimidating silhouette, dark metallic colors with red warning lights, deep space battle ready, OGame art style.

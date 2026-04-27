@@ -1,0 +1,1 @@
+A massive gas giant planet, swirling bands of orange and yellow storms, great red spot, no solid surface, majestic scale, OGame art style.

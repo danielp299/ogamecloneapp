@@ -1,0 +1,1 @@
+Interplanetary Missile launching from silo, heavy strategic weapon, smoke trail, long range attack, OGame art style.

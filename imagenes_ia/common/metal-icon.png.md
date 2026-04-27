@@ -1,0 +1,1 @@
+A sci-fi image representing metal-icon, detailed, OGame art style.

@@ -1,0 +1,1 @@
+A robust, heavily armored space fighter, bulky design compared to light fighter, heavy plating, large caliber cannons, dark grey metal, deep space background, OGame art style.

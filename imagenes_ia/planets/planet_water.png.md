@@ -1,0 +1,1 @@
+A water world, covered entirely in deep blue ocean, some hurricanes visible, reflected sun, aquatic planet, OGame art style.

@@ -1,0 +1,1 @@
+Interconnected nodes, global communication web, satellite uplink beam, digital network visualization, OGame art style.

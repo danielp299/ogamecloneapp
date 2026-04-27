@@ -1,0 +1,1 @@
+A sleek, small single-pilot space fighter jet, aggressive aerodynamics, laser cannons mounted on wings, shooting through space, metallic texture, fast and agile look, OGame art style.

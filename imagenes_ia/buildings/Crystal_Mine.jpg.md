@@ -1,0 +1,1 @@
+A high-tech crystal extraction facility, jagged blue crystal formations protruding from the ground, laser cutters harvesting crystals, glowing blue lights, futuristic machinery, OGame art style.

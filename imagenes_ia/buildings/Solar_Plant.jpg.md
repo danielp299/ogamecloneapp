@@ -1,0 +1,1 @@
+A vast array of futuristic solar panels, sleek and reflective, capturing energy from a nearby sun, clean high-tech structure, power conduits glowing, OGame art style.

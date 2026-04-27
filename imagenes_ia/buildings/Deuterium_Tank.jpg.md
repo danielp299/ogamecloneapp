@@ -1,0 +1,1 @@
+Heavily shielded spherical tanks, warning signs, containment fields, storing volatile fuel, industrial sci-fi setting, OGame art style.

@@ -1,0 +1,1 @@
+Digital abstract representation of a spying eye or radar sweep, data streams, binary code, holographic blue interface, high-tech icon, OGame art style.

@@ -1,0 +1,1 @@
+Planetary orbital chart, telescope lens view, galaxy map, scientific exploration theme, OGame art style.

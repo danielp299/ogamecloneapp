@@ -1,0 +1,1 @@
+Ion thruster engine, blue glow, sleek engine cowling, advanced propulsion system, OGame art style.

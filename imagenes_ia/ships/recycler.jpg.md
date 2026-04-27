@@ -1,0 +1,1 @@
+A specialized industrial spaceship, large grappling arms or magnetic collectors, collecting debris fields in space, rugged and dirty texture, functional design, OGame art style.

@@ -1,0 +1,1 @@
+A highly advanced, clean-looking facility, microscopic assembler swarms visible as a shimmer, sleek chrome surfaces, neon blue lighting, peak technology aesthetic, OGame art style.

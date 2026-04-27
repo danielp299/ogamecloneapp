@@ -1,0 +1,1 @@
+A medium-sized combat spaceship, elongated hull, multiple turrets visible on the sides, tactical military design, glowing engine exhaust, flying past a nebula, OGame art style.

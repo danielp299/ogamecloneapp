@@ -1,0 +1,1 @@
+Glowing energy force field bubble, deflecting a laser beam, blue transparent hexagon pattern, protection technology concept, OGame art style.

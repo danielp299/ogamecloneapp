@@ -1,0 +1,1 @@
+Red laser beam focusing through a lens, optical tech schematic, concentrated light energy, weapon technology, OGame art style.

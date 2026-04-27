@@ -1,0 +1,1 @@
+Panoramic view of a futuristic sci-fi city on a planet, skyscrapers, industrial zones, landing pads, sunset or sunrise, detailed architecture, OGame art style.

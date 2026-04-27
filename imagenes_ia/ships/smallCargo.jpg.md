@@ -1,0 +1,1 @@
+A small, agile sci-fi cargo spaceship, industrial design with visible cargo containers, flying through deep space, metallic hull, blue engine exhaust, OGame art style.

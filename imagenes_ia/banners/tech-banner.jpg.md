@@ -1,0 +1,1 @@
+Abstract digital landscape, data streams, holographic interfaces, blue and neon colors, representation of advanced research, OGame art style.

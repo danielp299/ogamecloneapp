@@ -1,0 +1,1 @@
+Giant armored silos for storing metal, reinforced structure, heavy industrial look, pipes connecting to ground, OGame art style.

@@ -1,0 +1,1 @@
+Holographic blueprint of a heavy weapon system, red targeting reticle, schematic view, military tech icon, OGame art style.

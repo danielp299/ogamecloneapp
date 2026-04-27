@@ -1,0 +1,1 @@
+A massive heavy transport spaceship, bulky industrial design, multiple large cargo containers attached, dark metallic hull, four engine thrusters, deep space background, OGame art style.

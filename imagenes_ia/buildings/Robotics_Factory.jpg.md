@@ -1,0 +1,1 @@
+A high-tech manufacturing plant, robotic arms assembling structures, sparks flying, automated assembly lines, metallic industrial interior or exterior, OGame art style.

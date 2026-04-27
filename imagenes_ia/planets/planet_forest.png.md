@@ -1,0 +1,1 @@
+A jungle planet, deep green vegetation covering the surface, misty atmosphere, teeming with life, OGame art style.

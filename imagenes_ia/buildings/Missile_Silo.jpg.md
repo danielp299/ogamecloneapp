@@ -1,0 +1,1 @@
+Underground launch bay doors, heavy reinforced concrete and metal, missile tips visible, military bunker aesthetic, OGame art style.

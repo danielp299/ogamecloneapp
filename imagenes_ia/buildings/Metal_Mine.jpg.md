@@ -1,0 +1,1 @@
+A futuristic open-pit metal mine on a rocky planet surface, massive drilling machines, conveyor belts, industrial lighting, dust and smoke, sci-fi industrial style, OGame art style.

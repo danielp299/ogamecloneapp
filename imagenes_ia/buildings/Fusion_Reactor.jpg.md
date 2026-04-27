@@ -1,0 +1,1 @@
+A compact but complex energy facility, glowing tokamak core, intense energy containment, heavy shielding, advanced technology look, OGame art style.

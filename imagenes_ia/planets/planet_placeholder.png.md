@@ -1,0 +1,1 @@
+A planet named planet_placeholder viewed from space, realistic texture, sci-fi setting, OGame art style.

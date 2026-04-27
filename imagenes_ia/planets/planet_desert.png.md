@@ -1,0 +1,1 @@
+A dry desert planet, vast sand dunes, yellow and tan colors, dust storms, arid environment, OGame art style.

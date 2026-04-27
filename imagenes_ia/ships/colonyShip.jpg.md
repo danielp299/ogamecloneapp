@@ -1,0 +1,1 @@
+A large colonization vessel, habitation modules visible, bio-domes or pods, industrial but designed for long travel, navigating near a new planet, OGame art style.

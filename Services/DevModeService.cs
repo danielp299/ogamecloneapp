@@ -1,54 +1,28 @@
-using Microsoft.EntityFrameworkCore;
-using myapp.Data;
+using System;
 
 namespace myapp.Services;
 
 public class DevModeService
 {
-    private readonly GameDbContext _dbContext;
-    private bool _isEnabled = true;
-    
-    public event Action? OnChange;
+    public bool IsEnabled { get; private set; } = true;
+    public event Action OnChange;
 
-    public DevModeService(GameDbContext dbContext)
+    public void SetEnabled(bool enabled)
     {
-        _dbContext = dbContext;
-    }
-
-    public bool IsEnabled => _isEnabled;
-
-    public async Task LoadStateAsync()
-    {
-        var state = await _dbContext.GameState.FirstOrDefaultAsync();
-        if (state != null)
-        {
-            _isEnabled = state.DevModeEnabled;
-        }
-    }
-
-    public async Task SetEnabledAsync(bool enabled)
-    {
-        _isEnabled = enabled;
-        
-        var state = await _dbContext.GameState.FirstOrDefaultAsync();
-        if (state != null)
-        {
-            state.DevModeEnabled = enabled;
-            await _dbContext.SaveChangesAsync();
-        }
-        
+        IsEnabled = enabled;
         NotifyStateChanged();
     }
 
-    public async Task ToggleAsync()
+    public void Toggle()
     {
-        await SetEnabledAsync(!_isEnabled);
+        IsEnabled = !IsEnabled;
+        NotifyStateChanged();
     }
 
     // Helper to get dev time if enabled, or original time if not
-    public TimeSpan GetDuration(TimeSpan original, int devSeconds = 5)
+    public TimeSpan GetDuration(TimeSpan original, int devSeconds = 0)
     {
-        return _isEnabled ? TimeSpan.FromSeconds(devSeconds) : original;
+        return IsEnabled ? TimeSpan.FromSeconds(devSeconds) : original;
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();

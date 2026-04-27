@@ -1,0 +1,1 @@
+A frozen ice planet, white and blue surface, glaciers, cold atmosphere, reflecting starlight, inhospitable beauty, OGame art style.

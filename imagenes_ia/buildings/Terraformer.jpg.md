@@ -1,0 +1,1 @@
+A colossal planetary engineering structure, beam of energy shooting into the atmosphere, changing the climate, massive scale, clouds swirling around it, OGame art style.

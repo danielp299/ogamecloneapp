@@ -1,10 +1,9 @@
-using Microsoft.EntityFrameworkCore;
-using myapp.Data;
-using myapp.Data.Entities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace myapp.Services;
-
-// Refer to wiki/business-rules/Buildings.md for business rules documentation
 
 public class Building
 {
@@ -30,37 +29,18 @@ public class Building
     public long MetalCost => (long)(BaseMetalCost * Math.Pow(Scaling, Level));
     public long CrystalCost => (long)(BaseCrystalCost * Math.Pow(Scaling, Level));
     public long DeuteriumCost => (long)(BaseDeuteriumCost * Math.Pow(Scaling, Level));
-    
-    // Duration calculated by BuildingService.CalculateConstructionDuration()
-    public TimeSpan Duration { get; set; }
-}
-
-public class QueuedBuildingState
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Title { get; set; } = "";
-    public int LevelBeforeUpgrade { get; set; }
-    public TimeSpan ConstructionDuration { get; set; }
-    public TimeSpan TimeRemaining { get; set; }
-    public bool IsBuilding { get; set; }
-    public int Galaxy { get; set; }
-    public int System { get; set; }
-    public int Position { get; set; }
+    // Duration logic can be improved later
+    public TimeSpan Duration => BaseDuration; 
 }
 
 public class BuildingService
 {
-    private readonly GameDbContext _dbContext;
     private readonly ResourceService _resourceService;
     private readonly DevModeService _devModeService;
-    private readonly EnemyService _enemyService;
-    private readonly PlayerStateService _playerStateService;
-    private readonly RankingService _rankingService;
     public List<Building> Buildings { get; private set; } = new();
     public List<Building> ConstructionQueue { get; private set; } = new();
-    private List<QueuedBuildingState> _allConstructionQueue = new();
     
-    public event Action? OnChange;
+    public event Action OnChange;
 
     private bool _isProcessingQueue = false;
 
@@ -75,153 +55,31 @@ public class BuildingService
     
     public double ProductionFactor { get; private set; } = 1.0;
 
-private bool _isInitialized = false;
-    private int _maxQueueSize = 5;
-
-    public int MaxQueueSize
+    public BuildingService(ResourceService resourceService, DevModeService devModeService)
     {
-        get => _maxQueueSize;
-        set => _maxQueueSize = Math.Max(1, value);
-    }
-
-    public BuildingService(GameDbContext dbContext, ResourceService resourceService, DevModeService devModeService, EnemyService enemyService, PlayerStateService playerStateService, RankingService? rankingService = null)
-    {
-        _dbContext = dbContext;
         _resourceService = resourceService;
         _devModeService = devModeService;
-        _enemyService = enemyService;
-        _playerStateService = playerStateService;
-        _rankingService = rankingService;
-        
         InitializeBuildings();
-        _ = ProcessQueueLoop();
-        
-        _playerStateService.OnChange += async () => 
-        {
-            await LoadFromDatabaseAsync();
-            await LoadQueueFromDatabaseAsync();
-            await UpdateProductionAsync();
-            SyncVisibleConstructionQueue();
-            NotifyStateChanged();
-        };
+        // Initial production calculation
+        UpdateProduction();
     }
 
-    public async Task InitializeAsync()
+    // Call this method whenever we need to ensure resources are up to date
+    // e.g., when loading a page or before performing an action
+    public void UpdateProduction()
     {
-        if (_isInitialized) return;
-        
-        await LoadFromDatabaseAsync();
-        await LoadQueueFromDatabaseAsync();
-        await UpdateProductionAsync();
-        SyncVisibleConstructionQueue();
-        
-        _isInitialized = true;
-    }
+        // Simple formula: BaseProduction * Level * (SpeedFactor)
+        // OGame formula is more complex: 30 * Level * 1.1^Level
+        // We'll use a simplified linear scaling for now: 30 * Level per hour
+        // Per second: (30 * Level) / 3600
 
-    public void ResetState()
-    {
-        Buildings.Clear();
-        ConstructionQueue.Clear();
-        _allConstructionQueue.Clear();
-        MetalHourlyProduction = 0;
-        CrystalHourlyProduction = 0;
-        DeuteriumHourlyProduction = 0;
-        MetalMineEnergyConsumption = 0;
-        CrystalMineEnergyConsumption = 0;
-        DeuteriumSynthesizerEnergyConsumption = 0;
-        ProductionFactor = 1.0;
-        _isInitialized = false;
-        _isProcessingQueue = false;
-        InitializeBuildings();
-        SyncVisibleConstructionQueue();
-    }
-
-    private async Task LoadFromDatabaseAsync()
-    {
-        int g = _playerStateService.ActiveGalaxy;
-        int s = _playerStateService.ActiveSystem;
-        int p = _playerStateService.ActivePosition;
-
-        var dbBuildings = await _dbContext.Buildings
-            .Where(b => b.Galaxy == g && b.System == s && b.Position == p)
-            .ToListAsync();
-
-        foreach (var building in Buildings)
-        {
-            var dbBuilding = dbBuildings.FirstOrDefault(b => b.BuildingType == building.Title);
-            if (dbBuilding != null)
-            {
-                building.Level = dbBuilding.Level;
-            }
-            else
-            {
-                building.Level = 0;
-            }
-
-            building.IsBuilding = false;
-            building.TimeRemaining = TimeSpan.Zero;
-            building.ConstructionDuration = TimeSpan.Zero;
-        }
-
-        SyncVisibleConstructionQueue();
-    }
-
-    private async Task LoadQueueFromDatabaseAsync()
-    {
-        var dbQueue = await _dbContext.BuildingQueue
-            .OrderBy(q => q.Galaxy)
-            .ThenBy(q => q.System)
-            .ThenBy(q => q.Position)
-            .ThenBy(q => q.QueuePosition)
-            .ThenBy(q => q.StartTime)
-            .ToListAsync();
-
-        _allConstructionQueue = dbQueue
-            .Select(q => new QueuedBuildingState
-            {
-                Id = q.Id,
-                Title = q.BuildingType,
-                LevelBeforeUpgrade = q.TargetLevel,
-                ConstructionDuration = q.Duration,
-                TimeRemaining = q.IsCompleted ? TimeSpan.Zero : q.TimeRemaining,
-                IsBuilding = q.IsProcessing,
-                Galaxy = q.Galaxy,
-                System = q.System,
-                Position = q.Position
-            })
-            .ToList();
-
-        SyncVisibleConstructionQueue();
-    }
-
-    private async Task SaveToDatabaseAsync()
-    {
-        int g = _playerStateService.ActiveGalaxy;
-        int s = _playerStateService.ActiveSystem;
-        int p = _playerStateService.ActivePosition;
-
-        foreach (var building in Buildings)
-        {
-            var dbBuilding = await _dbContext.Buildings.FirstOrDefaultAsync(b => 
-                b.BuildingType == building.Title && b.Galaxy == g && b.System == s && b.Position == p);
-            
-            if (dbBuilding != null)
-            {
-                dbBuilding.Level = building.Level;
-            }
-        }
-        await _dbContext.SaveChangesAsync();
-    }
-
-    public async Task UpdateProductionAsync()
-    {
         // Configuration Multiplier (x1000 speed for testing/fast servers)
         double speedMultiplier = 1000.0;
 
         double metalProduction = 0;
         double crystalProduction = 0;
         double deuteriumProduction = 0;
-
+        
         long energyProduction = 0;
         long energyConsumption = 0;
 
@@ -254,7 +112,7 @@ private bool _isInitialized = false;
 
         // Update Energy State
         long netEnergy = energyProduction - energyConsumption;
-        await _resourceService.SetEnergyAsync(netEnergy);
+        _resourceService.SetEnergy(netEnergy);
 
         // 2. Calculate Production Factor based on Energy
         ProductionFactor = 1.0;
@@ -335,36 +193,10 @@ private bool _isInitialized = false;
         MetalHourlyProduction += baseMetalProd;
         CrystalHourlyProduction += baseCrystalProd;
         
-        metalProduction += baseMetalProd / 3600.0;
+        metalProduction += baseMetalProd / 3600.0; 
         crystalProduction += baseCrystalProd / 3600.0;
 
-        _resourceService.MetalProductionRate = metalProduction;
-        _resourceService.CrystalProductionRate = crystalProduction;
-        _resourceService.DeuteriumProductionRate = deuteriumProduction;
-    }
-
-    public TimeSpan CalculateConstructionDuration(Building building)
-    {
-        int roboticsLevel = GetBuildingLevel("Robotics Factory");
-        int naniteLevel = GetBuildingLevel("Nanite Factory");
-        
-        long metalCost = building.MetalCost;
-        long crystalCost = building.CrystalCost;
-        
-        // Formula: Time(hours) = (Metal + Crystal) / (2500 * (1 + Robotics) * 2^Nanite * UniverseSpeed)
-        double universeSpeed = 1.0;
-        double divisor = 2500.0 * (1.0 + roboticsLevel) * Math.Pow(2, naniteLevel) * universeSpeed;
-        
-        double hours = (metalCost + crystalCost) / divisor;
-        double seconds = hours * 3600.0;
-        
-        return TimeSpan.FromSeconds(seconds);
-    }
-
-    public TimeSpan GetConstructionTime(Building building)
-    {
-        var calculatedDuration = CalculateConstructionDuration(building);
-        return _devModeService.GetDuration(calculatedDuration, 1);
+        _resourceService.UpdateResources(metalProduction, crystalProduction, deuteriumProduction);
     }
 
     private void InitializeBuildings()
@@ -377,7 +209,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 15,
             BaseDeuteriumCost = 0,
             ConstructionDuration = TimeSpan.FromSeconds(10),
-             Image = "buildings/building1.jpg",
+             Image = "assets/buildings/Metal_Mine.jpg",
             EnergyConsumption = 10
         });
         Buildings.Add(new Building
@@ -388,7 +220,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 24,
             BaseDeuteriumCost = 0,
             ConstructionDuration = TimeSpan.FromSeconds(15),
-             Image = "buildings/building2.jpg",
+             Image = "assets/buildings/Crystal_Mine.jpg",
             EnergyConsumption = 8
         });
         Buildings.Add(new Building
@@ -399,7 +231,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 75,
             BaseDeuteriumCost = 0,   
             ConstructionDuration = TimeSpan.Parse("00:00:30"),
-             Image = "buildings/building3.jpg",
+             Image = "assets/buildings/Deuterium_Synthesizer.jpg",
             EnergyConsumption = 15
         });
         Buildings.Add(new Building
@@ -410,7 +242,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 30,
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:20"),
-             Image = "buildings/building4.jpg",
+             Image = "assets/buildings/Solar_Plant.jpg",
             EnergyConsumption = -20
         });
         Buildings.Add(new Building
@@ -421,7 +253,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 120,
             BaseDeuteriumCost = 200,    
             ConstructionDuration = TimeSpan.Parse("00:01:00"),
-             Image = "buildings/building5.jpg",
+             Image = "assets/buildings/Robotics_Factory.jpg",
             EnergyConsumption = 30
         });
 
@@ -433,7 +265,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 360,
             BaseDeuteriumCost = 180,    
             ConstructionDuration = TimeSpan.Parse("00:00:45"),
-             Image = "buildings/building14.jpg",
+             Image = "assets/buildings/Fusion_Reactor.jpg",
             EnergyConsumption = 0 // Special handling: Produces Energy, Consumes Deuterium
         });
 
@@ -445,7 +277,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 40000,
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:10:00"),
-             Image = "buildings/building15.jpg",
+             Image = "assets/buildings/Alliance_Depot.jpg",
             EnergyConsumption = 0
         });
 
@@ -457,7 +289,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 200,
             BaseDeuteriumCost = 100,    
             ConstructionDuration = TimeSpan.Parse("00:01:30"),
-             Image = "buildings/building6.jpg",
+             Image = "assets/buildings/Shipyard.jpg",
             EnergyConsumption = 0 // Shipyard does not consume energy continuously in OGame logic usually, unless active? Let's keep 0 for base.
         });
         Buildings.Add(new Building
@@ -468,7 +300,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 0,
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:45"),
-             Image = "buildings/building7.jpg",
+             Image = "assets/buildings/Metal_Storage.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -479,7 +311,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 500, // Updated
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:50"),
-             Image = "buildings/building8.jpg",
+             Image = "assets/buildings/Crystal_Storage.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -490,7 +322,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 1000, // Updated
             BaseDeuteriumCost = 0,    
             ConstructionDuration = TimeSpan.Parse("00:00:55"),
-             Image = "buildings/building9.jpg",
+             Image = "assets/buildings/Deuterium_Tank.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -501,7 +333,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 400, // Updated
             BaseDeuteriumCost = 200,    
             ConstructionDuration = TimeSpan.Parse("00:01:15"),
-             Image = "buildings/building10.jpg",
+             Image = "assets/buildings/Research_Lab.jpg",
             EnergyConsumption = 0 // Lab doesn't consume energy passively usually
         });
 
@@ -513,7 +345,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 50000, // Updated
             BaseDeuteriumCost = 100000, // Updated
             ConstructionDuration = TimeSpan.Parse("01:00:00"),
-             Image = "buildings/building11.jpg",
+             Image = "assets/buildings/Terraformer.jpg",
             EnergyConsumption = 0 // Consumes energy only for BUILD cost usually? Or passive? OGame Terraformer cost includes Energy!
             // Note: Building cost logic needs to handle Energy cost if we want to be strict.
         });
@@ -526,7 +358,7 @@ private bool _isInitialized = false;
             BaseCrystalCost = 20000,
             BaseDeuteriumCost = 1000,    
             ConstructionDuration = TimeSpan.Parse("00:05:00"),
-             Image = "buildings/building12.jpg",
+             Image = "assets/buildings/Missile_Silo.jpg",
             EnergyConsumption = 0
         });
         Buildings.Add(new Building
@@ -537,237 +369,93 @@ private bool _isInitialized = false;
             BaseCrystalCost = 500000,
             BaseDeuteriumCost = 100000,    
             ConstructionDuration = TimeSpan.Parse("02:00:00"),
-             Image = "buildings/building13.jpg",
+             Image = "assets/buildings/Nanite_Factory.jpg",
             EnergyConsumption = 0 // Nanite doesn't consume energy
         });
     }
 
-    public async Task AddToQueueAsync(Building building)
+    public void AddToQueue(Building building)
     {
-        if (GetCurrentPlanetQueue().Count >= MaxQueueSize) return;
+        // Important: Update resources before spending them!
+        UpdateProduction();
 
-        int queuedSameBuilding = GetCurrentPlanetQueue().Count(q => q.Title == building.Title);
-        var queueBuilding = CreateQueueDisplayBuilding(building.Title, building.Level + queuedSameBuilding);
-        if (queueBuilding == null) return;
-
-        if (await _resourceService.HasResourcesAsync(queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost))
+        if (ConstructionQueue.Count >= 5) return;
+        
+        if (_resourceService.HasResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost))
         {
-            await _resourceService.ConsumeResourcesAsync(queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost);
-            _rankingService?.AddSpendingPoints(RankingService.PlayerKey, RankingService.PlayerName, false, queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost);
+            _resourceService.ConsumeResources(building.MetalCost, building.CrystalCost, building.DeuteriumCost);
+            
+            // Set initial state for queue
+            var duration = _devModeService.GetDuration(building.Duration, 0);
+            building.ConstructionDuration = duration;
+            building.TimeRemaining = duration;
+            
+            ConstructionQueue.Add(building);
+            NotifyStateChanged();
 
-            var calculatedDuration = CalculateConstructionDuration(queueBuilding);
-            var duration = _devModeService.GetDuration(calculatedDuration, 1);
-            int g = _playerStateService.ActiveGalaxy;
-            int s = _playerStateService.ActiveSystem;
-            int p = _playerStateService.ActivePosition;
-
-            _allConstructionQueue.Add(new QueuedBuildingState
+            if (!_isProcessingQueue)
             {
-                Title = building.Title,
-                LevelBeforeUpgrade = queueBuilding.Level,
-                ConstructionDuration = duration,
-                TimeRemaining = duration,
-                Galaxy = g,
-                System = s,
-                Position = p
-            });
+                _ = ProcessQueue();
+            }
+        }
+    }
 
-            await PersistQueueForPlanetAsync(g, s, p);
-            SyncVisibleConstructionQueue();
+    public void Cancel(Building building)
+    {
+        if (ConstructionQueue.Contains(building))
+        {
+            ConstructionQueue.Remove(building);
+            building.IsBuilding = false;
+            building.TimeRemaining = TimeSpan.Zero;
+            // Optionally refund resources here
             NotifyStateChanged();
         }
     }
 
-    public async Task CancelAsync(Building building)
+    private async Task ProcessQueue()
     {
-        var queuedItem = GetCurrentPlanetQueue().FirstOrDefault(q => q.Title == building.Title && q.LevelBeforeUpgrade == building.Level);
-        if (queuedItem == null) return;
+        _isProcessingQueue = true;
 
-        var queueBuilding = CreateQueueDisplayBuilding(queuedItem.Title, queuedItem.LevelBeforeUpgrade);
-        if (queueBuilding == null) return;
-
-        await _resourceService.RefundResourcesAsync(queueBuilding.MetalCost, queueBuilding.CrystalCost, queueBuilding.DeuteriumCost);
-        _allConstructionQueue.Remove(queuedItem);
-        await PersistQueueForPlanetAsync(queuedItem.Galaxy, queuedItem.System, queuedItem.Position);
-        SyncVisibleConstructionQueue();
-        NotifyStateChanged();
-    }
-
-    private async Task ProcessQueueLoop()
-    {
-        while (true)
+        while (ConstructionQueue.Count > 0)
         {
-            foreach (var queueGroup in _allConstructionQueue.GroupBy(q => $"{q.Galaxy}:{q.System}:{q.Position}").ToList())
+            var currentBuilding = ConstructionQueue[0];
+            currentBuilding.IsBuilding = true;
+            NotifyStateChanged();
+
+            while (currentBuilding.TimeRemaining > TimeSpan.Zero)
             {
-                var currentItem = queueGroup.FirstOrDefault();
-                if (currentItem == null) continue;
+                // Check if building was cancelled
+                if(!ConstructionQueue.Contains(currentBuilding)) break;
 
-                currentItem.IsBuilding = true;
-                currentItem.TimeRemaining = currentItem.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
-
-                if (currentItem.TimeRemaining <= TimeSpan.Zero)
-                {
-                    currentItem.IsBuilding = false;
-                    await IncrementBuildingLevelForPlanetAsync(currentItem.Title, currentItem.Galaxy, currentItem.System, currentItem.Position);
-                    _allConstructionQueue.Remove(currentItem);
-                    await PersistQueueForPlanetAsync(currentItem.Galaxy, currentItem.System, currentItem.Position);
-
-                    if (IsCurrentPlanet(currentItem.Galaxy, currentItem.System, currentItem.Position))
-                    {
-                        await _resourceService.SettleActivePlanetResourcesAsync();
-                        await LoadFromDatabaseAsync();
-                        await UpdateProductionAsync();
-                    }
-
-                    _ = _enemyService.OnPlayerBuildingUpgraded(currentItem.Title);
-                }
+                await Task.Delay(1000);
+                currentBuilding.TimeRemaining = currentBuilding.TimeRemaining.Subtract(TimeSpan.FromSeconds(1));
+                NotifyStateChanged();
             }
 
-            SyncVisibleConstructionQueue();
+            // Check again if cancelled
+            if(!ConstructionQueue.Contains(currentBuilding)) continue;
+
+            // Upgrade Logic
+            currentBuilding.IsBuilding = false;
+
+            // CRITICAL: Update production resources based on OLD levels before upgrading
+            // This ensures we don't calculate the past duration with the NEW production rate
+            UpdateProduction();
+            
+            // Energy update is now handled INSIDE UpdateProduction(), so we don't need manual logic here anymore.
+            // Just increment level and recalculate.
+
+            currentBuilding.Level++;
+            
+            ConstructionQueue.RemoveAt(0);
+            
+            // Recalculate production rates (and energy) with new levels
+            UpdateProduction();
+            
             NotifyStateChanged();
-            await Task.Delay(1000);
-        }
-    }
-
-    private void SyncVisibleConstructionQueue()
-    {
-        ConstructionQueue = GetCurrentPlanetQueue()
-            .Select(q =>
-            {
-                var queueBuilding = CreateQueueDisplayBuilding(q.Title, q.LevelBeforeUpgrade);
-                if (queueBuilding == null) return null;
-
-                queueBuilding.ConstructionDuration = q.ConstructionDuration;
-                queueBuilding.TimeRemaining = q.TimeRemaining;
-                queueBuilding.IsBuilding = q.IsBuilding;
-                return queueBuilding;
-            })
-            .Where(q => q != null)
-            .Cast<Building>()
-            .ToList();
-    }
-
-    private List<QueuedBuildingState> GetCurrentPlanetQueue()
-    {
-        return _allConstructionQueue
-            .Where(q => IsCurrentPlanet(q.Galaxy, q.System, q.Position))
-            .OrderBy(q => q.Id)
-            .ToList();
-    }
-
-    private bool IsCurrentPlanet(int galaxy, int system, int position)
-    {
-        return galaxy == _playerStateService.ActiveGalaxy &&
-               system == _playerStateService.ActiveSystem &&
-               position == _playerStateService.ActivePosition;
-    }
-
-    private Building? CreateQueueDisplayBuilding(string title, int level)
-    {
-        var source = Buildings.FirstOrDefault(b => b.Title == title);
-        if (source == null) return null;
-
-        return new Building
-        {
-            Title = source.Title,
-            Description = source.Description,
-            Image = source.Image,
-            BaseMetalCost = source.BaseMetalCost,
-            BaseCrystalCost = source.BaseCrystalCost,
-            BaseDeuteriumCost = source.BaseDeuteriumCost,
-            BaseDuration = source.BaseDuration,
-            EnergyConsumption = source.EnergyConsumption,
-            Scaling = source.Scaling,
-            Dependencies = new(source.Dependencies),
-            Level = level
-        };
-    }
-
-    public bool IsQueued(string buildingTitle)
-    {
-        return GetCurrentPlanetQueue().Any(q => q.Title == buildingTitle);
-    }
-
-    public Building? GetQueuedBuilding(string buildingTitle)
-    {
-        var queuedItem = GetCurrentPlanetQueue().FirstOrDefault(q => q.Title == buildingTitle);
-        if (queuedItem == null) return null;
-
-        var queueBuilding = CreateQueueDisplayBuilding(queuedItem.Title, queuedItem.LevelBeforeUpgrade);
-        if (queueBuilding == null) return null;
-
-        queueBuilding.ConstructionDuration = queuedItem.ConstructionDuration;
-        queueBuilding.TimeRemaining = queuedItem.TimeRemaining;
-        queueBuilding.IsBuilding = queuedItem.IsBuilding;
-        return queueBuilding;
-    }
-
-    private async Task IncrementBuildingLevelForPlanetAsync(string buildingTitle, int g, int s, int p)
-    {
-        var dbBuilding = await _dbContext.Buildings.FirstOrDefaultAsync(b =>
-            b.BuildingType == buildingTitle && b.Galaxy == g && b.System == s && b.Position == p);
-        if (dbBuilding == null) return;
-
-        dbBuilding.Level++;
-        await _dbContext.SaveChangesAsync();
-    }
-
-    private async Task PersistQueueForPlanetAsync(int g, int s, int p)
-    {
-        var planetQueue = _allConstructionQueue
-            .Where(q => q.Galaxy == g && q.System == s && q.Position == p)
-            .OrderBy(q => q.Id)
-            .ToList();
-
-        var existing = await _dbContext.BuildingQueue
-            .Where(q => q.Galaxy == g && q.System == s && q.Position == p)
-            .ToListAsync();
-
-        if (existing.Any())
-        {
-            _dbContext.BuildingQueue.RemoveRange(existing);
-            await _dbContext.SaveChangesAsync();
         }
 
-        if (!planetQueue.Any()) return;
-
-        DateTime nextStart = DateTime.UtcNow;
-        var entities = new List<BuildingQueueEntity>();
-
-        for (int i = 0; i < planetQueue.Count; i++)
-        {
-            var item = planetQueue[i];
-            item.IsBuilding = i == 0;
-            item.TimeRemaining = i == 0 ? GetRemainingDuration(item.TimeRemaining, item.ConstructionDuration) : item.ConstructionDuration;
-
-            DateTime startTime = nextStart;
-            DateTime endTime = startTime.Add(item.TimeRemaining);
-            nextStart = endTime;
-
-            entities.Add(new BuildingQueueEntity
-            {
-                Id = item.Id,
-                BuildingType = item.Title,
-                TargetLevel = item.LevelBeforeUpgrade,
-                Galaxy = g,
-                System = s,
-                Position = p,
-                StartTime = startTime,
-                EndTime = endTime,
-                IsProcessing = item.IsBuilding,
-                QueuePosition = i
-            });
-        }
-
-        await _dbContext.BuildingQueue.AddRangeAsync(entities);
-        await _dbContext.SaveChangesAsync();
-    }
-
-    private static TimeSpan GetRemainingDuration(TimeSpan remaining, TimeSpan fallback)
-    {
-        if (remaining <= TimeSpan.Zero) return fallback;
-        if (remaining > fallback) return fallback;
-        return remaining;
+        _isProcessingQueue = false;
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
@@ -778,6 +466,3 @@ private bool _isInitialized = false;
         return building?.Level ?? 0;
     }
 }
-
-
-

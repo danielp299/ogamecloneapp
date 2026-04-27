@@ -1,0 +1,1 @@
+Superheated green plasma ball, magnetic containment field, volatile energy, extreme heat visualization, OGame art style.

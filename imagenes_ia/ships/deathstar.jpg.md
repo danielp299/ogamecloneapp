@@ -1,0 +1,1 @@
+A colossal spherical battle station, moon-sized, complex surface details like a trench run, massive superlaser dish, terrifying and ominous, dark metallic grey, stars in background, OGame art style.

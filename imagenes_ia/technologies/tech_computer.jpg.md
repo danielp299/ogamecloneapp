@@ -1,0 +1,1 @@
+Futuristic supercomputer core, server racks with blinking lights, neural network visualization, glowing nodes, digital complexity, OGame art style.

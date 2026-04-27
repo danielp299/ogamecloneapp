@@ -1,0 +1,1 @@
+A defensive weapon system named laserCannon, turret or cannon, sci-fi military style, OGame art style.

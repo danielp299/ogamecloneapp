@@ -1,0 +1,1 @@
+Rapid fire laser turret, small and agile mount, red lens, defensive emplacement, OGame art style.

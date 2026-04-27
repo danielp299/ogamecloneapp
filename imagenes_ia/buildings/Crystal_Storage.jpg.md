@@ -1,0 +1,1 @@
+Large containment vessels made of reinforced glass and metal, glowing blue crystals visible inside, high-tech storage facility, OGame art style.

@@ -1,0 +1,1 @@
+Massive shield generator facility, projecting a thick energy dome into the sky, heavy power cables, fortress look, OGame art style.

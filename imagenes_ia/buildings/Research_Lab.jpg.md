@@ -1,0 +1,1 @@
+A scientific complex, large radar dishes, communication spires, clean white or silver aesthetic, data streams or holographic displays visible through windows, OGame art style.

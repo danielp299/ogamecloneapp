@@ -1,0 +1,1 @@
+A heavy destroyer class spaceship, flat and wide design, bristling with weaponry, multiple engine banks, imposing presence, dark space background, OGame art style.

@@ -1,0 +1,1 @@
+Formidable plasma projector, glowing green energy sphere in the barrel, heavy armor, ultimate planetary defense, OGame art style.

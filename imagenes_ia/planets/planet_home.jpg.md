@@ -1,0 +1,1 @@
+A beautiful terran-like planet, blue oceans, green continents, white clouds, viewed from space, sunlight reflecting off water, habitable and lush, OGame art style.

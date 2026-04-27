@@ -1,0 +1,1 @@
+A sci-fi image representing favicon, detailed, OGame art style.

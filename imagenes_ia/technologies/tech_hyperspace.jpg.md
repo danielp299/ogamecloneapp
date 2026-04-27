@@ -1,0 +1,1 @@
+Warp tunnel effect, streaks of starlight, bending space-time, purple and blue colors, speed and travel concept, OGame art style.

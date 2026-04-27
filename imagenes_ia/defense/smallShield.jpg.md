@@ -1,0 +1,1 @@
+Planetary shield generator, small dome emitting a faint blue barrier, defensive outpost, OGame art style.

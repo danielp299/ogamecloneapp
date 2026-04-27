@@ -1,0 +1,1 @@
+High-tech ion cannon turret, glowing blue energy emitter, sleek white and grey casing, shield stripping weapon, OGame art style.

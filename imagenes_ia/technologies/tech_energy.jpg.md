@@ -1,0 +1,1 @@
+Abstract visualization of raw energy, lightning arcs, battery cell or plasma containment, yellow and white glowing core, power technology, OGame art style.

@@ -1,0 +1,1 @@
+A sci-fi image representing crystal-icon, detailed, OGame art style.

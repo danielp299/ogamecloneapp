@@ -1,0 +1,1 @@
+Line of defensive turrets firing into the sky, lasers and missiles, explosions in the upper atmosphere, planetary defense grid, action shot, OGame art style.

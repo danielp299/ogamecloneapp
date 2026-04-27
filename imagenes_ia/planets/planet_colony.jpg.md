@@ -1,0 +1,1 @@
+A rocky colonization planet, craters, thin atmosphere, some settlements visible from space, reddish or brownish terrain, OGame art style.

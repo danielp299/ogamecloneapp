@@ -1,0 +1,1 @@
+A massive chemical processing plant, large cylindrical centrifuges, glowing green or blue liquids in pipes, steam venting, located in a desolate or icy environment, OGame art style.

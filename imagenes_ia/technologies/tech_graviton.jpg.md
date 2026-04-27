@@ -1,0 +1,1 @@
+Black hole visualization or gravity well, purple distortion grid, bending light, advanced physics concept, OGame art style.

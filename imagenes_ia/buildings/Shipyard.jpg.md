@@ -1,0 +1,1 @@
+A massive orbital or ground-based drydock, spaceship under construction, scaffolding, cranes, sparks, vast scale, open hangar doors, OGame art style.
